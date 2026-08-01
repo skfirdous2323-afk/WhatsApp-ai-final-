@@ -9,7 +9,6 @@ supabase
 !README.md
 .env*
 !.env.local.example
-Dockerfile
 docker-compose*.yml
 .dockerignore
 .vscode
