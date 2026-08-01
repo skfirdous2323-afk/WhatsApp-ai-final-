@@ -135,7 +135,10 @@ export function InviteMemberDialog({
         // string if `account` hasn't loaded yet (shouldn't happen
         // — the dialog requires admin+ which requires a loaded
         // profile — but stay safe).
-        accountName: account?.name ?? 'our wacrm account',
+
+accountName: account?.name ?? 'our ZIVEXO CRM workspace'
+
+
       });
       onCreated();
     } catch (err) {

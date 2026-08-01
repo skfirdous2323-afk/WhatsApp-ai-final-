@@ -21,11 +21,15 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: {
-    default: "wacrm",
-    template: "%s — wacrm",
-  },
-  description: "Self-hostable CRM template for WhatsApp.",
+
+
+title: {
+  default: "ZIVEXO CRM",
+  template: "%s — ZIVEXO CRM",
+},
+
+
+description: "Professional WhatsApp CRM by ZIVEXO.",
   robots: {
     index: false,
     follow: false,
