@@ -1,142 +1,271 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 export default function WhatsAppBotPage() {
+  const supabase = createClient();
+
+  const [clinicName, setClinicName] = useState("");
+  const [clinicType, setClinicType] = useState("Dental");
+  const [doctorName, setDoctorName] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [googleMaps, setGoogleMaps] = useState("");
+
+  const [loading, setLoading] = useState(false);
+
+  async function saveClinic() {
+    try {
+      setLoading(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert("Please login first.");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("clinics")
+        .insert({
+          user_id: user.id,
+          clinic_name: clinicName,
+          clinic_type: clinicType,
+          doctor_name: doctorName,
+          whatsapp_number: whatsappNumber,
+          phone_number: phoneNumber,
+          email,
+          address,
+          google_maps: googleMaps,
+        });
+
+      if (error) {
+        alert(error.message);
+        return;
+      }
+
+      alert("✅ Clinic information saved successfully.");
+    } catch (err) {
+      console.error(err);
+      alert("Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-4xl rounded-xl border bg-white p-8 shadow">
-        <h1 className="mb-2 text-3xl font-bold">
+return (
+  <div className="min-h-screen bg-gray-100 p-8">
+    <div className="mx-auto max-w-5xl rounded-2xl bg-white p-8 shadow-lg">
+
+      <h1 className="mb-2 text-3xl font-bold text-gray-900">
+        WhatsApp Bot Setup
+      </h1>
+
+      <p className="mb-8 text-gray-600">
+        Step 1 of 6 – Clinic Information
+      </p>
+
+      <div className="grid gap-6 md:grid-cols-2">
+<div>
+  <label className="mb-2 block font-medium text-gray-900">
+    Phone Number
+  </label>
+
+  <input
+    type="text"
+    value={phoneNumber}
+    onChange={(e) => setPhoneNumber(e.target.value)}
+    placeholder="+91XXXXXXXXXX"
+    className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900"
+  />
+</div>
+
+<div>
+  <label className="mb-2 block font-medium text-gray-900">
+    Email
+  </label>
+
+  <input
+    type="email"
+    value={email}
+    onChange={(e) => setEmail(e.target.value)}
+    placeholder="clinic@email.com"
+    className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900"
+  />
+</div>
+
+<div>
+  <label className="mb-2 block font-medium text-gray-900">
+    Address *
+  </label>
+
+  <textarea
+    rows={3}
+    value={address}
+    onChange={(e) => setAddress(e.target.value)}
+    placeholder="Clinic Address"
+    className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900"
+  />
+</div>
+
+<div className="md:col-span-2">
+  <label className="mb-2 block font-medium text-gray-900">
+    Google Maps Link
+  </label>
+
+  <input
+    type="text"
+    value={googleMaps}
+    onChange={(e) => setGoogleMaps(e.target.value)}
+    placeholder="https://maps.google.com/..."
+    className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900"
+  />
+</div>
+
+
+    <div className="min-h-screen bg-gray-100 p-8">
+      <div className="mx-auto max-w-5xl rounded-xl bg-white p-8 shadow">
+
+        <h1 className="mb-2 text-3xl font-bold text-gray-900">
           WhatsApp Bot Setup
         </h1>
 
-        <p className="mb-8 text-gray-500">
+        <p className="mb-8 text-gray-600">
           Step 1 of 6 – Clinic Information
         </p>
 
         <div className="grid gap-6 md:grid-cols-2">
+
           <div>
-            <label className="mb-2 block font-medium">
+            <label className="mb-2 block font-medium text-gray-800">
               Clinic Name *
             </label>
             <input
               type="text"
-              placeholder="Smile Care Dental Clinic"
-              className="w-full rounded-lg border p-3"
+              value={clinicName}
+              onChange={(e) => setClinicName(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-black"
             />
           </div>
 
           <div>
-            <label className="mb-2 block font-medium">
-              Clinic Logo
-            </label>
-            <input
-              type="file"
-              className="w-full rounded-lg border p-2"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block font-medium">
+            <label className="mb-2 block font-medium text-gray-800">
               Clinic Type
             </label>
-
-            <select className="w-full rounded-lg border p-3">
+            <select
+              value={clinicType}
+              onChange={(e) => setClinicType(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-black"
+            >
               <option>Dental</option>
               <option>General</option>
               <option>Eye</option>
               <option>Skin</option>
               <option>ENT</option>
               <option>Orthopedic</option>
-              <option>Other</option>
             </select>
           </div>
 
           <div>
-            <label className="mb-2 block font-medium">
-              Doctor Name *
+            <label className="mb-2 block font-medium text-gray-800">
+              Doctor Name
             </label>
-
             <input
               type="text"
-              placeholder="Dr. John Smith"
-              className="w-full rounded-lg border p-3"
+              value={doctorName}
+              onChange={(e) => setDoctorName(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-black"
             />
           </div>
 
           <div>
-            <label className="mb-2 block font-medium">
-              WhatsApp Number *
+            <label className="mb-2 block font-medium text-gray-800">
+              WhatsApp Number
             </label>
-
             <input
               type="text"
-              placeholder="+91XXXXXXXXXX"
-              className="w-full rounded-lg border p-3"
+              value={whatsappNumber}
+              onChange={(e) => setWhatsappNumber(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-black"
             />
           </div>
 
           <div>
-            <label className="mb-2 block font-medium">
+            <label className="mb-2 block font-medium text-gray-800">
               Phone Number
             </label>
-
             <input
               type="text"
-              placeholder="+91XXXXXXXXXX"
-              className="w-full rounded-lg border p-3"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-black"
             />
           </div>
 
           <div>
-            <label className="mb-2 block font-medium">
+            <label className="mb-2 block font-medium text-gray-800">
               Email
             </label>
-
             <input
               type="email"
-              placeholder="clinic@email.com"
-              className="w-full rounded-lg border p-3"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block font-medium">
-              Address *
-            </label>
-
-            <textarea
-              rows={3}
-              placeholder="Clinic Address"
-              className="w-full rounded-lg border p-3"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-black"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="mb-2 block font-medium">
-              Google Maps Link
+            <label className="mb-2 block font-medium text-gray-800">
+              Address
             </label>
-
-            <input
-              type="text"
-              placeholder="https://maps.google.com/..."
-              className="w-full rounded-lg border p-3"
+            <textarea
+              rows={3}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-black"
             />
           </div>
+
+          <div className="md:col-span-2">
+            <label className="mb-2 block font-medium text-gray-800">
+              Google Maps Link
+            </label>
+            <input
+              type="text"
+              value={googleMaps}
+              onChange={(e) => setGoogleMaps(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-black"
+            />
+          </div>
+
         </div>
 
         <div className="mt-8 flex justify-between">
-          <button className="rounded-lg bg-green-600 px-6 py-3 font-semibold text-white hover:bg-green-700">
-            Save Clinic Information
+
+          <button
+            onClick={saveClinic}
+            disabled={loading}
+            className="rounded-lg bg-green-600 px-6 py-3 font-semibold text-white hover:bg-green-700"
+          >
+            {loading ? "Saving..." : "Save Clinic"}
           </button>
 
           <Link
             href="/whatsapp-bot/doctors"
-            className="rounded-lg border border-green-600 px-6 py-3 font-semibold text-green-600 hover:bg-green-50"
+            className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white hover:bg-blue-700"
           >
-            Next → Doctors
+            Next →
           </Link>
+
         </div>
+
       </div>
     </div>
   );
