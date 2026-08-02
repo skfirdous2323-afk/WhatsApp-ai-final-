@@ -59,9 +59,11 @@ export default function WhatsAppBotPage() {
     }
   }
 
-  return (
 return (
   <div className="min-h-screen bg-gray-100 p-8">
+
+
+
     <div className="mx-auto max-w-5xl rounded-2xl bg-white p-8 shadow-lg">
 
       <h1 className="mb-2 text-3xl font-bold text-gray-900">
