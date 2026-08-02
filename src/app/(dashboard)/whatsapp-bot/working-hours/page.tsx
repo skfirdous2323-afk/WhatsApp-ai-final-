@@ -863,10 +863,16 @@ export default function WorkingHoursPage() {
               ← Previous
             </Link>
             <Link
-              href="/whatsapp-bot/appointment-settings"
+
+
+href="/whatsapp-bot/review-and-publish"
+
+
               className="rounded-lg bg-gradient-to-r from-green-600 to-green-700 px-6 py-2.5 font-semibold text-white hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg"
             >
-              Next → Appointment Settings
+              Next → Review & Publish
+
+
             </Link>
           </div>
         </div>
