@@ -91,7 +91,7 @@ const { data: existingClinic } = await supabase
   .eq("user_id", user.id)
   .single();
 
-.
+
       // Upload logo if exists
       let logoUrl = null;
       if (logo) {
