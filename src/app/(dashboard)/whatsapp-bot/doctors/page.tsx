@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/utils/supabase/client";
+
 interface Doctor {
   id?: string;
   name: string;
@@ -28,7 +29,6 @@ export default function DoctorsPage() {
   
   const supabase = createClient();
 
-  // Load doctors on component mount
   useEffect(() => {
     loadDoctors();
   }, []);
@@ -59,7 +59,6 @@ export default function DoctorsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form
     if (!formData.name || !formData.specialization || !formData.qualification) {
       showMessage('error', 'Please fill in all required fields');
       return;
@@ -68,7 +67,6 @@ export default function DoctorsPage() {
     setIsSaving(true);
     try {
       if (editingId) {
-        // Update existing doctor
         const { error } = await supabase
           .from('doctors')
           .update({
@@ -83,7 +81,6 @@ export default function DoctorsPage() {
         if (error) throw error;
         showMessage('success', 'Doctor updated successfully');
       } else {
-        // Add new doctor
         const { error } = await supabase
           .from('doctors')
           .insert([{
@@ -98,7 +95,6 @@ export default function DoctorsPage() {
         showMessage('success', 'Doctor added successfully');
       }
 
-      // Reset form and reload data
       resetForm();
       await loadDoctors();
     } catch (error) {
@@ -118,7 +114,6 @@ export default function DoctorsPage() {
       fees: doctor.fees || ""
     });
     setEditingId(doctor.id || null);
-    // Scroll to form
     document.getElementById('doctor-form')?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -164,24 +159,24 @@ export default function DoctorsPage() {
       <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Doctor Management</h1>
               <p className="mt-1 text-gray-600">Step 2 of 6 – Manage your medical professionals</p>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
                 {doctors.length} Doctors
               </span>
               <Link
                 href="/whatsapp-bot"
-                className="rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 ← Previous
               </Link>
               <Link
                 href="/whatsapp-bot/services"
-                className="rounded-lg bg-gradient-to-r from-green-600 to-green-700 px-6 py-2 font-semibold text-white hover:from-green-700 hover:to-green-800 transition-all shadow-lg hover:shadow-xl"
+                className="rounded-lg bg-gradient-to-r from-green-600 to-green-700 px-6 py-2 text-sm font-semibold text-white hover:from-green-700 hover:to-green-800 transition-all shadow-lg hover:shadow-xl"
               >
                 Next → Services
               </Link>
@@ -286,7 +281,7 @@ export default function DoctorsPage() {
                   />
                 </div>
 
-                <div className="flex space-x-3 pt-2">
+                <div className="flex gap-3 pt-2">
                   <button
                     type="submit"
                     disabled={isSaving}
@@ -309,7 +304,7 @@ export default function DoctorsPage() {
                     <button
                       type="button"
                       onClick={resetForm}
-                      className="rounded-lg border border-gray-300 px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 rounded-lg border border-gray-300 font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                     >
                       Cancel
                     </button>
@@ -322,7 +317,7 @@ export default function DoctorsPage() {
           {/* Doctors List Section */}
           <div className="lg:col-span-2">
             <div className="rounded-xl bg-white p-6 shadow-xl border border-gray-100">
-              <div className="mb-6 flex items-center justify-between">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-xl font-semibold text-gray-900">Doctor List</h2>
                 <span className="text-sm text-gray-500">{doctors.length} total</span>
               </div>
@@ -346,15 +341,15 @@ export default function DoctorsPage() {
                       key={doctor.id}
                       className="group rounded-lg border border-gray-200 bg-white p-4 hover:border-blue-300 hover:shadow-md transition-all"
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3">
-                            <h3 className="text-lg font-semibold text-gray-900">{doctor.name}</h3>
-                            <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-lg font-semibold text-gray-900 truncate">{doctor.name}</h3>
+                            <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 whitespace-nowrap">
                               {doctor.specialization}
                             </span>
                           </div>
-                          <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 text-sm">
                             <div>
                               <span className="font-medium text-gray-600">Qualification:</span>
                               <span className="ml-1 text-gray-800">{doctor.qualification}</span>
@@ -366,23 +361,23 @@ export default function DoctorsPage() {
                               </div>
                             )}
                             {doctor.fees && (
-                              <div className="col-span-2">
+                              <div className="sm:col-span-2">
                                 <span className="font-medium text-gray-600">Fees:</span>
                                 <span className="ml-1 font-semibold text-green-600">₹{doctor.fees}</span>
                               </div>
                             )}
                           </div>
                         </div>
-                        <div className="ml-4 flex space-x-2">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           <button
                             onClick={() => handleEdit(doctor)}
-                            className="rounded-lg px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+                            className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleRemove(doctor.id!)}
-                            className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                            className="px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           >
                             Remove
                           </button>
