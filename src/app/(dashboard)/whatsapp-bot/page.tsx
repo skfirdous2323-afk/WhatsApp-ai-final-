@@ -36,7 +36,6 @@ export default function WhatsAppBotPage() {
           user_id: user.id,
           clinic_name: clinicName,
           clinic_type: clinicType,
-          doctor_name: doctorName,
           whatsapp_number: whatsappNumber,
           phone_number: phoneNumber,
           email,
