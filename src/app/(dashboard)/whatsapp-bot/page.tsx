@@ -9,7 +9,6 @@ export default function WhatsAppBotPage() {
 
   const [clinicName, setClinicName] = useState("");
   const [clinicType, setClinicType] = useState("Dental");
-  const [doctorName, setDoctorName] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
@@ -102,18 +101,6 @@ export default function WhatsAppBotPage() {
             </select>
           </div>
 
-          <div>
-            <label className="mb-2 block font-medium text-gray-900">
-              Doctor Name
-            </label>
-            <input
-              type="text"
-              value={doctorName}
-              onChange={(e) => setDoctorName(e.target.value)}
-              placeholder="Dr. Name"
-              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900"
-            />
-          </div>
 
           <div>
             <label className="mb-2 block font-medium text-gray-900">
