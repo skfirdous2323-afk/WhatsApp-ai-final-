@@ -117,13 +117,16 @@ export default function ReviewPage() {
 
       // Update summary
       const workingDays = workingHours?.filter(h => h.is_open).length || 0;
-      const hasDoctors = doctors && doctors.length > 0;
-      const hasServices = services && services.length > 0;
-      const hasClinic = clinic && clinic.clinic_name;
-      const hasWhatsApp = clinic && clinic.whatsapp_number;
-      const hasWelcome = welcomeMessage && welcomeMessage.welcome_message;
-      const hasFaq = faq && faq.length > 0;
-      const hasAI = aiSettings && aiSettings.is_enabled;
+const hasDoctors = (doctors?.length ?? 0) > 0;
+const hasServices = (services?.length ?? 0) > 0;
+
+const hasClinic = !!clinic?.clinic_name;
+
+const hasWhatsApp = !!clinic?.whatsapp_number;
+const hasWelcome = !!welcomeMessage?.welcome_message;
+const hasFaq = (faq?.length ?? 0) > 0;
+const hasAI = !!aiSettings?.is_enabled;
+
 
       // Check if bot is already published
       const botStatus = clinic?.bot_status === 'published' ? 'Published' : 
