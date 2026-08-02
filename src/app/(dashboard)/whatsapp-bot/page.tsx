@@ -122,7 +122,7 @@ const { data: existingClinic } = await supabase
         email,
         address,
         google_maps: googleMaps,
-        logo_url: logoUrl,
+clinic_logo: logoUrl,
         language,
         timezone,
         website,

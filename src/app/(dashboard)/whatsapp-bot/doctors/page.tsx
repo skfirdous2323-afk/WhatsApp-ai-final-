@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+
 interface Doctor {
   id?: string;
   name: string;
@@ -25,7 +26,7 @@ export default function DoctorsPage() {
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  
+
   const supabase = createClient();
 
   useEffect(() => {
@@ -35,13 +36,57 @@ export default function DoctorsPage() {
   const loadDoctors = async () => {
     setIsLoading(true);
     try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+
+
+
+const { data: clinic, error: clinicError } = await supabase
+  .from("clinics")
+  .select("id")
+  .eq("user_id", user.id)
+  .order("created_at", { ascending: false })
+  .limit(1)
+  .single();
+
+if (clinicError || !clinic) {
+  throw new Error("Clinic not found");
+}
+
+const clinicId = clinic.id;
+
+
+
+
+
+      if (profileError || !profile?.clinic_id) {
+        throw new Error('Clinic not found for this user');
+      }
+
+      // Load doctors for this clinic
       const { data, error } = await supabase
-        .from('doctors')
+        .from('clinic_doctors')
         .select('*')
+        .eq('clinic_id', profile.clinic_id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setDoctors(data || []);
+      
+      // Map database fields to interface
+      const mappedDoctors = data?.map(doc => ({
+        id: doc.id,
+        name: doc.doctor_name,
+        specialization: doc.specialization,
+        qualification: doc.qualification,
+        experience: doc.experience || "",
+        fees: doc.consultation_fee || ""
+      })) || [];
+      
+      setDoctors(mappedDoctors);
     } catch (error) {
       console.error('Error loading doctors:', error);
       showMessage('error', 'Failed to load doctors');
@@ -57,7 +102,7 @@ export default function DoctorsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.specialization || !formData.qualification) {
       showMessage('error', 'Please fill in all required fields');
       return;
@@ -65,29 +110,51 @@ export default function DoctorsPage() {
 
     setIsSaving(true);
     try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Get clinic_id from user's profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('clinic_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.clinic_id) {
+        throw new Error('Clinic not found for this user');
+      }
+
       if (editingId) {
+        // Update existing doctor
         const { error } = await supabase
-          .from('doctors')
+          .from('clinic_doctors')
           .update({
-            name: formData.name,
+            doctor_name: formData.name,
             specialization: formData.specialization,
             qualification: formData.qualification,
             experience: formData.experience,
-            fees: formData.fees
+            consultation_fee: formData.fees
           })
-          .eq('id', editingId);
+          .eq('id', editingId)
+          .eq('clinic_id', profile.clinic_id);
 
         if (error) throw error;
         showMessage('success', 'Doctor updated successfully');
       } else {
+        // Add new doctor
         const { error } = await supabase
-          .from('doctors')
+          .from('clinic_doctors')
           .insert([{
-            name: formData.name,
+            clinic_id: profile.clinic_id,
+            user_id: user.id,
+            doctor_name: formData.name,
             specialization: formData.specialization,
             qualification: formData.qualification,
-            experience: formData.experience,
-            fees: formData.fees
+            experience: formData.experience || null,
+            consultation_fee: formData.fees || null
           }]);
 
         if (error) throw error;
@@ -98,7 +165,7 @@ export default function DoctorsPage() {
       await loadDoctors();
     } catch (error) {
       console.error('Error saving doctor:', error);
-      showMessage('error', `Failed to ${editingId ? 'update' : 'add'} doctor`);
+      showMessage('error', `Failed to ${editingId ? 'update' : 'add'} doctor: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSaving(false);
     }
@@ -121,10 +188,28 @@ export default function DoctorsPage() {
 
     setIsSaving(true);
     try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Get clinic_id from user's profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('clinic_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.clinic_id) {
+        throw new Error('Clinic not found for this user');
+      }
+
       const { error } = await supabase
-        .from('doctors')
+        .from('clinic_doctors')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('clinic_id', profile.clinic_id);
 
       if (error) throw error;
       showMessage('success', 'Doctor removed successfully');
@@ -298,7 +383,7 @@ export default function DoctorsPage() {
                       editingId ? 'Update Doctor' : 'Add Doctor'
                     )}
                   </button>
-                  
+
                   {editingId && (
                     <button
                       type="button"
