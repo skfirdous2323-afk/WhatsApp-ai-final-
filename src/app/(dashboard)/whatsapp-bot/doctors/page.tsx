@@ -17,7 +17,7 @@ export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState<Doctor>({
+  const [formData, setFormData] = useState({
     name: "",
     specialization: "",
     qualification: "",
@@ -33,6 +33,23 @@ export default function DoctorsPage() {
     loadDoctors();
   }, []);
 
+  // Helper function to get clinic ID
+  const getClinicId = async (userId: string) => {
+    const { data: clinic, error: clinicError } = await supabase
+      .from("clinics")
+      .select("id")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (clinicError || !clinic) {
+      throw new Error("Clinic not found");
+    }
+
+    return clinic.id;
+  };
+
   const loadDoctors = async () => {
     setIsLoading(true);
     try {
@@ -42,40 +59,18 @@ export default function DoctorsPage() {
         throw new Error('User not authenticated');
       }
 
-
-
-
-const { data: clinic, error: clinicError } = await supabase
-  .from("clinics")
-  .select("id")
-  .eq("user_id", user.id)
-  .order("created_at", { ascending: false })
-  .limit(1)
-  .single();
-
-if (clinicError || !clinic) {
-  throw new Error("Clinic not found");
-}
-
-const clinicId = clinic.id;
-
-
-
-
-
-      if (profileError || !profile?.clinic_id) {
-        throw new Error('Clinic not found for this user');
-      }
+      // Get clinic ID
+      const clinicId = await getClinicId(user.id);
 
       // Load doctors for this clinic
       const { data, error } = await supabase
         .from('clinic_doctors')
         .select('*')
-        .eq('clinic_id', profile.clinic_id)
+        .eq('clinic_id', clinicId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
+
       // Map database fields to interface
       const mappedDoctors = data?.map(doc => ({
         id: doc.id,
@@ -85,7 +80,7 @@ const clinicId = clinic.id;
         experience: doc.experience || "",
         fees: doc.consultation_fee || ""
       })) || [];
-      
+
       setDoctors(mappedDoctors);
     } catch (error) {
       console.error('Error loading doctors:', error);
@@ -116,16 +111,8 @@ const clinicId = clinic.id;
         throw new Error('User not authenticated');
       }
 
-      // Get clinic_id from user's profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('clinic_id')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError || !profile?.clinic_id) {
-        throw new Error('Clinic not found for this user');
-      }
+      // Get clinic ID
+      const clinicId = await getClinicId(user.id);
 
       if (editingId) {
         // Update existing doctor
@@ -139,7 +126,7 @@ const clinicId = clinic.id;
             consultation_fee: formData.fees
           })
           .eq('id', editingId)
-          .eq('clinic_id', profile.clinic_id);
+          .eq('clinic_id', clinicId);
 
         if (error) throw error;
         showMessage('success', 'Doctor updated successfully');
@@ -148,7 +135,7 @@ const clinicId = clinic.id;
         const { error } = await supabase
           .from('clinic_doctors')
           .insert([{
-            clinic_id: profile.clinic_id,
+            clinic_id: clinicId,
             user_id: user.id,
             doctor_name: formData.name,
             specialization: formData.specialization,
@@ -194,22 +181,14 @@ const clinicId = clinic.id;
         throw new Error('User not authenticated');
       }
 
-      // Get clinic_id from user's profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('clinic_id')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError || !profile?.clinic_id) {
-        throw new Error('Clinic not found for this user');
-      }
+      // Get clinic ID
+      const clinicId = await getClinicId(user.id);
 
       const { error } = await supabase
         .from('clinic_doctors')
         .delete()
         .eq('id', id)
-        .eq('clinic_id', profile.clinic_id);
+        .eq('clinic_id', clinicId);
 
       if (error) throw error;
       showMessage('success', 'Doctor removed successfully');
@@ -239,19 +218,19 @@ const clinicId = clinic.id;
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Doctor Management</h1>
-              <p className="mt-1 text-gray-600">Step 2 of 6 – Manage your medical professionals</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
-                {doctors.length} Doctors
-              </span>
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Doctor Management</h1>
+            <p className="mt-1 text-sm text-gray-500">Step 2 of 6 – Manage your medical professionals</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-800">
+              {doctors.length} Doctors
+            </span>
+            <div className="flex gap-2">
               <Link
                 href="/whatsapp-bot"
                 className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
@@ -260,7 +239,7 @@ const clinicId = clinic.id;
               </Link>
               <Link
                 href="/whatsapp-bot/services"
-                className="rounded-lg bg-gradient-to-r from-green-600 to-green-700 px-6 py-2 text-sm font-semibold text-white hover:from-green-700 hover:to-green-800 transition-all shadow-lg hover:shadow-xl"
+                className="rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 text-sm font-medium text-white hover:from-blue-700 hover:to-blue-800 transition-colors shadow-md hover:shadow-lg"
               >
                 Next → Services
               </Link>
@@ -271,10 +250,14 @@ const clinicId = clinic.id;
         {/* Message Alert */}
         {message && (
           <div className={`mb-6 rounded-lg p-4 ${
-            message.type === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+            message.type === 'success' 
+              ? 'bg-green-50 border border-green-200' 
+              : 'bg-red-50 border border-red-200'
           }`}>
             <p className={`${
-              message.type === 'success' ? 'text-green-800' : 'text-red-800'
+              message.type === 'success' 
+                ? 'text-green-800' 
+                : 'text-red-800'
             }`}>
               {message.text}
             </p>
@@ -383,7 +366,6 @@ const clinicId = clinic.id;
                       editingId ? 'Update Doctor' : 'Add Doctor'
                     )}
                   </button>
-
                   {editingId && (
                     <button
                       type="button"
