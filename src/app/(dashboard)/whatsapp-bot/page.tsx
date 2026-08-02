@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function WhatsAppBotPage() {
   const supabase = createClient();
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [clinicName, setClinicName] = useState("");
   const [clinicType, setClinicType] = useState("Dental");
@@ -14,174 +17,490 @@ export default function WhatsAppBotPage() {
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [googleMaps, setGoogleMaps] = useState("");
-
+  const [logo, setLogo] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [language, setLanguage] = useState("English");
+  const [timezone, setTimezone] = useState("Asia/Kolkata");
+  const [website, setWebsite] = useState("");
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    if (file) {
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        showMessage('error', 'Logo size should be less than 2MB');
+        return;
+      }
+      setLogo(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeLogo = () => {
+    setLogo(null);
+    setLogoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const showMessage = (type: 'success' | 'error', text: string) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage(null), 5000);
+  };
 
   async function saveClinic() {
+    // Validation
+    if (!clinicName.trim()) {
+      showMessage('error', 'Please enter clinic name');
+      return;
+    }
+    if (!address.trim()) {
+      showMessage('error', 'Please enter clinic address');
+      return;
+    }
+    if (!whatsappNumber.trim()) {
+      showMessage('error', 'Please enter WhatsApp number');
+      return;
+    }
+
     try {
       setLoading(true);
+      setMessage(null);
 
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) {
-        alert("Please login first.");
+        showMessage('error', 'Please login first');
         return;
       }
 
-      const { error } = await supabase
-        .from("clinics")
-        .insert({
-          user_id: user.id,
-          clinic_name: clinicName,
-          clinic_type: clinicType,
-          whatsapp_number: whatsappNumber,
-          phone_number: phoneNumber,
-          email,
-          address,
-          google_maps: googleMaps,
-        });
+      // Check if clinic already exists for this user
+
+const { data: existingClinic } = await supabase
+  .from("clinics")
+  .select("id")
+  .eq("user_id", user.id)
+  .single();
+
+.
+      // Upload logo if exists
+      let logoUrl = null;
+      if (logo) {
+        const fileExt = logo.name.split('.').pop();
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('clinic-logos')
+          .upload(fileName, logo);
+
+        if (uploadError) {
+          console.error('Logo upload error:', uploadError);
+          showMessage('error', 'Failed to upload logo');
+          return;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('clinic-logos')
+          .getPublicUrl(fileName);
+        
+        logoUrl = publicUrl;
+      }
+
+      const clinicData = {
+        clinic_name: clinicName,
+        clinic_type: clinicType,
+        whatsapp_number: whatsappNumber,
+        phone_number: phoneNumber,
+        email,
+        address,
+        google_maps: googleMaps,
+        logo_url: logoUrl,
+        language,
+        timezone,
+        website,
+      };
+
+      let error;
+
+      if (existingClinic) {
+        // Update existing clinic
+        const { error: updateError } = await supabase
+          .from("clinics")
+          .update(clinicData)
+          .eq("id", existingClinic.id);
+        error = updateError;
+      } else {
+        // Insert new clinic
+        const { error: insertError } = await supabase
+          .from("clinics")
+          .insert({
+            ...clinicData,
+            user_id: user.id,
+          });
+        error = insertError;
+      }
 
       if (error) {
-        alert(error.message);
+        showMessage('error', error.message);
         return;
       }
 
-      alert("✅ Clinic information saved successfully.");
+      showMessage('success', '✅ Clinic information saved successfully!');
+      
+      // Navigate to next page after successful save
+      setTimeout(() => {
+        router.push("/whatsapp-bot/doctors");
+      }, 1500);
+
     } catch (err) {
       console.error(err);
-      alert("Something went wrong.");
+      showMessage('error', 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="mx-auto max-w-5xl rounded-2xl bg-white p-8 shadow-lg">
-        <h1 className="mb-2 text-3xl font-bold text-gray-900">
-          WhatsApp Bot Setup
-        </h1>
-
-        <p className="mb-8 text-gray-600">
-          Step 1 of 6 – Clinic Information
-        </p>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block font-medium text-gray-900">
-              Clinic Name *
-            </label>
-            <input
-              type="text"
-              value={clinicName}
-              onChange={(e) => setClinicName(e.target.value)}
-              placeholder="Enter clinic name"
-              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block font-medium text-gray-900">
-              Clinic Type
-            </label>
-            <select
-              value={clinicType}
-              onChange={(e) => setClinicType(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900"
-            >
-              <option>Dental</option>
-              <option>General</option>
-              <option>Eye</option>
-              <option>Skin</option>
-              <option>ENT</option>
-              <option>Orthopedic</option>
-            </select>
-          </div>
-
-
-          <div>
-            <label className="mb-2 block font-medium text-gray-900">
-              WhatsApp Number
-            </label>
-            <input
-              type="text"
-              value={whatsappNumber}
-              onChange={(e) => setWhatsappNumber(e.target.value)}
-              placeholder="+91XXXXXXXXXX"
-              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block font-medium text-gray-900">
-              Phone Number
-            </label>
-            <input
-              type="text"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder="+91XXXXXXXXXX"
-              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block font-medium text-gray-900">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="clinic@email.com"
-              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="mb-2 block font-medium text-gray-900">
-              Address *
-            </label>
-            <textarea
-              rows={3}
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="Clinic Address"
-              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="mb-2 block font-medium text-gray-900">
-              Google Maps Link
-            </label>
-            <input
-              type="text"
-              value={googleMaps}
-              onChange={(e) => setGoogleMaps(e.target.value)}
-              placeholder="https://maps.google.com/..."
-              className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900"
-            />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+      <div className="mx-auto max-w-7xl">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                WhatsApp Bot Setup
+              </h1>
+              <p className="mt-1 text-gray-600">
+                Step 1 of 6 – Clinic Information
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/whatsapp-bot/doctors"
+                className={`rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-2.5 font-semibold text-white hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl ${
+                  loading ? 'opacity-50 pointer-events-none' : ''
+                }`}
+              >
+                Next → Doctors
+              </Link>
+            </div>
           </div>
         </div>
 
-        <div className="mt-8 flex justify-between">
-          <button
-            onClick={saveClinic}
-            disabled={loading}
-            className="rounded-lg bg-green-600 px-6 py-3 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
-          >
-            {loading ? "Saving..." : "Save Clinic"}
-          </button>
+        {/* Message Alert */}
+        {message && (
+          <div className={`mb-6 rounded-lg p-4 ${
+            message.type === 'success' 
+              ? 'bg-green-50 border border-green-200' 
+              : 'bg-red-50 border border-red-200'
+          }`}>
+            <p className={`${
+              message.type === 'success' ? 'text-green-800' : 'text-red-800'
+            }`}>
+              {message.text}
+            </p>
+          </div>
+        )}
 
-          <Link
-            href="/whatsapp-bot/doctors"
-            className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white hover:bg-blue-700"
-          >
-            Next →
-          </Link>
+        <div className="rounded-xl bg-white p-8 shadow-xl border border-gray-100">
+          <div className="grid gap-8 lg:grid-cols-3">
+            {/* Left Column - Form */}
+            <div className="lg:col-span-2">
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Clinic Logo Upload */}
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Clinic Logo
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
+                      {logoPreview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={logoPreview}
+                          alt="Logo preview"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoChange}
+                        className="hidden"
+                        id="logo-upload"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <label
+                          htmlFor="logo-upload"
+                          className="cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                        >
+                          Upload Logo
+                        </label>
+                        {logoPreview && (
+                          <button
+                            onClick={removeLogo}
+                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Recommended: Square image, max 2MB
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clinic Name */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Clinic Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={clinicName}
+                    onChange={(e) => setClinicName(e.target.value)}
+                    placeholder="Enter clinic name"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+
+                {/* Clinic Type */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Clinic Type
+                  </label>
+                  <select
+                    value={clinicType}
+                    onChange={(e) => setClinicType(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  >
+                    <option>Dental</option>
+                    <option>General</option>
+                    <option>Eye</option>
+                    <option>Skin</option>
+                    <option>ENT</option>
+                    <option>Orthopedic</option>
+                    <option>Cardiology</option>
+                    <option>Neurology</option>
+                    <option>Pediatrics</option>
+                    <option>Gynecology</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+
+                {/* WhatsApp Number */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    WhatsApp Number *
+                  </label>
+                  <input
+                    type="text"
+                    value={whatsappNumber}
+                    onChange={(e) => setWhatsappNumber(e.target.value)}
+                    placeholder="+91XXXXXXXXXX"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+
+                {/* Phone Number */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="+91XXXXXXXXXX"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="clinic@email.com"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+
+                {/* Website */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Website
+                  </label>
+                  <input
+                    type="url"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="https://yourclinic.com"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+
+                {/* Address */}
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Address *
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Clinic Address"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+
+                {/* Google Maps */}
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Google Maps Link
+                  </label>
+                  <input
+                    type="text"
+                    value={googleMaps}
+                    onChange={(e) => setGoogleMaps(e.target.value)}
+                    placeholder="https://maps.google.com/..."
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Settings */}
+            <div className="lg:col-span-1">
+              <div className="rounded-lg bg-gradient-to-br from-gray-50 to-blue-50 p-6 border border-gray-200">
+                <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                  ⚙️ Settings
+                </h3>
+                
+                <div className="space-y-4">
+                  {/* Language */}
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                      🌐 Language
+                    </label>
+                    <select
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    >
+                      <option>English</option>
+                      <option>Hindi</option>
+                      <option>Bengali</option>
+                      <option>Spanish</option>
+                      <option>French</option>
+                      <option>German</option>
+                      <option>Arabic</option>
+                      <option>Urdu</option>
+                    </select>
+                  </div>
+
+                  {/* Timezone */}
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                      🕒 Time Zone
+                    </label>
+                    <select
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    >
+                      <option>Asia/Kolkata</option>
+                      <option>Asia/Dhaka</option>
+                      <option>Asia/Dubai</option>
+                      <option>Asia/Singapore</option>
+                      <option>America/New_York</option>
+                      <option>America/Los_Angeles</option>
+                      <option>Europe/London</option>
+                      <option>Europe/Paris</option>
+                      <option>Australia/Sydney</option>
+                    </select>
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-200">
+                    <div className="rounded-lg bg-blue-50 p-3">
+                      <p className="text-xs text-blue-800">
+                        💡 All settings will be applied to your WhatsApp bot configuration
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-gray-200">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-500">
+                Step 1 of 6
+              </span>
+              <div className="flex gap-1">
+                <div className="h-2 w-8 rounded-full bg-blue-600"></div>
+                <div className="h-2 w-2 rounded-full bg-gray-300"></div>
+                <div className="h-2 w-2 rounded-full bg-gray-300"></div>
+                <div className="h-2 w-2 rounded-full bg-gray-300"></div>
+                <div className="h-2 w-2 rounded-full bg-gray-300"></div>
+                <div className="h-2 w-2 rounded-full bg-gray-300"></div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={saveClinic}
+                disabled={loading}
+                className="rounded-lg bg-gradient-to-r from-green-600 to-green-700 px-6 py-2.5 font-semibold text-white hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <span className="flex items-center">
+                    <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Saving...
+                  </span>
+                ) : (
+                  "💾 Save Clinic"
+                )}
+              </button>
+
+              <Link
+                href="/whatsapp-bot/doctors"
+                className={`rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-2.5 font-semibold text-white hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg ${
+                  loading ? 'opacity-50 pointer-events-none' : ''
+                }`}
+              >
+                Next → Doctors
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>
