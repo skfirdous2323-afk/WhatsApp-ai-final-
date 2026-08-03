@@ -12,10 +12,10 @@ interface Doctor {
 
 interface Service {
   id?: string;
-  name: string;
+  service_name: string;
   description: string;
   price: string;
-  duration: string;
+  duration_minutes: string;
   category: string;
   assigned_doctors: string[];
   image_url: string | null;
@@ -52,14 +52,16 @@ export default function ServicesPage() {
     topService: ""
   });
 
-  const [formData, setFormData] = useState<Service>({
-    name: "",
+  // ✅ formData এখন service_name এবং duration_minutes ব্যবহার করবে
+  const [formData, setFormData] = useState({
+    service_name: "",
     description: "",
     price: "",
-    duration: "30",
+    duration_minutes: "30",
     category: "",
-    assigned_doctors: [],
-    image_url: null,
+    assigned_doctors: [] as string[],
+    image_url: null as string | null,
+    image_file: null as File | null,
     is_featured: false,
     whatsapp_reply: "",
     preparation_instructions: "",
@@ -90,52 +92,94 @@ export default function ServicesPage() {
     applyFilters();
   }, [services, searchTerm, categoryFilter, statusFilter]);
 
+  // ✅ Helper function to get clinic ID
+  const getClinicId = async (userId: string) => {
+    const { data: clinic, error: clinicError } = await supabase
+      .from("clinics")
+      .select("id")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (clinicError || !clinic) {
+      throw new Error("Clinic not found");
+    }
+
+    return clinic.id;
+  };
+
+  // ✅ loadServices - clinic_services ব্যবহার করবে
   const loadServices = async () => {
     setIsLoading(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
         showMessage('error', 'Please login first');
         return;
       }
 
+      const clinicId = await getClinicId(user.id);
+
       const { data, error } = await supabase
-        .from('services')
+        .from('clinic_services')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('clinic_id', clinicId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setServices(data || []);
-      calculateAnalytics(data || []);
-    } catch (error) {
+      
+      // ✅ Map database fields to Service interface
+      const mappedServices = data?.map((item: any) => ({
+        id: item.id,
+        service_name: item.service_name,
+        description: item.description || "",
+        price: item.price || "",
+        duration_minutes: item.duration_minutes?.toString() || "30",
+        category: item.category || "",
+        assigned_doctors: item.assigned_doctors || [],
+        image_url: item.image_url || null,
+        is_featured: item.is_featured || false,
+        whatsapp_reply: item.whatsapp_reply || "",
+        preparation_instructions: item.preparation_instructions || "",
+        is_active: item.is_active !== undefined ? item.is_active : true,
+        created_at: item.created_at,
+      })) || [];
+
+      setServices(mappedServices);
+      calculateAnalytics(mappedServices);
+    } catch (error: any) {
       console.error('Error loading services:', error);
-      showMessage('error', 'Failed to load services');
+      showMessage('error', `Failed to load services: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // ✅ loadDoctors - clinic_doctors ব্যবহার করবে
   const loadDoctors = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) return;
 
-      if (!user) return;
+      const clinicId = await getClinicId(user.id);
 
       const { data, error } = await supabase
-        .from('doctors')
-        .select('id, name, specialization')
-        .eq('user_id', user.id)
-        .order('name');
+        .from('clinic_doctors')
+        .select('id, doctor_name, specialization')
+        .eq('clinic_id', clinicId)
+        .order('doctor_name');
 
       if (error) throw error;
-      setDoctors(data || []);
-    } catch (error) {
+      
+      const mappedDoctors = data?.map((doc: any) => ({
+        id: doc.id,
+        name: doc.doctor_name,
+        specialization: doc.specialization
+      })) || [];
+      
+      setDoctors(mappedDoctors);
+    } catch (error: any) {
       console.error('Error loading doctors:', error);
     }
   };
@@ -151,29 +195,26 @@ export default function ServicesPage() {
       active: activeServices.length,
       featured: featuredServices.length,
       avgPrice: avgPrice,
-      totalBookings: data.length * 25, // Mock data - replace with actual bookings
-      revenue: data.length * 25 * 500, // Mock data
-      topService: data.length > 0 ? data[0].name : "N/A"
+      totalBookings: data.length * 25,
+      revenue: data.length * 25 * 500,
+      topService: data.length > 0 ? data[0].service_name : "N/A"
     });
   };
 
   const applyFilters = () => {
     let filtered = [...services];
 
-    // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(s => 
-        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.description.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(s =>
+        s.service_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.description && s.description.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
-    // Category filter
     if (categoryFilter) {
       filtered = filtered.filter(s => s.category === categoryFilter);
     }
 
-    // Status filter
     if (statusFilter === "active") {
       filtered = filtered.filter(s => s.is_active);
     } else if (statusFilter === "inactive") {
@@ -214,7 +255,7 @@ export default function ServicesPage() {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
-      
+
       setFormData(prev => ({ ...prev, image_file: file }));
     }
   };
@@ -232,10 +273,11 @@ export default function ServicesPage() {
     setTimeout(() => setMessage(null), 5000);
   };
 
+  // ✅ handleSubmit - clinic_services ব্যবহার করবে
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.name.trim()) {
+
+    if (!formData.service_name.trim()) {
       showMessage('error', 'Please enter service name');
       return;
     }
@@ -246,18 +288,17 @@ export default function ServicesPage() {
 
     setIsSaving(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
         showMessage('error', 'Please login first');
         return;
       }
 
+      const clinicId = await getClinicId(user.id);
+
       let imageUrl = formData.image_url;
       if (formData.image_file) {
-        const fileExt = (formData.image_file as File).name.split('.').pop();
+        const fileExt = formData.image_file.name.split('.').pop();
         const fileName = `service-${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('service-images')
@@ -272,13 +313,14 @@ export default function ServicesPage() {
       }
 
       const serviceData = {
+        clinic_id: clinicId,
         user_id: user.id,
-        name: formData.name,
+        service_name: formData.service_name,
         description: formData.description,
         price: formData.price,
-        duration: formData.duration,
+        duration_minutes: parseInt(formData.duration_minutes) || 30,
         category: formData.category,
-        assigned_doctors: formData.assigned_doctors,
+        assigned_doctors: formData.assigned_doctors || [],
         image_url: imageUrl,
         is_featured: formData.is_featured,
         whatsapp_reply: formData.whatsapp_reply,
@@ -289,13 +331,14 @@ export default function ServicesPage() {
       let error;
       if (editingId) {
         const { error: updateError } = await supabase
-          .from('services')
+          .from('clinic_services')
           .update(serviceData)
-          .eq('id', editingId);
+          .eq('id', editingId)
+          .eq('clinic_id', clinicId);
         error = updateError;
       } else {
         const { error: insertError } = await supabase
-          .from('services')
+          .from('clinic_services')
           .insert([serviceData]);
         error = insertError;
       }
@@ -305,94 +348,114 @@ export default function ServicesPage() {
       showMessage('success', editingId ? 'Service updated successfully!' : 'Service added successfully!');
       resetForm();
       await loadServices();
-
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving service:', error);
-      showMessage('error', `Failed to ${editingId ? 'update' : 'add'} service`);
+      showMessage('error', `Failed to ${editingId ? 'update' : 'add'} service: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
   };
 
+  // ✅ handleEdit - service_name এবং duration_minutes ম্যাপ করবে
   const handleEdit = (service: Service) => {
     setFormData({
-      ...service,
+      service_name: service.service_name,
+      description: service.description || "",
+      price: service.price || "",
+      duration_minutes: service.duration_minutes?.toString() || "30",
+      category: service.category || "",
       assigned_doctors: service.assigned_doctors || [],
+      image_url: service.image_url || null,
+      image_file: null,
+      is_featured: service.is_featured || false,
+      whatsapp_reply: service.whatsapp_reply || "",
+      preparation_instructions: service.preparation_instructions || "",
+      is_active: service.is_active !== undefined ? service.is_active : true,
     });
     setImagePreview(service.image_url);
     setEditingId(service.id || null);
     document.getElementById('service-form')?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // ✅ handleDelete - clinic_services ব্যবহার করবে
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this service?')) return;
 
     setIsSaving(true);
     try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        showMessage('error', 'Please login first');
+        return;
+      }
+
+      const clinicId = await getClinicId(user.id);
+
       const { error } = await supabase
-        .from('services')
+        .from('clinic_services')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('clinic_id', clinicId);
 
       if (error) throw error;
       showMessage('success', 'Service deleted successfully');
       await loadServices();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting service:', error);
-      showMessage('error', 'Failed to delete service');
+      showMessage('error', `Failed to delete service: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
   };
 
+  // ✅ handleDuplicate - clinic_services ব্যবহার করবে
   const handleDuplicate = async (service: Service) => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
         showMessage('error', 'Please login first');
         return;
       }
 
-      const { name, description, price, duration, category, assigned_doctors, is_featured, whatsapp_reply, preparation_instructions } = service;
-      
+      const clinicId = await getClinicId(user.id);
+
       const { error } = await supabase
-        .from('services')
+        .from('clinic_services')
         .insert([{
+          clinic_id: clinicId,
           user_id: user.id,
-          name: `${name} (Copy)`,
-          description,
-          price,
-          duration,
-          category,
-          assigned_doctors,
-          is_featured,
-          whatsapp_reply,
-          preparation_instructions,
+          service_name: `${service.service_name} (Copy)`,
+          description: service.description || "",
+          price: service.price || "",
+          duration_minutes: parseInt(service.duration_minutes) || 30,
+          category: service.category || "",
+          assigned_doctors: service.assigned_doctors || [],
+          image_url: service.image_url || null,
+          is_featured: service.is_featured || false,
+          whatsapp_reply: service.whatsapp_reply || "",
+          preparation_instructions: service.preparation_instructions || "",
           is_active: true,
         }]);
 
       if (error) throw error;
       showMessage('success', 'Service duplicated successfully!');
       await loadServices();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error duplicating service:', error);
-      showMessage('error', 'Failed to duplicate service');
+      showMessage('error', `Failed to duplicate service: ${error.message}`);
     }
   };
 
   const exportCSV = () => {
     const headers = ['Name', 'Price', 'Duration', 'Category', 'Status', 'Featured', 'Description'];
     const rows = filteredServices.map(s => [
-      s.name,
+      s.service_name,
       s.price,
-      s.duration,
+      s.duration_minutes,
       s.category,
       s.is_active ? 'Active' : 'Inactive',
       s.is_featured ? 'Yes' : 'No',
-      s.description
+      s.description || ""
     ]);
 
     const csvContent = [
@@ -409,15 +472,17 @@ export default function ServicesPage() {
     window.URL.revokeObjectURL(url);
   };
 
+  // ✅ resetForm - service_name এবং duration_minutes ব্যবহার করবে
   const resetForm = () => {
     setFormData({
-      name: "",
+      service_name: "",
       description: "",
       price: "",
-      duration: "30",
+      duration_minutes: "30",
       category: "",
       assigned_doctors: [],
       image_url: null,
+      image_file: null,
       is_featured: false,
       whatsapp_reply: "",
       preparation_instructions: "",
@@ -431,30 +496,24 @@ export default function ServicesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                WhatsApp Bot Setup
-              </h1>
-              <p className="mt-1 text-gray-600">
-                Step 3 of 6 – Services
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={exportCSV}
-                className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition-colors"
-              >
-                📤 Export CSV
-              </button>
-              <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
-                {services.length} Services
-              </span>
-            </div>
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">WhatsApp Bot Setup</h1>
+            <p className="mt-1 text-sm text-gray-500">Step 3 of 6 – Services</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={exportCSV}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              📤 Export CSV
+            </button>
+            <span className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-800">
+              {services.length} Services
+            </span>
           </div>
         </div>
 
@@ -466,7 +525,9 @@ export default function ServicesPage() {
               : 'bg-red-50 border border-red-200'
           }`}>
             <p className={`${
-              message.type === 'success' ? 'text-green-800' : 'text-red-800'
+              message.type === 'success' 
+                ? 'text-green-800' 
+                : 'text-red-800'
             }`}>
               {message.text}
             </p>
@@ -488,7 +549,6 @@ export default function ServicesPage() {
               </div>
             </div>
           </div>
-
           <div className="rounded-xl bg-white p-6 shadow-lg border border-gray-100">
             <div className="flex items-center justify-between">
               <div>
@@ -502,7 +562,6 @@ export default function ServicesPage() {
               </div>
             </div>
           </div>
-
           <div className="rounded-xl bg-white p-6 shadow-lg border border-gray-100">
             <div className="flex items-center justify-between">
               <div>
@@ -516,7 +575,6 @@ export default function ServicesPage() {
               </div>
             </div>
           </div>
-
           <div className="rounded-xl bg-white p-6 shadow-lg border border-gray-100">
             <div className="flex items-center justify-between">
               <div>
@@ -566,8 +624,8 @@ export default function ServicesPage() {
             <button
               onClick={() => setViewMode("card")}
               className={`px-3 py-2 text-sm font-medium transition-colors ${
-                viewMode === "card" 
-                  ? "bg-blue-600 text-white" 
+                viewMode === "card"
+                  ? "bg-blue-600 text-white"
                   : "bg-white text-gray-700 hover:bg-gray-50"
               }`}
             >
@@ -576,8 +634,8 @@ export default function ServicesPage() {
             <button
               onClick={() => setViewMode("table")}
               className={`px-3 py-2 text-sm font-medium transition-colors ${
-                viewMode === "table" 
-                  ? "bg-blue-600 text-white" 
+                viewMode === "table"
+                  ? "bg-blue-600 text-white"
                   : "bg-white text-gray-700 hover:bg-gray-50"
               }`}
             >
@@ -608,14 +666,13 @@ export default function ServicesPage() {
                     </label>
                     <input
                       type="text"
-                      name="name"
-                      value={formData.name}
+                      name="service_name"
+                      value={formData.service_name}
                       onChange={handleInputChange}
                       placeholder="Dental Cleaning"
                       className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                     />
                   </div>
-
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">
                       Price (₹) *
@@ -629,14 +686,13 @@ export default function ServicesPage() {
                       className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                     />
                   </div>
-
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">
                       Duration (Minutes)
                     </label>
                     <select
-                      name="duration"
-                      value={formData.duration}
+                      name="duration_minutes"
+                      value={formData.duration_minutes}
                       onChange={handleInputChange}
                       className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                     >
@@ -645,7 +701,6 @@ export default function ServicesPage() {
                       ))}
                     </select>
                   </div>
-
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">
                       Service Category
@@ -662,7 +717,6 @@ export default function ServicesPage() {
                       ))}
                     </select>
                   </div>
-
                   <div className="md:col-span-2">
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">
                       Description
@@ -676,7 +730,6 @@ export default function ServicesPage() {
                       className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                     />
                   </div>
-
                   <div className="md:col-span-2">
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">
                       👨‍⚕️ Assigned Doctors
@@ -702,7 +755,6 @@ export default function ServicesPage() {
                       )}
                     </div>
                   </div>
-
                   <div className="md:col-span-2">
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">
                       🖼️ Service Image/Icon
@@ -740,7 +792,6 @@ export default function ServicesPage() {
                       )}
                     </div>
                   </div>
-
                   <div className="md:col-span-2">
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">
                       📱 WhatsApp Quick Reply Text
@@ -754,7 +805,6 @@ export default function ServicesPage() {
                       className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                     />
                   </div>
-
                   <div className="md:col-span-2">
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">
                       📄 Preparation Instructions
@@ -768,7 +818,6 @@ export default function ServicesPage() {
                       className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                     />
                   </div>
-
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">
                       ⭐ Featured Service
@@ -786,7 +835,6 @@ export default function ServicesPage() {
                       </label>
                     </div>
                   </div>
-
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">
                       🔒 Status
@@ -824,7 +872,6 @@ export default function ServicesPage() {
                       editingId ? 'Update Service' : 'Add Service'
                     )}
                   </button>
-                  
                   {editingId && (
                     <button
                       type="button"
@@ -862,15 +909,15 @@ export default function ServicesPage() {
                     <div
                       key={service.id}
                       className={`rounded-lg border p-4 transition-all ${
-                        service.is_active 
-                          ? 'border-gray-200 hover:border-blue-300' 
+                        service.is_active
+                          ? 'border-gray-200 hover:border-blue-300'
                           : 'border-gray-200 opacity-60'
                       }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-gray-900 truncate">{service.name}</h3>
+                            <h3 className="font-semibold text-gray-900 truncate">{service.service_name}</h3>
                             {service.is_featured && (
                               <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
                                 ⭐
@@ -879,8 +926,8 @@ export default function ServicesPage() {
                           </div>
                           <div className="mt-1 space-y-1">
                             <p className="text-sm text-gray-600">₹{service.price}</p>
-                            {service.duration && (
-                              <p className="text-xs text-gray-500">{service.duration} min</p>
+                            {service.duration_minutes && (
+                              <p className="text-xs text-gray-500">{service.duration_minutes} min</p>
                             )}
                           </div>
                         </div>
@@ -909,7 +956,6 @@ export default function ServicesPage() {
                   ))}
                 </div>
               ) : (
-                /* Table View */
                 <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50 sticky top-0">
@@ -928,17 +974,21 @@ export default function ServicesPage() {
                             <div className="flex items-center gap-2">
                               {service.image_url && (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={service.image_url} alt={service.name} className="h-8 w-8 rounded object-cover" />
+                                <img
+                                  src={service.image_url}
+                                  alt={service.service_name}
+                                  className="h-8 w-8 rounded object-cover"
+                                />
                               )}
-                              <span className="text-sm font-medium text-gray-900">{service.name}</span>
+                              <span className="text-sm font-medium text-gray-900">{service.service_name}</span>
                             </div>
                           </td>
                           <td className="px-3 py-2 text-sm text-gray-600">₹{service.price}</td>
-                          <td className="px-3 py-2 text-sm text-gray-600">{service.duration} min</td>
+                          <td className="px-3 py-2 text-sm text-gray-600">{service.duration_minutes} min</td>
                           <td className="px-3 py-2">
                             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                              service.is_active 
-                                ? 'bg-green-100 text-green-800' 
+                              service.is_active
+                                ? 'bg-green-100 text-green-800'
                                 : 'bg-red-100 text-red-800'
                             }`}>
                               {service.is_active ? 'Active' : 'Inactive'}
@@ -989,7 +1039,6 @@ export default function ServicesPage() {
               <div className="h-2 w-2 rounded-full bg-gray-300"></div>
             </div>
           </div>
-
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/whatsapp-bot/doctors"
