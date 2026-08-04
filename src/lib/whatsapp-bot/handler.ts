@@ -57,16 +57,23 @@ const { data: clinic, error: clinicError } = await db
 
   // Doctors
   if (msg === "2") {
-    const { data: doctors } = await db
-      .from("clinic_doctors")
-      .select("name")
-      .eq("clinic_id", clinicId)
-      .order("created_at", { ascending: false });
 
-    const list =
-      doctors && doctors.length
-        ? doctors.map((d: any, i: number) => `${i + 1}. ${d.name}`).join("\n")
-        : "No doctors found.";
+const { data: doctors } = await db
+  .from("clinic_doctors")
+  .select("doctor_name,specialization")
+  .eq("clinic_id", clinicId)
+  .order("created_at", { ascending: false });
+
+const list =
+  doctors && doctors.length
+    ? doctors
+        .map(
+          (d: any, i: number) =>
+            `${i + 1}. ${d.doctor_name} (${d.specialization})`
+        )
+        .join("\n")
+    : "No doctors found.";
+
 
     await engineSendText({
       accountId,
