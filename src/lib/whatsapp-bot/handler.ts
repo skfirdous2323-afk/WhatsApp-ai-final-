@@ -1,5 +1,6 @@
 import { engineSendText } from "@/lib/flows/meta-send";
 import { supabaseAdmin } from "@/lib/ai/admin-client";
+
 export async function runWhatsAppBot({
   accountId,
   userId,
@@ -14,28 +15,29 @@ export async function runWhatsAppBot({
   text: string;
 }) {
   const msg = text.trim().toLowerCase();
-const db = supabaseAdmin();
-const { data: clinic, error: clinicError } = await db
-  .from("clinics")
-  .select("id")
-  .eq("user_id", userId)
-  .single();
+  const db = supabaseAdmin();
 
-if (clinicError || !clinic) {
-  console.error("Clinic not found", clinicError);
-  return false;
-}
+  const { data: clinic, error: clinicError } = await db
+    .from("clinics")
+    .select("id")
+    .eq("user_id", userId)
+    .single();
 
-const clinicId = clinic.id;
+  if (clinicError || !clinic) {
+    console.error("Clinic not found", clinicError);
+    return false;
+  }
 
+  const clinicId = clinic.id;
+
+  // Main Menu
   if (msg === "hi" || msg === "hello") {
     await engineSendText({
       accountId,
       userId,
       conversationId,
       contactId,
-      text:
-`👋 Welcome!
+      text: `👋 Welcome!
 
 1️⃣ Book Appointment
 2️⃣ Doctors
@@ -46,26 +48,29 @@ const clinicId = clinic.id;
     return true;
   }
 
+  // Doctors
+  if (msg === "2") {
+    const { data: doctors } = await db
+      .from("clinic_doctors")
+      .select("name")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false });
+
+    const list =
+      doctors && doctors.length
+        ? doctors.map((d: any, i: number) => `${i + 1}. ${d.name}`).join("\n")
+        : "No doctors found.";
+
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: `👨‍⚕️ Doctors\n\n${list}`,
+    });
+
+    return true;
+  }
+
   return false;
-}
-if (msg === "2") {
-  const { data: doctors } = await db
-    .from("clinic_doctors")
-    .select("name")
-    .eq("clinic_id", clinicId);
-
-  const list =
-    doctors && doctors.length
-      ? doctors.map((d, i) => `${i + 1}. ${d.name}`).join("\n")
-      : "No doctors found.";
-
-  await engineSendText({
-    accountId,
-    userId,
-    conversationId,
-    contactId,
-    text: `👨‍⚕️ Doctors:\n\n${list}`,
-  });
-
-  return true;
 }
