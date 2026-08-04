@@ -1,5 +1,23 @@
 import { engineSendText } from "@/lib/flows/meta-send";
 import { supabaseAdmin } from "@/lib/ai/admin-client";
+import {
+  getSession,
+  setSession,
+  clearSession,
+} from "@/lib/whatsapp-bot/session";
+
+// Type definitions
+interface SessionData {
+  step: string;
+  serviceId?: string;
+  serviceName?: string;
+  doctorId?: string;
+  doctorName?: string;
+  date?: string;
+  time?: string;
+  patientName?: string;
+  patientPhone?: string;
+}
 
 export async function runWhatsAppBot({
   accountId,
@@ -17,18 +35,14 @@ export async function runWhatsAppBot({
   const msg = text.trim().toLowerCase();
   const db = supabaseAdmin();
 
-const { data: clinic, error: clinicError } = await db
-  .from("clinics")
-  .select("id")
-  .eq("user_id", userId)
-  .order("created_at", { ascending: false })
-  .limit(1)
-  .maybeSingle();
-
-
-
-
-
+  // Get clinic ID
+  const { data: clinic, error: clinicError } = await db
+    .from("clinics")
+    .select("id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (clinicError || !clinic) {
     console.error("Clinic not found", clinicError);
@@ -36,55 +50,485 @@ const { data: clinic, error: clinicError } = await db
   }
 
   const clinicId = clinic.id;
+  const session = getSession(contactId) as SessionData | null;
 
-  // Main Menu
-  if (msg === "hi" || msg === "hello") {
+  // ============================================================
+  // Handle session-based flows
+  // ============================================================
+  if (session) {
+    // ---- STEP: Service Selection ----
+    if (session.step === "service") {
+      const serviceIndex = parseInt(msg) - 1;
+      
+      const { data: services } = await db
+        .from("clinic_services")
+        .select("id, service_name")
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false });
+
+      if (services && services[serviceIndex]) {
+        const selected = services[serviceIndex];
+        
+        // Update session with selected service
+        setSession(contactId, {
+          step: "doctor",
+          serviceId: selected.id,
+          serviceName: selected.service_name,
+        });
+
+        // Get doctors for this clinic
+        const { data: doctors } = await db
+          .from("clinic_doctors")
+          .select("id, doctor_name, specialization")
+          .eq("clinic_id", clinicId)
+          .order("created_at", { ascending: false });
+
+        if (!doctors || doctors.length === 0) {
+          await engineSendText({
+            accountId,
+            userId,
+            conversationId,
+            contactId,
+            text: "❌ No doctors available. Please contact the clinic.",
+          });
+          clearSession(contactId);
+          return true;
+        }
+
+        const doctorList = doctors
+          .map((d: any, i: number) => `${i + 1}. ${d.doctor_name} (${d.specialization})`)
+          .join("\n");
+
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: `👨‍⚕️ Select a Doctor for ${selected.service_name}:\n\n${doctorList}\n\nReply with the number.`,
+        });
+
+        return true;
+      } else {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Invalid selection. Please reply with a number from the list.",
+        });
+        return true;
+      }
+    }
+
+    // ---- STEP: Doctor Selection ----
+    if (session.step === "doctor") {
+      const doctorIndex = parseInt(msg) - 1;
+      
+      const { data: doctors } = await db
+        .from("clinic_doctors")
+        .select("id, doctor_name, specialization")
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false });
+
+      if (doctors && doctors[doctorIndex]) {
+        const selected = doctors[doctorIndex];
+        
+        setSession(contactId, {
+          step: "date",
+          serviceId: session.serviceId,
+          serviceName: session.serviceName,
+          doctorId: selected.id,
+          doctorName: selected.doctor_name,
+        });
+
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: `📅 Please enter the date for your appointment with ${selected.doctor_name}.\n\nFormat: DD-MM-YYYY (e.g., 25-12-2024)`,
+        });
+
+        return true;
+      } else {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Invalid selection. Please reply with a number from the list.",
+        });
+        return true;
+      }
+    }
+
+    // ---- STEP: Date Selection ----
+    if (session.step === "date") {
+      // Validate date format (DD-MM-YYYY)
+      const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
+      if (!dateRegex.test(msg)) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Invalid date format. Please use DD-MM-YYYY (e.g., 25-12-2024)",
+        });
+        return true;
+      }
+
+      setSession(contactId, {
+        step: "time",
+        serviceId: session.serviceId,
+        serviceName: session.serviceName,
+        doctorId: session.doctorId,
+        doctorName: session.doctorName,
+        date: msg,
+      });
+
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: `🕐 Please enter the time for your appointment.\n\nFormat: HH:MM (e.g., 14:30 for 2:30 PM)`,
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Time Selection ----
+    if (session.step === "time") {
+      // Validate time format (HH:MM)
+      const timeRegex = /^\d{2}:\d{2}$/;
+      if (!timeRegex.test(msg)) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Invalid time format. Please use HH:MM (e.g., 14:30)",
+        });
+        return true;
+      }
+
+      setSession(contactId, {
+        step: "name",
+        serviceId: session.serviceId,
+        serviceName: session.serviceName,
+        doctorId: session.doctorId,
+        doctorName: session.doctorName,
+        date: session.date,
+        time: msg,
+      });
+
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: `👤 Please enter your full name.`,
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Name ----
+    if (session.step === "name") {
+      if (msg.length < 2) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Please enter a valid name (at least 2 characters).",
+        });
+        return true;
+      }
+
+      setSession(contactId, {
+        step: "phone",
+        serviceId: session.serviceId,
+        serviceName: session.serviceName,
+        doctorId: session.doctorId,
+        doctorName: session.doctorName,
+        date: session.date,
+        time: session.time,
+        patientName: msg,
+      });
+
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: `📱 Please enter your phone number with country code.\n\nExample: 919876543210`,
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Phone & Confirm ----
+    if (session.step === "phone") {
+      const phoneRegex = /^\d{10,15}$/;
+      if (!phoneRegex.test(msg)) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Invalid phone number. Please enter 10-15 digits without spaces or symbols.",
+        });
+        return true;
+      }
+
+      // Save appointment to database
+      try {
+        const appointmentData = {
+          clinic_id: clinicId,
+          user_id: userId,
+          contact_id: contactId,
+          service_id: session.serviceId,
+          doctor_id: session.doctorId,
+          appointment_date: session.date,
+          appointment_time: session.time,
+          patient_name: session.patientName,
+          patient_phone: msg,
+          status: "pending",
+          created_at: new Date().toISOString(),
+        };
+
+        const { error: insertError } = await db
+          .from("appointments")
+          .insert([appointmentData]);
+
+        if (insertError) {
+          console.error("Error saving appointment:", insertError);
+          await engineSendText({
+            accountId,
+            userId,
+            conversationId,
+            contactId,
+            text: "❌ Failed to book appointment. Please try again later.",
+          });
+          clearSession(contactId);
+          return true;
+        }
+
+        // Clear session after successful booking
+        clearSession(contactId);
+
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: `✅ Appointment Confirmed!\n\n📋 Service: ${session.serviceName}\n👨‍⚕️ Doctor: ${session.doctorName}\n📅 Date: ${session.date}\n🕐 Time: ${session.time}\n👤 Patient: ${session.patientName}\n📱 Phone: ${msg}\n\nThank you for booking with us! We'll send you a reminder.`,
+        });
+
+        return true;
+      } catch (error) {
+        console.error("Error saving appointment:", error);
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ An error occurred. Please try again later.",
+        });
+        clearSession(contactId);
+        return true;
+      }
+    }
+  }
+
+  // ============================================================
+  // Main Menu Handlers
+  // ============================================================
+
+  // Hi / Hello - Show Main Menu
+  if (msg === "hi" || msg === "hello" || msg === "hey") {
+    clearSession(contactId);
+
     await engineSendText({
       accountId,
       userId,
       conversationId,
       contactId,
-      text: `👋 Welcome!
+      text: `👋 Welcome to our clinic!
+
+Please select an option:
 
 1️⃣ Book Appointment
 2️⃣ Doctors
 3️⃣ Services
-4️⃣ Working Hours`,
+4️⃣ Working Hours
+
+Reply with the number.`,
     });
 
     return true;
   }
 
-  // Doctors
-  if (msg === "2") {
+  // 1 - Book Appointment
+  if (msg === "1") {
+    const { data: services } = await db
+      .from("clinic_services")
+      .select("id, service_name")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false });
 
-const { data: doctors } = await db
-  .from("clinic_doctors")
-  .select("doctor_name,specialization")
-  .eq("clinic_id", clinicId)
-  .order("created_at", { ascending: false });
+    if (!services || services.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ No services available. Please contact the clinic.",
+      });
+      return true;
+    }
 
-const list =
-  doctors && doctors.length
-    ? doctors
-        .map(
-          (d: any, i: number) =>
-            `${i + 1}. ${d.doctor_name} (${d.specialization})`
-        )
-        .join("\n")
-    : "No doctors found.";
+    setSession(contactId, { step: "service" });
 
+    const list = services
+      .map((s: any, i: number) => `${i + 1}. ${s.service_name}`)
+      .join("\n");
 
     await engineSendText({
       accountId,
       userId,
       conversationId,
       contactId,
-      text: `👨‍⚕️ Doctors\n\n${list}`,
+      text: `📋 Select a Service:\n\n${list}\n\nReply with the number.`,
     });
 
     return true;
   }
 
-  return false;
+  // 2 - Show Doctors
+  if (msg === "2") {
+    const { data: doctors } = await db
+      .from("clinic_doctors")
+      .select("doctor_name, specialization")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false });
+
+    if (!doctors || doctors.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ No doctors available.",
+      });
+      return true;
+    }
+
+    const list = doctors
+      .map(
+        (d: any, i: number) =>
+          `${i + 1}. ${d.doctor_name} (${d.specialization})`
+      )
+      .join("\n");
+
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: `👨‍⚕️ Our Doctors:\n\n${list}`,
+    });
+
+    return true;
+  }
+
+  // 3 - Show Services
+  if (msg === "3") {
+    const { data: services } = await db
+      .from("clinic_services")
+      .select("service_name, price, duration_minutes")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false });
+
+    if (!services || services.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ No services available.",
+      });
+      return true;
+    }
+
+    const list = services
+      .map(
+        (s: any) =>
+          `🩺 ${s.service_name}${s.price ? ` - ₹${s.price}` : ""}${
+            s.duration_minutes ? ` (${s.duration_minutes} min)` : ""
+          }`
+      )
+      .join("\n");
+
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: `🩺 Our Services:\n\n${list}`,
+    });
+
+    return true;
+  }
+
+  // 4 - Show Working Hours
+  if (msg === "4") {
+    const { data: hours } = await db
+      .from("clinic_working_hours")
+      .select("day_name, open_time, close_time, is_closed")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: true });
+
+    if (!hours || hours.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ Working hours not available.",
+      });
+      return true;
+    }
+
+    const list = hours
+      .map((h: any) =>
+        h.is_closed
+          ? `${h.day_name}: Closed`
+          : `${h.day_name}: ${h.open_time} - ${h.close_time}`
+      )
+      .join("\n");
+
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: `🕒 Working Hours:\n\n${list}`,
+    });
+
+    return true;
+  }
+
+  // Unknown command - show help
+  await engineSendText({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    text: `❌ I didn't understand that.\n\nPlease reply with:\n1️⃣ Book Appointment\n2️⃣ Doctors\n3️⃣ Services\n4️⃣ Working Hours\n\nOr type "Hi" to see the menu.`,
+  });
+
+  return true;
 }
+
