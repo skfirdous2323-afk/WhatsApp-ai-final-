@@ -368,9 +368,8 @@ await sendMainMenu({
   userId,
   conversationId,
   contactId,
-  clinicId, // clinicId যোগ করুন
+  clinicId,
 });
-
 
     return true;
   }
