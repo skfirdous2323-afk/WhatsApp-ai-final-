@@ -2,7 +2,6 @@ import {
   engineSendText,
   engineSendInteractiveList,
 } from "@/lib/flows/meta-send";
-
 import { supabaseAdmin } from "@/lib/ai/admin-client";
 import { sendMainMenu } from "@/lib/whatsapp-bot/menu";
 import {
@@ -74,144 +73,134 @@ export async function runWhatsAppBot({
   if (session) {
     // ---- STEP: Service Selection ----
     if (session.step === "service") {
+      let selected;
 
-
-
-const serviceId = command.replace("service_", "");
-
-const { data: services } = await db
-  .from("clinic_services")
-  .select("id, service_name")
-  .eq("clinic_id", clinicId);
-
-const selected = services?.find(
-  (s: any) => String(s.id) === serviceId
-);
-
-if (selected) {
-
-
-
-
-
-        setSession(contactId, {
-          step: "doctor",
-          serviceId: selected.id,
-          serviceName: selected.service_name,
-        });
-
-        const { data: doctors } = await db
-          .from("clinic_doctors")
-          .select("id, doctor_name, specialization")
+      if (command.startsWith("service_")) {
+        const serviceId = command.replace("service_", "");
+        const { data: services } = await db
+          .from("clinic_services")
+          .select("id, service_name")
+          .eq("clinic_id", clinicId);
+        selected = services?.find((s: any) => String(s.id) === serviceId);
+      } else {
+        const serviceIndex = parseInt(command) - 1;
+        const { data: services } = await db
+          .from("clinic_services")
+          .select("id, service_name")
           .eq("clinic_id", clinicId)
           .order("created_at", { ascending: false });
+        selected = services?.[serviceIndex];
+      }
 
-        if (!doctors || doctors.length === 0) {
-          await engineSendText({
-            accountId,
-            userId,
-            conversationId,
-            contactId,
-            text: "❌ No doctors available. Please contact the clinic.",
-          });
-          clearSession(contactId);
-          return true;
-        }
-
-
-
-
-await engineSendInteractiveList({
-  accountId,
-  userId,
-  conversationId,
-  contactId,
-  bodyText: `👨‍⚕️ Select a Doctor for ${selected.service_name}`,
-  footerText: "Please choose a doctor",
-  buttonText: "View Doctors",
-  sections: [
-    {
-      title: "Available Doctors",
-      rows: doctors.map((d: any) => ({
-        id: `doctor_${d.id}`,
-        title: d.doctor_name,
-        description: d.specialization,
-      })),
-    },
-  ],
-});
-
-return true;
-
-
-
-
-      } else {
+      if (!selected) {
         await engineSendText({
           accountId,
           userId,
           conversationId,
           contactId,
-          text: "❌ Invalid selection. Please reply with a number from the list.",
+          text: "❌ Invalid service. Please select again.",
         });
         return true;
       }
-    }
 
-    // ---- STEP: Doctor Selection ----
-    if (session.step === "doctor") {
-      const doctorIndex = parseInt(command) - 1;
+      setSession(contactId, {
+        step: "doctor",
+        serviceId: selected.id,
+        serviceName: selected.service_name,
+      });
 
+      // Get doctors for this service
       const { data: doctors } = await db
         .from("clinic_doctors")
         .select("id, doctor_name, specialization")
         .eq("clinic_id", clinicId)
         .order("created_at", { ascending: false });
 
-      if (doctors && doctors[doctorIndex]) {
-
-const doctorId = command.replace("doctor_", "");
-
-const { data: doctors } = await db
-  .from("clinic_doctors")
-  .select("id, doctor_name, specialization")
-  .eq("clinic_id", clinicId);
-
-const selected = doctors?.find(
-  (d: any) => String(d.id) === doctorId
-);
-
-if (selected) {
-
-
-
-        setSession(contactId, {
-          step: "date",
-          serviceId: session.serviceId,
-          serviceName: session.serviceName,
-          doctorId: selected.id,
-          doctorName: selected.doctor_name,
-        });
-
+      if (!doctors || doctors.length === 0) {
         await engineSendText({
           accountId,
           userId,
           conversationId,
           contactId,
-          text: `📅 Please enter the date for your appointment with ${selected.doctor_name}.\n\nFormat: DD-MM-YYYY (e.g., 25-12-2024)`,
+          text: "❌ No doctors available. Please contact the clinic.",
         });
-
+        clearSession(contactId);
         return true;
+      }
+
+      // Show interactive list for doctors
+      await engineSendInteractiveList({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        bodyText: `👨‍⚕️ Select a Doctor for ${selected.service_name}`,
+        footerText: "Please choose a doctor",
+        buttonText: "View Doctors",
+        sections: [
+          {
+            title: "Available Doctors",
+            rows: doctors.map((d: any) => ({
+              id: `doctor_${d.id}`,
+              title: d.doctor_name,
+              description: d.specialization,
+            })),
+          },
+        ],
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Doctor Selection ----
+    if (session.step === "doctor") {
+      let selected;
+
+      if (command.startsWith("doctor_")) {
+        const doctorId = command.replace("doctor_", "");
+        const { data: doctors } = await db
+          .from("clinic_doctors")
+          .select("id, doctor_name, specialization")
+          .eq("clinic_id", clinicId);
+        selected = doctors?.find((d: any) => String(d.id) === doctorId);
       } else {
+        const doctorIndex = parseInt(command) - 1;
+        const { data: doctors } = await db
+          .from("clinic_doctors")
+          .select("id, doctor_name, specialization")
+          .eq("clinic_id", clinicId)
+          .order("created_at", { ascending: false });
+        selected = doctors?.[doctorIndex];
+      }
+
+      if (!selected) {
         await engineSendText({
           accountId,
           userId,
           conversationId,
           contactId,
-          text: "❌ Invalid selection. Please reply with a number from the list.",
+          text: "❌ Invalid doctor. Please select again.",
         });
         return true;
       }
+
+      setSession(contactId, {
+        step: "date",
+        serviceId: session.serviceId,
+        serviceName: session.serviceName,
+        doctorId: selected.id,
+        doctorName: selected.doctor_name,
+      });
+
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: `📅 Please enter the date for your appointment with ${selected.doctor_name}.\n\nFormat: DD-MM-YYYY (e.g., 25-12-2024)`,
+      });
+
+      return true;
     }
 
     // ---- STEP: Date Selection ----
@@ -237,12 +226,37 @@ if (selected) {
         date: msg,
       });
 
-      await engineSendText({
+      // ✅ Show Interactive List for Time Selection
+      const timeSlots = [
+        { id: "time_09:00", title: "09:00 AM" },
+        { id: "time_10:00", title: "10:00 AM" },
+        { id: "time_11:00", title: "11:00 AM" },
+        { id: "time_12:00", title: "12:00 PM" },
+        { id: "time_02:00", title: "02:00 PM" },
+        { id: "time_03:00", title: "03:00 PM" },
+        { id: "time_04:00", title: "04:00 PM" },
+        { id: "time_05:00", title: "05:00 PM" },
+        { id: "time_06:00", title: "06:00 PM" },
+      ];
+
+      await engineSendInteractiveList({
         accountId,
         userId,
         conversationId,
         contactId,
-        text: `🕐 Please enter the time for your appointment.\n\nFormat: HH:MM (e.g., 14:30 for 2:30 PM)`,
+        bodyText: `🕐 Select Appointment Time for ${session.serviceName} with ${session.doctorName}`,
+        footerText: "Choose a time slot",
+        buttonText: "View Time Slots",
+        sections: [
+          {
+            title: "Available Time Slots",
+            rows: timeSlots.map((slot) => ({
+              id: slot.id,
+              title: slot.title,
+              description: "Tap to select this time",
+            })),
+          },
+        ],
       });
 
       return true;
@@ -250,14 +264,25 @@ if (selected) {
 
     // ---- STEP: Time Selection ----
     if (session.step === "time") {
-      const timeRegex = /^\d{2}:\d{2}$/;
-      if (!timeRegex.test(msg)) {
+      let selectedTime: string | null = null;
+
+      if (command.startsWith("time_")) {
+        selectedTime = command.replace("time_", "");
+      } else {
+        // Fallback: if user types time manually (HH:MM)
+        const timeRegex = /^\d{2}:\d{2}$/;
+        if (timeRegex.test(msg)) {
+          selectedTime = msg;
+        }
+      }
+
+      if (!selectedTime) {
         await engineSendText({
           accountId,
           userId,
           conversationId,
           contactId,
-          text: "❌ Invalid time format. Please use HH:MM (e.g., 14:30)",
+          text: "❌ Invalid time. Please select from the list or use HH:MM format.",
         });
         return true;
       }
@@ -269,7 +294,7 @@ if (selected) {
         doctorId: session.doctorId,
         doctorName: session.doctorName,
         date: session.date,
-        time: msg,
+        time: selectedTime,
       });
 
       await engineSendText({
@@ -430,31 +455,29 @@ if (selected) {
 
     setSession(contactId, { step: "service" });
 
+    await engineSendInteractiveList({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      bodyText: "📋 Select a Service",
+      footerText: "Please choose a service",
+      buttonText: "View Services",
+      sections: [
+        {
+          title: "Available Services",
+          rows: services.map((s: any) => ({
+            id: `service_${s.id}`,
+            title: s.service_name,
+            description: "Tap to select",
+          })),
+        },
+      ],
+    });
 
+    return true;
+  }
 
-
-
-await engineSendInteractiveList({
-  accountId,
-  userId,
-  conversationId,
-  contactId,
-  bodyText: "📋 Select a Service",
-  footerText: "Please choose a service",
-  buttonText: "View Services",
-  sections: [
-    {
-      title: "Available Services",
-      rows: services.map((s: any) => ({
-        id: `service_${s.id}`,
-        title: s.service_name,
-        description: "Tap to select",
-      })),
-    },
-  ],
-});
-
-return true;
   // 2 or "doctors" - Show Doctors
   if (command === "2" || command === "doctors") {
     const { data: doctors } = await db
