@@ -34,7 +34,7 @@ export async function runWhatsAppBot({
   text: string;
 }) {
   const msg = text.trim().toLowerCase();
-  
+
   // Convert text commands to numbers
   const command = msg
     .replace(/^book$/i, "1")
@@ -44,7 +44,7 @@ export async function runWhatsAppBot({
     .replace(/^faq$/i, "5")
     .replace(/^contact$/i, "6")
     .replace(/^location$/i, "7");
-  
+
   const db = supabaseAdmin();
 
   // Get clinic ID
@@ -69,55 +69,47 @@ export async function runWhatsAppBot({
   // ============================================================
   if (session) {
     // ---- STEP: Service Selection ----
+    if (session.step === "service") {
+      const serviceIndex = parseInt(command) - 1;
 
+      const { data: services } = await db
+        .from("clinic_services")
+        .select("id, service_name")
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false });
 
-if (session.step === "service") {
-  let selected;
+      if (services && services[serviceIndex]) {
+        const selected = services[serviceIndex];
 
-  const { data: services } = await db
-    .from("clinic_services")
-    .select("id, service_name")
-    .eq("clinic_id", clinicId)
-    .order("created_at", { ascending: false });
+        setSession(contactId, {
+          step: "doctor",
+          serviceId: selected.id,
+          serviceName: selected.service_name,
+        });
 
-  // Interactive List reply
-  if (command.startsWith("service_")) {
-    const serviceId = command.replace("service_", "");
-    selected = services?.find((s: any) => s.id === serviceId);
-  }
-  // Number reply (backup)
-  else {
-    const index = parseInt(command) - 1;
-    selected = services?.[index];
-  }
+        const { data: doctors } = await db
+          .from("clinic_doctors")
+          .select("id, doctor_name, specialization")
+          .eq("clinic_id", clinicId)
+          .order("created_at", { ascending: false });
 
-  if (!selected) {
-    await engineSendText({
-      accountId,
-      userId,
-      conversationId,
-      contactId,
-      text: "❌ Invalid service. Please select again.",
-    });
-    return true;
-  }
-
-  setSession(contactId, {
-    step: "doctor",
-    serviceId: selected.id,
-    serviceName: selected.service_name,
-  });
-
-  // Continue to doctor selection...
-}
-
-
-
-
-
+        if (!doctors || doctors.length === 0) {
+          await engineSendText({
+            accountId,
+            userId,
+            conversationId,
+            contactId,
+            text: "❌ No doctors available. Please contact the clinic.",
+          });
+          clearSession(contactId);
+          return true;
+        }
 
         const doctorList = doctors
-          .map((d: any, i: number) => `${i + 1}. ${d.doctor_name} (${d.specialization})`)
+          .map(
+            (d: any, i: number) =>
+              `${i + 1}. ${d.doctor_name} (${d.specialization})`
+          )
           .join("\n");
 
         await engineSendText({
@@ -144,7 +136,7 @@ if (session.step === "service") {
     // ---- STEP: Doctor Selection ----
     if (session.step === "doctor") {
       const doctorIndex = parseInt(command) - 1;
-      
+
       const { data: doctors } = await db
         .from("clinic_doctors")
         .select("id, doctor_name, specialization")
@@ -153,7 +145,7 @@ if (session.step === "service") {
 
       if (doctors && doctors[doctorIndex]) {
         const selected = doctors[doctorIndex];
-        
+
         setSession(contactId, {
           step: "date",
           serviceId: session.serviceId,
@@ -183,29 +175,19 @@ if (session.step === "service") {
       }
     }
 
-
-
-await engineSendInteractiveList({
-  accountId,
-  userId,
-  conversationId,
-  contactId,
-  bodyText: `👨‍⚕️ Select a Doctor for ${selected.service_name}`,
-  footerText: "Please choose a doctor",
-  buttonText: "View Doctors",
-  sections: [
-    {
-      title: "Available Doctors",
-      rows: doctors.map((d: any) => ({
-        id: `doctor_${d.id}`,
-        title: d.doctor_name,
-        description: d.specialization,
-      })),
-    },
-  ],
-});
-
-
+    // ---- STEP: Date Selection ----
+    if (session.step === "date") {
+      const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
+      if (!dateRegex.test(msg)) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Invalid date format. Please use DD-MM-YYYY (e.g., 25-12-2024)",
+        });
+        return true;
+      }
 
       setSession(contactId, {
         step: "time",
@@ -228,33 +210,18 @@ await engineSendInteractiveList({
     }
 
     // ---- STEP: Time Selection ----
-
-
-
-await engineSendInteractiveList({
-  accountId,
-  userId,
-  conversationId,
-  contactId,
-  bodyText: "🕐 Select Appointment Time",
-  footerText: "Choose a time slot",
-  buttonText: "View Time Slots",
-  sections: [
-    {
-      title: "Available Time",
-      rows: [
-        { id: "time_09:00", title: "09:00 AM" },
-        { id: "time_10:00", title: "10:00 AM" },
-        { id: "time_11:00", title: "11:00 AM" },
-        { id: "time_02:00", title: "02:00 PM" },
-        { id: "time_03:00", title: "03:00 PM" },
-        { id: "time_04:00", title: "04:00 PM" },
-      ],
-    },
-  ],
-});
-
-
+    if (session.step === "time") {
+      const timeRegex = /^\d{2}:\d{2}$/;
+      if (!timeRegex.test(msg)) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Invalid time format. Please use HH:MM (e.g., 14:30)",
+        });
+        return true;
+      }
 
       setSession(contactId, {
         step: "name",
@@ -412,30 +379,13 @@ await engineSendInteractiveList({
       .order("created_at", { ascending: false });
 
     if (!services || services.length === 0) {
-
-await engineSendInteractiveList({
-  accountId,
-  userId,
-  conversationId,
-  contactId,
-  bodyText: "📋 Select a Service",
-  footerText: "Please choose a service",
-  buttonText: "View Services",
-  sections: [
-    {
-      title: "Available Services",
-      rows: services.map((s: any) => ({
-        id: `service_${s.id}`,
-        title: s.service_name,
-        description: "Tap to select",
-      })),
-    },
-  ],
-});
-
-
-
-
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ No services available. Please contact the clinic.",
+      });
       return true;
     }
 
@@ -476,7 +426,10 @@ await engineSendInteractiveList({
     }
 
     const list = doctors
-      .map((d: any, i: number) => `${i + 1}. ${d.doctor_name} (${d.specialization})`)
+      .map(
+        (d: any, i: number) =>
+          `${i + 1}. ${d.doctor_name} (${d.specialization})`
+      )
       .join("\n");
 
     await engineSendText({
@@ -510,7 +463,12 @@ await engineSendInteractiveList({
     }
 
     const list = services
-      .map((s: any) => `🩺 ${s.service_name}${s.price ? ` - ₹${s.price}` : ""}${s.duration_minutes ? ` (${s.duration_minutes} min)` : ""}`)
+      .map(
+        (s: any) =>
+          `🩺 ${s.service_name}${s.price ? ` - ₹${s.price}` : ""}${
+            s.duration_minutes ? ` (${s.duration_minutes} min)` : ""
+          }`
+      )
       .join("\n");
 
     await engineSendText({
@@ -544,7 +502,11 @@ await engineSendInteractiveList({
     }
 
     const list = hours
-      .map((h: any) => h.is_closed ? `${h.day_name}: Closed` : `${h.day_name}: ${h.open_time} - ${h.close_time}`)
+      .map((h: any) =>
+        h.is_closed
+          ? `${h.day_name}: Closed`
+          : `${h.day_name}: ${h.open_time} - ${h.close_time}`
+      )
       .join("\n");
 
     await engineSendText({
@@ -577,7 +539,9 @@ await engineSendInteractiveList({
       return true;
     }
 
-    const list = faq.map((f: any, i: number) => `${i + 1}. ${f.question}\n   ${f.answer}`).join("\n\n");
+    const list = faq
+      .map((f: any, i: number) => `${i + 1}. ${f.question}\n   ${f.answer}`)
+      .join("\n\n");
 
     await engineSendText({
       accountId,
@@ -599,7 +563,8 @@ await engineSendInteractiveList({
       .maybeSingle();
 
     let contactText = `📞 Contact ${clinicData?.clinic_name || "Us"}:\n\n`;
-    if (clinicData?.whatsapp_number) contactText += `📱 WhatsApp: ${clinicData.whatsapp_number}\n`;
+    if (clinicData?.whatsapp_number)
+      contactText += `📱 WhatsApp: ${clinicData.whatsapp_number}\n`;
 
     await engineSendText({
       accountId,
