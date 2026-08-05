@@ -362,12 +362,15 @@ export async function runWhatsAppBot({
   if (msg === "hi" || msg === "hello" || msg === "hey") {
     clearSession(contactId);
 
-    await sendMainMenu({
-      accountId,
-      userId,
-      conversationId,
-      contactId,
-    });
+
+await sendMainMenu({
+  accountId,
+  userId,
+  conversationId,
+  contactId,
+  clinicId, // clinicId যোগ করুন
+});
+
 
     return true;
   }
