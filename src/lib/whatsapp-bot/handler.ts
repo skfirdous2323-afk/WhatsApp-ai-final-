@@ -136,7 +136,8 @@ export async function runWhatsAppBot({
         contactId,
         bodyText: `👨‍⚕️ Select a Doctor for ${selected.service_name}`,
         footerText: "Please choose a doctor",
-        sections: [
+buttonLabel: "View Services",
+  sections: [
           {
             title: "Available Doctors",
             rows: doctors.map((d: any) => ({
