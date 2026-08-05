@@ -1,5 +1,6 @@
 import { engineSendText } from "@/lib/flows/meta-send";
 import { supabaseAdmin } from "@/lib/ai/admin-client";
+import { sendMainMenu } from "@/lib/whatsapp-bot/menu";
 import {
   getSession,
   setSession,
@@ -33,6 +34,17 @@ export async function runWhatsAppBot({
   text: string;
 }) {
   const msg = text.trim().toLowerCase();
+  
+  // ✅ Convert text commands to numbers
+  const command = msg
+    .replace(/^book$/i, "1")
+    .replace(/^doctors$/i, "2")
+    .replace(/^services$/i, "3")
+    .replace(/^hours$/i, "4")
+    .replace(/^faq$/i, "5")
+    .replace(/^contact$/i, "6")
+    .replace(/^location$/i, "7");
+  
   const db = supabaseAdmin();
 
   // Get clinic ID
@@ -58,7 +70,7 @@ export async function runWhatsAppBot({
   if (session) {
     // ---- STEP: Service Selection ----
     if (session.step === "service") {
-      const serviceIndex = parseInt(msg) - 1;
+      const serviceIndex = parseInt(command) - 1;
       
       const { data: services } = await db
         .from("clinic_services")
@@ -122,7 +134,7 @@ export async function runWhatsAppBot({
 
     // ---- STEP: Doctor Selection ----
     if (session.step === "doctor") {
-      const doctorIndex = parseInt(msg) - 1;
+      const doctorIndex = parseInt(command) - 1;
       
       const { data: doctors } = await db
         .from("clinic_doctors")
@@ -343,35 +355,25 @@ export async function runWhatsAppBot({
   }
 
   // ============================================================
-  // Main Menu Handlers
+  // Main Menu Handlers (using command variable)
   // ============================================================
 
   // Hi / Hello - Show Main Menu
   if (msg === "hi" || msg === "hello" || msg === "hey") {
     clearSession(contactId);
 
-    await engineSendText({
+    await sendMainMenu({
       accountId,
       userId,
       conversationId,
       contactId,
-      text: `👋 Welcome to our clinic!
-
-Please select an option:
-
-1️⃣ Book Appointment
-2️⃣ Doctors
-3️⃣ Services
-4️⃣ Working Hours
-
-Reply with the number.`,
     });
 
     return true;
   }
 
-  // 1 - Book Appointment
-  if (msg === "1") {
+  // ✅ 1 - Book Appointment (using command)
+  if (command === "1") {
     const { data: services } = await db
       .from("clinic_services")
       .select("id, service_name")
@@ -406,8 +408,8 @@ Reply with the number.`,
     return true;
   }
 
-  // 2 - Show Doctors
-  if (msg === "2") {
+  // ✅ 2 - Show Doctors (using command)
+  if (command === "2") {
     const { data: doctors } = await db
       .from("clinic_doctors")
       .select("doctor_name, specialization")
@@ -443,8 +445,8 @@ Reply with the number.`,
     return true;
   }
 
-  // 3 - Show Services
-  if (msg === "3") {
+  // ✅ 3 - Show Services (using command)
+  if (command === "3") {
     const { data: services } = await db
       .from("clinic_services")
       .select("service_name, price, duration_minutes")
@@ -482,8 +484,8 @@ Reply with the number.`,
     return true;
   }
 
-  // 4 - Show Working Hours
-  if (msg === "4") {
+  // ✅ 4 - Show Working Hours (using command)
+  if (command === "4") {
     const { data: hours } = await db
       .from("clinic_working_hours")
       .select("day_name, open_time, close_time, is_closed")
@@ -531,4 +533,3 @@ Reply with the number.`,
 
   return true;
 }
-
