@@ -35,7 +35,7 @@ export async function runWhatsAppBot({
 }) {
   const msg = text.trim().toLowerCase();
   
-  // ✅ Convert text commands to numbers
+  // Convert text commands to numbers
   const command = msg
     .replace(/^book$/i, "1")
     .replace(/^doctors$/i, "2")
@@ -81,14 +81,12 @@ export async function runWhatsAppBot({
       if (services && services[serviceIndex]) {
         const selected = services[serviceIndex];
         
-        // Update session with selected service
         setSession(contactId, {
           step: "doctor",
           serviceId: selected.id,
           serviceName: selected.service_name,
         });
 
-        // Get doctors for this clinic
         const { data: doctors } = await db
           .from("clinic_doctors")
           .select("id, doctor_name, specialization")
@@ -176,7 +174,6 @@ export async function runWhatsAppBot({
 
     // ---- STEP: Date Selection ----
     if (session.step === "date") {
-      // Validate date format (DD-MM-YYYY)
       const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
       if (!dateRegex.test(msg)) {
         await engineSendText({
@@ -211,7 +208,6 @@ export async function runWhatsAppBot({
 
     // ---- STEP: Time Selection ----
     if (session.step === "time") {
-      // Validate time format (HH:MM)
       const timeRegex = /^\d{2}:\d{2}$/;
       if (!timeRegex.test(msg)) {
         await engineSendText({
@@ -294,7 +290,6 @@ export async function runWhatsAppBot({
         return true;
       }
 
-      // Save appointment to database
       try {
         const appointmentData = {
           clinic_id: clinicId,
@@ -327,7 +322,6 @@ export async function runWhatsAppBot({
           return true;
         }
 
-        // Clear session after successful booking
         clearSession(contactId);
 
         await engineSendText({
@@ -359,242 +353,214 @@ export async function runWhatsAppBot({
   // ============================================================
 
   // Hi / Hello - Show Main Menu
-  if (msg === "hi" || msg === "hello" || msg === "hey") {
+  if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
     clearSession(contactId);
 
-
-await sendMainMenu({
-  accountId,
-  userId,
-  conversationId,
-  contactId,
-  clinicId,
-});
+    await sendMainMenu({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      clinicId,
+    });
 
     return true;
   }
 
+  // 1 - Book Appointment
+  if (command === "1" || command === "book") {
+    const { data: services } = await db
+      .from("clinic_services")
+      .select("id, service_name")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false });
 
+    if (!services || services.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ No services available. Please contact the clinic.",
+      });
+      return true;
+    }
 
-// ============================================================
-// Handle Interactive List Selections
-// ============================================================
+    setSession(contactId, { step: "service" });
 
-// Book Appointment (from list)
-if (command === "book") {
-  // Same as "1" - show services
-  const { data: services } = await db
-    .from("clinic_services")
-    .select("id, service_name")
-    .eq("clinic_id", clinicId)
-    .order("created_at", { ascending: false });
+    const list = services
+      .map((s: any, i: number) => `${i + 1}. ${s.service_name}`)
+      .join("\n");
 
-  if (!services || services.length === 0) {
     await engineSendText({
       accountId,
       userId,
       conversationId,
       contactId,
-      text: "❌ No services available. Please contact the clinic.",
+      text: `📋 Select a Service:\n\n${list}\n\nReply with the number.`,
     });
+
     return true;
   }
 
-  setSession(contactId, { step: "service" });
+  // 2 - Show Doctors
+  if (command === "2" || command === "doctors") {
+    const { data: doctors } = await db
+      .from("clinic_doctors")
+      .select("doctor_name, specialization")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false });
 
-  const list = services
-    .map((s: any, i: number) => `${i + 1}. ${s.service_name}`)
-    .join("\n");
+    if (!doctors || doctors.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ No doctors available.",
+      });
+      return true;
+    }
 
-  await engineSendText({
-    accountId,
-    userId,
-    conversationId,
-    contactId,
-    text: `📋 Select a Service:\n\n${list}\n\nReply with the number.`,
-  });
+    const list = doctors
+      .map((d: any, i: number) => `${i + 1}. ${d.doctor_name} (${d.specialization})`)
+      .join("\n");
 
-  return true;
-}
-
-// Doctors (from list)
-if (command === "doctors") {
-  // Same as "2"
-  const { data: doctors } = await db
-    .from("clinic_doctors")
-    .select("doctor_name, specialization")
-    .eq("clinic_id", clinicId)
-    .order("created_at", { ascending: false });
-
-  if (!doctors || doctors.length === 0) {
     await engineSendText({
       accountId,
       userId,
       conversationId,
       contactId,
-      text: "❌ No doctors available.",
+      text: `👨‍⚕️ Our Doctors:\n\n${list}`,
     });
+
     return true;
   }
 
-  const list = doctors
-    .map((d: any, i: number) => `${i + 1}. ${d.doctor_name} (${d.specialization})`)
-    .join("\n");
+  // 3 - Show Services
+  if (command === "3" || command === "services") {
+    const { data: services } = await db
+      .from("clinic_services")
+      .select("service_name, price, duration_minutes")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false });
 
-  await engineSendText({
-    accountId,
-    userId,
-    conversationId,
-    contactId,
-    text: `👨‍⚕️ Our Doctors:\n\n${list}`,
-  });
+    if (!services || services.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ No services available.",
+      });
+      return true;
+    }
 
-  return true;
-}
+    const list = services
+      .map((s: any) => `🩺 ${s.service_name}${s.price ? ` - ₹${s.price}` : ""}${s.duration_minutes ? ` (${s.duration_minutes} min)` : ""}`)
+      .join("\n");
 
-// Services (from list)
-if (command === "services") {
-  // Same as "3"
-  const { data: services } = await db
-    .from("clinic_services")
-    .select("service_name, price, duration_minutes")
-    .eq("clinic_id", clinicId)
-    .order("created_at", { ascending: false });
-
-  if (!services || services.length === 0) {
     await engineSendText({
       accountId,
       userId,
       conversationId,
       contactId,
-      text: "❌ No services available.",
+      text: `🩺 Our Services:\n\n${list}`,
     });
+
     return true;
   }
 
-  const list = services
-    .map((s: any) => `🩺 ${s.service_name}${s.price ? ` - ₹${s.price}` : ""}${s.duration_minutes ? ` (${s.duration_minutes} min)` : ""}`)
-    .join("\n");
+  // 4 - Show Working Hours
+  if (command === "4" || command === "hours") {
+    const { data: hours } = await db
+      .from("clinic_working_hours")
+      .select("day_name, open_time, close_time, is_closed")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: true });
 
-  await engineSendText({
-    accountId,
-    userId,
-    conversationId,
-    contactId,
-    text: `🩺 Our Services:\n\n${list}`,
-  });
+    if (!hours || hours.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ Working hours not available.",
+      });
+      return true;
+    }
 
-  return true;
-}
+    const list = hours
+      .map((h: any) => h.is_closed ? `${h.day_name}: Closed` : `${h.day_name}: ${h.open_time} - ${h.close_time}`)
+      .join("\n");
 
-// Hours (from list)
-if (command === "hours") {
-  // Same as "4"
-  const { data: hours } = await db
-    .from("clinic_working_hours")
-    .select("day_name, open_time, close_time, is_closed")
-    .eq("clinic_id", clinicId)
-    .order("created_at", { ascending: true });
-
-  if (!hours || hours.length === 0) {
     await engineSendText({
       accountId,
       userId,
       conversationId,
       contactId,
-      text: "❌ Working hours not available.",
+      text: `🕒 Working Hours:\n\n${list}`,
     });
+
     return true;
   }
 
-  const list = hours
-    .map((h: any) => h.is_closed ? `${h.day_name}: Closed` : `${h.day_name}: ${h.open_time} - ${h.close_time}`)
-    .join("\n");
+  // 5 - FAQ
+  if (command === "5" || command === "faq") {
+    const { data: faq } = await db
+      .from("clinic_knowledge_base")
+      .select("question, answer")
+      .eq("clinic_id", clinicId)
+      .limit(5);
 
-  await engineSendText({
-    accountId,
-    userId,
-    conversationId,
-    contactId,
-    text: `🕒 Working Hours:\n\n${list}`,
-  });
+    if (!faq || faq.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ No FAQ available.",
+      });
+      return true;
+    }
 
-  return true;
-}
+    const list = faq.map((f: any, i: number) => `${i + 1}. ${f.question}\n   ${f.answer}`).join("\n\n");
 
-// FAQ (from list)
-if (command === "faq") {
-  const { data: faq } = await db
-    .from("clinic_knowledge_base")
-    .select("question, answer")
-    .eq("clinic_id", clinicId)
-    .limit(5);
-
-  if (!faq || faq.length === 0) {
     await engineSendText({
       accountId,
       userId,
       conversationId,
       contactId,
-      text: "❌ No FAQ available.",
+      text: `❓ Frequently Asked Questions:\n\n${list}`,
     });
+
     return true;
   }
 
-  const list = faq.map((f: any, i: number) => `${i + 1}. ${f.question}\n   ${f.answer}`).join("\n\n");
+  // 6 - Contact
+  if (command === "6" || command === "contact") {
+    const { data: clinicData } = await db
+      .from("clinics")
+      .select("clinic_name, whatsapp_number")
+      .eq("id", clinicId)
+      .maybeSingle();
 
-  await engineSendText({
-    accountId,
-    userId,
-    conversationId,
-    contactId,
-    text: `❓ Frequently Asked Questions:\n\n${list}`,
-  });
+    let contactText = `📞 Contact ${clinicData?.clinic_name || "Us"}:\n\n`;
+    if (clinicData?.whatsapp_number) contactText += `📱 WhatsApp: ${clinicData.whatsapp_number}\n`;
 
-  return true;
-}
-
-// Contact (from list)
-if (command === "contact") {
-  const { data: clinic } = await db
-    .from("clinics")
-    .select("clinic_name, whatsapp_number, clinic_phone, clinic_email")
-    .eq("id", clinicId)
-    .maybeSingle();
-
-  let contactText = `📞 Contact ${clinic?.clinic_name || "Us"}:\n\n`;
-  if (clinic?.whatsapp_number) contactText += `📱 WhatsApp: ${clinic.whatsapp_number}\n`;
-  if (clinic?.clinic_phone) contactText += `📞 Phone: ${clinic.clinic_phone}\n`;
-  if (clinic?.clinic_email) contactText += `📧 Email: ${clinic.clinic_email}\n`;
-
-  await engineSendText({
-    accountId,
-    userId,
-    conversationId,
-    contactId,
-    text: contactText || "📞 Contact information not available.",
-  });
-
-  return true;
-}
-
-// Location (from list)
-if (command === "location") {
-  const { data: clinic } = await db
-    .from("clinics")
-    .select("clinic_name, clinic_address")
-    .eq("id", clinicId)
-    .maybeSingle();
-
-  if (clinic?.clinic_address) {
     await engineSendText({
       accountId,
       userId,
       conversationId,
       contactId,
-      text: `📍 ${clinic.clinic_name || "Clinic"} Address:\n\n${clinic.clinic_address}`,
+      text: contactText || "📞 Contact information not available.",
     });
-  } else {
+
+    return true;
+  }
+
+  // 7 - Location
+  if (command === "7" || command === "location") {
     await engineSendText({
       accountId,
       userId,
@@ -602,7 +568,18 @@ if (command === "location") {
       contactId,
       text: "📍 Location information not available.",
     });
+
+    return true;
   }
 
-  return true;
+  // Unknown command - show help
+  await engineSendText({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    text: `❌ I didn't understand that.\n\nPlease reply with:\n1️⃣ Book Appointment\n2️⃣ Doctors\n3️⃣ Services\n4️⃣ Working Hours\n5️⃣ FAQ\n6️⃣ Contact\n7️⃣ Location\n\nOr type "Hi" to see the menu.`,
+  });
+
+  return true; // ✅ এই ব্রেসটি ঠিক করা হয়েছে
 }
