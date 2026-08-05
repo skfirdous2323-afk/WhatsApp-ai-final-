@@ -754,14 +754,21 @@ async function processMessage(
   // message all exist before any step — including send_message — runs.
   // Fire-and-forget: a slow or failing automation must not block the
   // webhook's 200 OK response to Meta.
-  const inboundText = contentText ?? message.text?.body ?? ''
+  
+const inboundText = contentText ?? message.text?.body ?? ''
+const command = interactiveReplyId || inboundText
+
 const botHandled = await runWhatsAppBot({
   accountId,
   userId: configOwnerUserId,
   conversationId: conversation.id,
   contactId: contactRecord.id,
-  text: inboundText,
+  text: command,
 })
+
+
+
+
 
 if (botHandled) {
   return
