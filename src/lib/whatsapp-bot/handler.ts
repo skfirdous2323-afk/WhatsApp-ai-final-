@@ -135,10 +135,9 @@ export async function runWhatsAppBot({
         conversationId,
         contactId,
         bodyText: `👨‍⚕️ Select a Doctor for ${selected.service_name}`,
-      
-  footerText: "Please choose a doctor",
-buttonLabel: "View Services",
-  sections: [
+        footerText: "Please choose a doctor",
+        buttonLabel: "View Doctors",
+        sections: [
           {
             title: "Available Doctors",
             rows: doctors.map((d: any) => ({
@@ -227,7 +226,7 @@ buttonLabel: "View Services",
         date: msg,
       });
 
-      // ✅ Show Interactive List for Time Selection
+      // Show Interactive List for Time Selection
       const timeSlots = [
         { id: "time_09:00", title: "09:00 AM" },
         { id: "time_10:00", title: "10:00 AM" },
@@ -247,8 +246,7 @@ buttonLabel: "View Services",
         contactId,
         bodyText: `🕐 Select Appointment Time for ${session.serviceName} with ${session.doctorName}`,
         footerText: "Choose a time slot",
-buttonLabel: "View Time Slots",
-
+        buttonLabel: "View Time Slots",
         sections: [
           {
             title: "Available Time Slots",
@@ -464,8 +462,7 @@ buttonLabel: "View Time Slots",
       contactId,
       bodyText: "📋 Select a Service",
       footerText: "Please choose a service",
-buttonLabel: "View Services",
-
+      buttonLabel: "View Services",
       sections: [
         {
           title: "Available Services",
