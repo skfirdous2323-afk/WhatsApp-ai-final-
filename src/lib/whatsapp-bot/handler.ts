@@ -246,7 +246,8 @@ buttonLabel: "View Services",
         contactId,
         bodyText: `🕐 Select Appointment Time for ${session.serviceName} with ${session.doctorName}`,
         footerText: "Choose a time slot",
-        buttonText: "View Time Slots",
+buttonLabel: "View Time Slots",
+
         sections: [
           {
             title: "Available Time Slots",
