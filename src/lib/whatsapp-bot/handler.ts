@@ -135,7 +135,8 @@ export async function runWhatsAppBot({
         conversationId,
         contactId,
         bodyText: `👨‍⚕️ Select a Doctor for ${selected.service_name}`,
-        footerText: "Please choose a doctor",
+      
+  footerText: "Please choose a doctor",
 buttonLabel: "View Services",
   sections: [
           {
@@ -463,6 +464,8 @@ buttonLabel: "View Time Slots",
       contactId,
       bodyText: "📋 Select a Service",
       footerText: "Please choose a service",
+buttonLabel: "View Services",
+
       sections: [
         {
           title: "Available Services",
