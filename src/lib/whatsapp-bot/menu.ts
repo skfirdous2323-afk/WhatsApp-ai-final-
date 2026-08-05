@@ -1,22 +1,22 @@
 import { supabaseAdmin } from "@/lib/ai/admin-client";
-import { engineSendInteractiveButtons } from "@/lib/flows/meta-send";
+import { engineSendInteractiveList } from "@/lib/flows/meta-send";
 
 export async function sendMainMenu({
   accountId,
   userId,
   conversationId,
   contactId,
-  clinicId,  // ✅ নতুন প্যারামিটার
+  clinicId,
 }: {
   accountId: string;
   userId: string;
   conversationId: string;
   contactId: string;
-  clinicId: string;  // ✅ নতুন প্যারামিটার
+  clinicId: string;
 }) {
   const db = supabaseAdmin();
 
-  // ✅ clinicId দিয়ে clinic ডেটা নিন
+  // Get clinic data
   const { data: clinic, error: clinicError } = await db
     .from("clinics")
     .select("clinic_name, whatsapp_number")
@@ -27,10 +27,10 @@ export async function sendMainMenu({
     console.error("Error fetching clinic:", clinicError);
   }
 
-  const clinicName = clinic?.clinic_name || "Our Clinic";
-  const whatsappNumber = clinic?.whatsapp_number || "";
+  const clinicName = clinic?.clinic_name || "Sunrise Health Clinic";
+  const whatsappNumber = clinic?.whatsapp_number || "+91 9876543210";
 
-  // ✅ clinicId দিয়ে working hours নিন
+  // Get today's working hours
   const { data: hoursData } = await db
     .from("clinic_working_hours")
     .select("day_name, is_closed, open_time, close_time")
@@ -44,13 +44,14 @@ export async function sendMainMenu({
     
     if (todayHours) {
       if (todayHours.is_closed) {
-        hoursSummary = `📌 Today (${today}): Closed`;
+        hoursSummary = `Today (${today}): Closed`;
       } else {
-        hoursSummary = `📌 Today (${today}): ${todayHours.open_time} - ${todayHours.close_time}`;
+        hoursSummary = `Today (${today}): ${todayHours.open_time} - ${todayHours.close_time}`;
       }
     }
   }
 
+  // Build welcome message
   let welcomeText = `👋 Welcome to *${clinicName}*!`;
 
   if (hoursSummary) {
@@ -61,22 +62,58 @@ export async function sendMainMenu({
     welcomeText += `\n📱 WhatsApp: ${whatsappNumber}`;
   }
 
-  welcomeText += `\n\n*Please choose an option:*`;
+  welcomeText += `\n\n*Please choose an option from the menu below.*`;
 
-  // ✅ ৩টির বেশি বাটন নয় (WhatsApp-এর সীমা)
-  const buttons = [
-    { id: "book", title: "📅 Book" },
-    { id: "doctors", title: "👨‍⚕️ Doctors" },
-    { id: "services", title: "🦷 Services" },
-  ];
-
-  await engineSendInteractiveButtons({
+  // ✅ Interactive List - 7 options
+  await engineSendInteractiveList({
     accountId,
     userId,
     conversationId,
     contactId,
     bodyText: welcomeText,
-    buttons: buttons,
+    buttonLabel: "📋 Open Menu",
+    sections: [
+      {
+        title: "Dental Clinic",
+        rows: [
+          {
+            id: "book",
+            title: "📅 Book Appointment",
+            description: "Book a new appointment",
+          },
+          {
+            id: "doctors",
+            title: "👨‍⚕️ Doctors",
+            description: "View all doctors",
+          },
+          {
+            id: "services",
+            title: "🦷 Services",
+            description: "Our treatments",
+          },
+          {
+            id: "hours",
+            title: "🕒 Working Hours",
+            description: "Clinic timing",
+          },
+          {
+            id: "faq",
+            title: "❓ FAQ",
+            description: "Frequently asked questions",
+          },
+          {
+            id: "contact",
+            title: "📞 Contact",
+            description: "Contact clinic",
+          },
+          {
+            id: "location",
+            title: "📍 Location",
+            description: "Clinic address",
+          },
+        ],
+      },
+    ],
     footerText: `🏥 ${clinicName} • ZIVEXO CRM`,
   });
 }
