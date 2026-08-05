@@ -1,4 +1,8 @@
-import { engineSendText } from "@/lib/flows/meta-send";
+import {
+  engineSendText,
+  engineSendInteractiveList,
+} from "@/lib/flows/meta-send";
+
 import { supabaseAdmin } from "@/lib/ai/admin-client";
 import { sendMainMenu } from "@/lib/whatsapp-bot/menu";
 import {
@@ -70,16 +74,25 @@ export async function runWhatsAppBot({
   if (session) {
     // ---- STEP: Service Selection ----
     if (session.step === "service") {
-      const serviceIndex = parseInt(command) - 1;
 
-      const { data: services } = await db
-        .from("clinic_services")
-        .select("id, service_name")
-        .eq("clinic_id", clinicId)
-        .order("created_at", { ascending: false });
 
-      if (services && services[serviceIndex]) {
-        const selected = services[serviceIndex];
+
+const serviceId = command.replace("service_", "");
+
+const { data: services } = await db
+  .from("clinic_services")
+  .select("id, service_name")
+  .eq("clinic_id", clinicId);
+
+const selected = services?.find(
+  (s: any) => String(s.id) === serviceId
+);
+
+if (selected) {
+
+
+
+
 
         setSession(contactId, {
           step: "doctor",
@@ -105,22 +118,34 @@ export async function runWhatsAppBot({
           return true;
         }
 
-        const doctorList = doctors
-          .map(
-            (d: any, i: number) =>
-              `${i + 1}. ${d.doctor_name} (${d.specialization})`
-          )
-          .join("\n");
 
-        await engineSendText({
-          accountId,
-          userId,
-          conversationId,
-          contactId,
-          text: `👨‍⚕️ Select a Doctor for ${selected.service_name}:\n\n${doctorList}\n\nReply with the number.`,
-        });
 
-        return true;
+
+await engineSendInteractiveList({
+  accountId,
+  userId,
+  conversationId,
+  contactId,
+  bodyText: `👨‍⚕️ Select a Doctor for ${selected.service_name}`,
+  footerText: "Please choose a doctor",
+  buttonText: "View Doctors",
+  sections: [
+    {
+      title: "Available Doctors",
+      rows: doctors.map((d: any) => ({
+        id: `doctor_${d.id}`,
+        title: d.doctor_name,
+        description: d.specialization,
+      })),
+    },
+  ],
+});
+
+return true;
+
+
+
+
       } else {
         await engineSendText({
           accountId,
@@ -144,7 +169,21 @@ export async function runWhatsAppBot({
         .order("created_at", { ascending: false });
 
       if (doctors && doctors[doctorIndex]) {
-        const selected = doctors[doctorIndex];
+
+const doctorId = command.replace("doctor_", "");
+
+const { data: doctors } = await db
+  .from("clinic_doctors")
+  .select("id, doctor_name, specialization")
+  .eq("clinic_id", clinicId);
+
+const selected = doctors?.find(
+  (d: any) => String(d.id) === doctorId
+);
+
+if (selected) {
+
+
 
         setSession(contactId, {
           step: "date",
@@ -391,21 +430,31 @@ export async function runWhatsAppBot({
 
     setSession(contactId, { step: "service" });
 
-    const list = services
-      .map((s: any, i: number) => `${i + 1}. ${s.service_name}`)
-      .join("\n");
 
-    await engineSendText({
-      accountId,
-      userId,
-      conversationId,
-      contactId,
-      text: `📋 Select a Service:\n\n${list}\n\nReply with the number.`,
-    });
 
-    return true;
-  }
 
+
+await engineSendInteractiveList({
+  accountId,
+  userId,
+  conversationId,
+  contactId,
+  bodyText: "📋 Select a Service",
+  footerText: "Please choose a service",
+  buttonText: "View Services",
+  sections: [
+    {
+      title: "Available Services",
+      rows: services.map((s: any) => ({
+        id: `service_${s.id}`,
+        title: s.service_name,
+        description: "Tap to select",
+      })),
+    },
+  ],
+});
+
+return true;
   // 2 or "doctors" - Show Doctors
   if (command === "2" || command === "doctors") {
     const { data: doctors } = await db
