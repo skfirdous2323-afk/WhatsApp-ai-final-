@@ -581,4 +581,5 @@ export async function runWhatsAppBot({
     text: `❌ I didn't understand that.\n\nPlease reply with:\n1️⃣ Book Appointment\n2️⃣ Doctors\n3️⃣ Services\n4️⃣ Working Hours\n5️⃣ FAQ\n6️⃣ Contact\n7️⃣ Location\n\nOr type "Hi" to see the menu.`,
   });
 
-  return true; 
+  return true;
+}
