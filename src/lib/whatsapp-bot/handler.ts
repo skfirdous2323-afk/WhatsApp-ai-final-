@@ -143,7 +143,12 @@ console.log("Message:", msg);
             title: "Available Doctors",
             rows: doctors.map((d: any) => ({
               id: `doctor_${d.id}`,
-              title: d.doctor_name,
+
+
+title:
+  d.doctor_name.length > 24
+    ? d.doctor_name.substring(0, 21) + "..."
+    : d.doctor_name,
               description: d.specialization,
             })),
           },
@@ -469,7 +474,11 @@ console.log("Message:", msg);
           title: "Available Services",
           rows: services.map((s: any) => ({
             id: `service_${s.id}`,
-            title: s.service_name,
+title:
+  s.service_name.length > 24
+    ? s.service_name.substring(0, 21) + "..."
+    : s.service_name,
+
             description: "Tap to select",
           })),
         },
