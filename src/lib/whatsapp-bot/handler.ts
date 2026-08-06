@@ -95,7 +95,8 @@ function generateTimeSlots(slotDuration: number) {
  */
 function getTimeSlotPage(slotDuration: number, page: number) {
   const allSlots = generateTimeSlots(slotDuration);
-  const pageSize = 9;
+const pageSize = 8;
+
   const start = page * pageSize;
   const end = start + pageSize;
   const pageSlots = allSlots.slice(start, end);
