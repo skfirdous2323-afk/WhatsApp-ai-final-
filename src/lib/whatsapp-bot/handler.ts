@@ -822,6 +822,8 @@ try {
     return true;
   }
 
+
+}
   // Unknown command - show help
   await engineSendText({
     accountId,
