@@ -517,89 +517,56 @@ export async function runWhatsAppBot({
         return true;
       }
 
-      setSession(contactId, {
-        step: "phone",
-        serviceId: session.serviceId,
-        serviceName: session.serviceName,
-        doctorId: session.doctorId,
-        doctorName: session.doctorName,
-        date: session.date,
-        time: session.time,
-        patientName: msg,
-      });
+try {
+  const appointmentData = {
+    clinic_id: clinicId,
+    user_id: userId,
+    contact_id: contactId,
+    service_id: session.serviceId,
+    doctor_id: session.doctorId,
+    appointment_date: session.date,
+    appointment_time: session.time,
+    patient_name: msg,
+    patient_phone: contactId,
+    status: "pending",
+    created_at: new Date().toISOString(),
+  };
 
-      await engineSendText({
-        accountId,
-        userId,
-        conversationId,
-        contactId,
-        text: `📱 Please enter your phone number with country code.\n\nExample: 919876543210`,
-      });
+  const { error: insertError } = await db
+    .from("appointments")
+    .insert([appointmentData]);
 
-      return true;
-    }
-
-
-      try {
-        const appointmentData = {
-          clinic_id: clinicId,
-          user_id: userId,
-          contact_id: contactId,
-          service_id: session.serviceId,
-          doctor_id: session.doctorId,
-          appointment_date: session.date,
-          appointment_time: session.time,
-          patient_name: session.patientName,
-
-patient_phone: contactId,
-
-
-          status: "pending",
-          created_at: new Date().toISOString(),
-        };
-
-        const { error: insertError } = await db
-          .from("appointments")
-          .insert([appointmentData]);
-
-        if (insertError) {
-          console.error("Error saving appointment:", insertError);
-          await engineSendText({
-            accountId,
-            userId,
-            conversationId,
-            contactId,
-            text: "❌ Failed to book appointment. Please try again later.",
-          });
-          clearSession(contactId);
-          return true;
-        }
-
-        clearSession(contactId);
-
-        await engineSendText({
-          accountId,
-          userId,
-          conversationId,
-          contactId,
-          text: `✅ Appointment Confirmed!\n\n📋 Service: ${session.serviceName}\n👨‍⚕️ Doctor: ${session.doctorName}\n📅 Date: ${session.date}\n🕐 Time: ${session.time}\n👤 Patient: ${session.patientName}\n📱 Phone: ${msg}\n\nThank you for booking with us! We'll send you a reminder.`,
-        });
-
-        return true;
-      } catch (error) {
-        console.error("Error saving appointment:", error);
-        await engineSendText({
-          accountId,
-          userId,
-          conversationId,
-          contactId,
-          text: "❌ An error occurred. Please try again later.",
-        });
-        clearSession(contactId);
-        return true;
-      }
-    }
+  if (insertError) {
+    throw insertError;
   }
+
+  clearSession(contactId);
+
+  await engineSendText({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    text: `✅ Appointment Confirmed!\n\n📋 Service: ${session.serviceName}\n👨‍⚕️ Doctor: ${session.doctorName}\n📅 Date: ${session.date}\n🕐 Time: ${session.time}\n👤 Patient: ${msg}`,
+  });
+
+  return true;
+} catch (error) {
+  console.error(error);
+
+  await engineSendText({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    text: "❌ Failed to book appointment.",
+  });
+
+  clearSession(contactId);
+  return true;
+}
+
+} // <-- closes if (session.step === "name")
 
   // ============================================================
   // Main Menu Handlers
