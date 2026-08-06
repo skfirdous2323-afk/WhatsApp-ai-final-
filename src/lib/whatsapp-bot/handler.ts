@@ -37,7 +37,8 @@ export async function runWhatsAppBot({
   text: string;
 }) {
   const msg = text.trim().toLowerCase();
-
+console.log("Reply ID:", text);
+console.log("Message:", msg);
   // Convert text commands to numbers
   const command = msg
     .replace(/^book$/i, "1")
