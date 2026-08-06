@@ -539,19 +539,6 @@ export async function runWhatsAppBot({
       return true;
     }
 
-    // ---- STEP: Phone & Confirm ----
-    if (session.step === "phone") {
-      const phoneRegex = /^\d{10,15}$/;
-      if (!phoneRegex.test(msg)) {
-        await engineSendText({
-          accountId,
-          userId,
-          conversationId,
-          contactId,
-          text: "❌ Invalid phone number. Please enter 10-15 digits without spaces or symbols.",
-        });
-        return true;
-      }
 
       try {
         const appointmentData = {
@@ -563,7 +550,10 @@ export async function runWhatsAppBot({
           appointment_date: session.date,
           appointment_time: session.time,
           patient_name: session.patientName,
-          patient_phone: msg,
+
+patient_phone: contactId,
+
+
           status: "pending",
           created_at: new Date().toISOString(),
         };
