@@ -8,6 +8,9 @@ export type Session = {
   time?: string;
   patientName?: string;
   patientPhone?: string;
+page?: number;
+
+
 };
 
 const sessions = new Map<string, Session>();
