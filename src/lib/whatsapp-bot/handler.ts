@@ -156,6 +156,7 @@ export async function runWhatsAppBot({
     .replace(/^contact$/i, "6")
     .replace(/^location$/i, "7");
 
+
   const db = supabaseAdmin();
 
   // Get clinic ID
@@ -182,8 +183,15 @@ export async function runWhatsAppBot({
     .maybeSingle();
 
   const slotDuration = settings?.slot_duration || 30;
-  const session = getSession(contactId) as SessionData | null;
+let session = getSession(contactId) as SessionData | null;
 
+
+
+
+if (session && command !== "1" && ["2", "3", "4", "5", "6", "7"].includes(command)) {
+  clearSession(contactId);
+  session = null;
+}
   // ============================================================
   // Handle session-based flows
   // ============================================================
