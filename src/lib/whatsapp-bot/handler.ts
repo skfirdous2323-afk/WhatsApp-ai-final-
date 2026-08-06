@@ -126,6 +126,53 @@ function getTimeSlotPage(slotDuration: number, page: number) {
   return rows;
 }
 
+async function getAvailableBookingDates(
+  db: any,
+  clinicId: string,
+  maxDays = 30
+) {
+  const { data: workingHours } = await db
+    .from("clinic_working_hours")
+    .select("day_name, is_closed")
+    .eq("clinic_id", clinicId);
+
+  const closedDays = new Set(
+    (workingHours || [])
+      .filter((d: any) => d.is_closed)
+      .map((d: any) => d.day_name.toLowerCase())
+  );
+
+  const dates = [];
+  const today = new Date();
+
+  for (let i = 0; i < maxDays && dates.length < 7; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+
+    const weekday = d.toLocaleDateString("en-US", {
+      weekday: "long",
+    });
+
+    if (closedDays.has(weekday.toLowerCase())) {
+      continue;
+    }
+
+    const id = d.toISOString().split("T")[0];
+
+    dates.push({
+      id: `date_${id}`,
+      title: d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+      }),
+      description: weekday,
+    });
+  }
+
+  return dates;
+}
+
+
 // ============================================================
 // Main Handler
 // ============================================================
@@ -319,8 +366,7 @@ if (session && command !== "1" && ["2", "3", "4", "5", "6", "7"].includes(comman
         doctorName: selected.doctor_name,
       });
 
-      const dates = getNext7Days();
-
+const dates = await getAvailableBookingDates(db, clinicId);
       await engineSendInteractiveList({
         accountId,
         userId,
