@@ -339,7 +339,9 @@ while (hour < 18 || (hour === 18 && minute === 0)) {
         sections: [
           {
             title: "Available Time Slots",
-            rows: timeSlots.map((slot) => ({
+
+rows: timeSlots.slice(0, 10).map((slot) => ({
+
               id: slot.id,
               title: slot.title,
               description: "Tap to select this time",
