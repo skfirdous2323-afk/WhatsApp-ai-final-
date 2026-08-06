@@ -23,6 +23,31 @@ interface SessionData {
   patientPhone?: string;
 }
 
+function getNext7Days() {
+  const days = [];
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+
+    const id = d.toISOString().split("T")[0];
+
+    days.push({
+      id: `date_${id}`,
+      title: d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+      }),
+      description: d.toLocaleDateString("en-US", {
+        weekday: "long",
+      }),
+    });
+  }
+
+  return days;
+}
+
+
 export async function runWhatsAppBot({
   accountId,
   userId,
@@ -198,30 +223,61 @@ title:
         doctorName: selected.doctor_name,
       });
 
-      await engineSendText({
-        accountId,
-        userId,
-        conversationId,
-        contactId,
-        text: `📅 Please enter the date for your appointment with ${selected.doctor_name}.\n\nFormat: DD-MM-YYYY (e.g., 25-12-2024)`,
-      });
+
+const dates = getNext7Days();
+
+await engineSendInteractiveList({
+  accountId,
+  userId,
+  conversationId,
+  contactId,
+  bodyText: `📅 Select Appointment Date for ${selected.doctor_name}`,
+  buttonLabel: "View Dates",
+  footerText: "Choose a date",
+  sections: [
+    {
+      title: "Next 7 Days",
+      rows: dates.map((d) => ({
+        id: d.id,
+        title: d.title,
+        description: d.description,
+      })),
+    },
+  ],
+});
+
+
+
+
+
 
       return true;
     }
 
     // ---- STEP: Date Selection ----
     if (session.step === "date") {
-      const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
-      if (!dateRegex.test(msg)) {
-        await engineSendText({
-          accountId,
-          userId,
-          conversationId,
-          contactId,
-          text: "❌ Invalid date format. Please use DD-MM-YYYY (e.g., 25-12-2024)",
-        });
-        return true;
-      }
+
+let selectedDate: string | null = null;
+
+if (command.startsWith("date_")) {
+  selectedDate = command.replace("date_", "");
+} else {
+  selectedDate = msg;
+}
+
+if (!selectedDate) {
+  await engineSendText({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    text: "❌ Please select a date from the list.",
+  });
+  return true;
+}
+
+
+
 
       setSession(contactId, {
         step: "time",
@@ -229,7 +285,9 @@ title:
         serviceName: session.serviceName,
         doctorId: session.doctorId,
         doctorName: session.doctorName,
-        date: msg,
+
+date: selectedDate,
+
       });
 
       // Show Interactive List for Time Selection
