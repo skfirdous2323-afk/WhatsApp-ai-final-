@@ -10,7 +10,10 @@ import {
   clearSession,
 } from "@/lib/whatsapp-bot/session";
 
-// Type definitions
+// ============================================================
+// Type Definitions
+// ============================================================
+
 interface SessionData {
   step: string;
   serviceId?: string;
@@ -21,12 +24,16 @@ interface SessionData {
   time?: string;
   patientName?: string;
   patientPhone?: string;
+  page?: number;
 }
 
 // ============================================================
 // Helper Functions
 // ============================================================
 
+/**
+ * Generate next 7 days for date selection
+ */
 function getNext7Days() {
   const days = [];
   const today = new Date();
@@ -51,6 +58,10 @@ function getNext7Days() {
   return days;
 }
 
+/**
+ * Generate time slots based on slot duration
+ * Default: 9:00 AM to 6:00 PM
+ */
 function generateTimeSlots(slotDuration: number) {
   const timeSlots = [];
   let hour = 9;
@@ -79,6 +90,50 @@ function generateTimeSlots(slotDuration: number) {
   return timeSlots;
 }
 
+/**
+ * Get paginated time slots with navigation buttons
+ */
+function getTimeSlotPage(slotDuration: number, page: number) {
+  const allSlots = generateTimeSlots(slotDuration);
+  const pageSize = 9;
+  const start = page * pageSize;
+  const end = start + pageSize;
+  const pageSlots = allSlots.slice(start, end);
+
+  const rows = pageSlots.map((slot) => ({
+    id: slot.id,
+    title: slot.title,
+    description: "Tap to select this time",
+  }));
+
+  // Add Previous button
+  if (page > 0) {
+
+rows.push({
+  id: `prev_slots_${page - 1}`,
+  title: "⬅️ Previous Slots",
+  description: "Go back to previous slots",
+});
+
+
+
+  }
+
+  // Add Next button
+  if (end < allSlots.length) {
+
+
+rows.push({
+  id: `next_slots_${page + 1}`,
+  title: "➡️ View More Slots",
+  description: "Show more available time slots",
+});
+
+  }
+
+  return rows;
+}
+
 // ============================================================
 // Main Handler
 // ============================================================
@@ -97,7 +152,8 @@ export async function runWhatsAppBot({
   text: string;
 }) {
   const msg = text.trim().toLowerCase();
-console.log("Message:", text);
+  console.log("📩 Message received:", text);
+
   // Convert text commands to numbers
   const command = msg
     .replace(/^book$/i, "1")
@@ -120,7 +176,7 @@ console.log("Message:", text);
     .maybeSingle();
 
   if (clinicError || !clinic) {
-    console.error("Clinic not found", clinicError);
+    console.error("❌ Clinic not found", clinicError);
     return false;
   }
 
@@ -178,7 +234,7 @@ console.log("Message:", text);
         serviceName: selected.service_name,
       });
 
-      // Get doctors for this service
+      // Get doctors for this clinic
       const { data: doctors } = await db
         .from("clinic_doctors")
         .select("id, doctor_name, specialization")
@@ -298,7 +354,6 @@ console.log("Message:", text);
         // Fallback: if user types date manually
         const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
         if (dateRegex.test(msg)) {
-          // Convert DD-MM-YYYY to YYYY-MM-DD for storage
           const parts = msg.split("-");
           selectedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
         } else {
@@ -324,26 +379,11 @@ console.log("Message:", text);
         doctorId: session.doctorId,
         doctorName: session.doctorName,
         date: selectedDate,
+        page: 0,
       });
 
-      const timeSlots = generateTimeSlots(slotDuration);
-
-      // Show first 9 time slots with "More" option
-      const rows = [
-        ...timeSlots.slice(0, 9).map((slot) => ({
-          id: slot.id,
-          title: slot.title,
-          description: "Tap to select this time",
-        })),
-      ];
-
-      if (timeSlots.length > 9) {
-        rows.push({
-          id: "more_slots_1",
-          title: "➡️ More Time Slots",
-          description: `View next ${Math.min(timeSlots.length - 9, 9)} slots`,
-        });
-      }
+      // Show first page of time slots
+      const rows = getTimeSlotPage(slotDuration, 0);
 
       await engineSendInteractiveList({
         accountId,
@@ -366,47 +406,24 @@ console.log("Message:", text);
 
     // ---- STEP: Time Selection ----
     if (session.step === "time") {
-      // Handle "More Time Slots" navigation
-      if (command === "more_slots_1") {
-        const timeSlots = generateTimeSlots(slotDuration);
-        const startIndex = 9;
-        const endIndex = Math.min(startIndex + 9, timeSlots.length);
+      // Handle navigation: Previous page
+      if (command.startsWith("prev_slots_")) {
+        const page = parseInt(command.replace("prev_slots_", ""));
+        setSession(contactId, { ...session, page });
 
-        const rows = [
-          ...timeSlots.slice(startIndex, endIndex).map((slot) => ({
-            id: slot.id,
-            title: slot.title,
-            description: "Tap to select this time",
-          })),
-        ];
-
-        if (timeSlots.length > endIndex) {
-          rows.push({
-            id: "more_slots_2",
-            title: "➡️ More Time Slots",
-            description: `View next ${Math.min(timeSlots.length - endIndex, 9)} slots`,
-          });
-        }
-
-        if (startIndex > 0) {
-          rows.push({
-            id: "back_to_start",
-            title: "⬅️ Back to Start",
-            description: "View first time slots",
-          });
-        }
+        const rows = getTimeSlotPage(slotDuration, page);
 
         await engineSendInteractiveList({
           accountId,
           userId,
           conversationId,
           contactId,
-          bodyText: "🕐 More Time Slots",
+          bodyText: `🕐 Select Appointment Time for ${session.serviceName} with ${session.doctorName}`,
           footerText: "Choose a time slot",
-          buttonLabel: "View More",
+          buttonLabel: "View Time Slots",
           sections: [
             {
-              title: "More Available Time Slots",
+              title: "Available Time Slots",
               rows: rows,
             },
           ],
@@ -415,108 +432,12 @@ console.log("Message:", text);
         return true;
       }
 
-      if (command === "more_slots_2") {
-        const timeSlots = generateTimeSlots(slotDuration);
-        const startIndex = 18;
-        const endIndex = Math.min(startIndex + 9, timeSlots.length);
+      // Handle navigation: Next page
+      if (command.startsWith("next_slots_")) {
+        const page = parseInt(command.replace("next_slots_", ""));
+        setSession(contactId, { ...session, page });
 
-        const rows = [
-          ...timeSlots.slice(startIndex, endIndex).map((slot) => ({
-            id: slot.id,
-            title: slot.title,
-            description: "Tap to select this time",
-          })),
-        ];
-
-        if (timeSlots.length > endIndex) {
-          rows.push({
-            id: "more_slots_3",
-            title: "➡️ More Time Slots",
-            description: `View next ${Math.min(timeSlots.length - endIndex, 9)} slots`,
-          });
-        }
-
-        rows.push({
-          id: "back_to_start",
-          title: "⬅️ Back to Start",
-          description: "View first time slots",
-        });
-
-        await engineSendInteractiveList({
-          accountId,
-          userId,
-          conversationId,
-          contactId,
-          bodyText: "🕐 More Time Slots",
-          footerText: "Choose a time slot",
-          buttonLabel: "View More",
-          sections: [
-            {
-              title: "More Available Time Slots",
-              rows: rows,
-            },
-          ],
-        });
-
-        return true;
-      }
-
-      if (command === "more_slots_3") {
-        const timeSlots = generateTimeSlots(slotDuration);
-        const startIndex = 27;
-        const endIndex = Math.min(startIndex + 9, timeSlots.length);
-
-        const rows = [
-          ...timeSlots.slice(startIndex, endIndex).map((slot) => ({
-            id: slot.id,
-            title: slot.title,
-            description: "Tap to select this time",
-          })),
-        ];
-
-        rows.push({
-          id: "back_to_start",
-          title: "⬅️ Back to Start",
-          description: "View first time slots",
-        });
-
-        await engineSendInteractiveList({
-          accountId,
-          userId,
-          conversationId,
-          contactId,
-          bodyText: "🕐 More Time Slots",
-          footerText: "Choose a time slot",
-          buttonLabel: "View More",
-          sections: [
-            {
-              title: "More Available Time Slots",
-              rows: rows,
-            },
-          ],
-        });
-
-        return true;
-      }
-
-      if (command === "back_to_start") {
-        const timeSlots = generateTimeSlots(slotDuration);
-
-        const rows = [
-          ...timeSlots.slice(0, 9).map((slot) => ({
-            id: slot.id,
-            title: slot.title,
-            description: "Tap to select this time",
-          })),
-        ];
-
-        if (timeSlots.length > 9) {
-          rows.push({
-            id: "more_slots_1",
-            title: "➡️ More Time Slots",
-            description: `View next ${Math.min(timeSlots.length - 9, 9)} slots`,
-          });
-        }
+        const rows = getTimeSlotPage(slotDuration, page);
 
         await engineSendInteractiveList({
           accountId,
@@ -712,7 +633,7 @@ console.log("Message:", text);
   // Interactive List Direct Selections
   // ============================================================
 
-  // Book Appointment (from interactive list or text command)
+  // 1. Book Appointment
   if (msg === "book" || command === "1" || command === "book") {
     const { data: services } = await db
       .from("clinic_services")
@@ -759,7 +680,7 @@ console.log("Message:", text);
     return true;
   }
 
-  // Doctors (from interactive list or text command)
+  // 2. View Doctors
   if (msg === "doctors" || command === "2" || command === "doctors") {
     const { data: doctors } = await db
       .from("clinic_doctors")
@@ -796,7 +717,7 @@ console.log("Message:", text);
     return true;
   }
 
-  // Services (from interactive list or text command)
+  // 3. View Services
   if (msg === "services" || command === "3" || command === "services") {
     const { data: services } = await db
       .from("clinic_services")
@@ -835,7 +756,7 @@ console.log("Message:", text);
     return true;
   }
 
-  // Working Hours (from interactive list or text command)
+  // 4. View Working Hours
   if (msg === "hours" || command === "4" || command === "hours") {
     const { data: hours } = await db
       .from("clinic_working_hours")
@@ -873,7 +794,7 @@ console.log("Message:", text);
     return true;
   }
 
-  // FAQ (from interactive list or text command)
+  // 5. View FAQ
   if (msg === "faq" || command === "5" || command === "faq") {
     const { data: faq } = await db
       .from("clinic_knowledge_base")
@@ -907,7 +828,7 @@ console.log("Message:", text);
     return true;
   }
 
-  // Contact (from interactive list or text command)
+  // 6. Contact Information
   if (msg === "contact" || command === "6" || command === "contact") {
     const { data: clinicData } = await db
       .from("clinics")
@@ -930,7 +851,7 @@ console.log("Message:", text);
     return true;
   }
 
-  // Location (from interactive list or text command)
+  // 7. Location
   if (msg === "location" || command === "7" || command === "location") {
     await engineSendText({
       accountId,
