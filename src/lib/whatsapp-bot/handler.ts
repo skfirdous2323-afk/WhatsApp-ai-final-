@@ -91,7 +91,19 @@ console.log("Message:", msg);
   }
 
   const clinicId = clinic.id;
-  const session = getSession(contactId) as SessionData | null;
+  
+// Get appointment settings
+const { data: settings } = await db
+
+.from("clinic_appointment_settings")
+  .select("slot_duration")
+  .eq("clinic_id", clinicId)
+  .maybeSingle();
+
+const slotDuration = settings?.slot_duration || 30;
+
+
+const session = getSession(contactId) as SessionData | null;
 
   // ============================================================
   // Handle session-based flows
@@ -290,18 +302,31 @@ date: selectedDate,
 
       });
 
-      // Show Interactive List for Time Selection
-      const timeSlots = [
-        { id: "time_09:00", title: "09:00 AM" },
-        { id: "time_10:00", title: "10:00 AM" },
-        { id: "time_11:00", title: "11:00 AM" },
-        { id: "time_12:00", title: "12:00 PM" },
-        { id: "time_02:00", title: "02:00 PM" },
-        { id: "time_03:00", title: "03:00 PM" },
-        { id: "time_04:00", title: "04:00 PM" },
-        { id: "time_05:00", title: "05:00 PM" },
-        { id: "time_06:00", title: "06:00 PM" },
-      ];
+const timeSlots = [];
+
+let hour = 9;
+let minute = 0;
+
+while (hour < 18 || (hour === 18 && minute === 0)) {
+  const hh = String(hour).padStart(2, "0");
+  const mm = String(minute).padStart(2, "0");
+
+  const hour12 = hour > 12 ? hour - 12 : hour;
+  const ampm = hour >= 12 ? "PM" : "AM";
+
+  timeSlots.push({
+    id: `time_${hh}:${mm}`,
+    title: `${String(hour12).padStart(2, "0")}:${mm} ${ampm}`,
+  });
+
+  minute += slotDuration;
+
+  while (minute >= 60) {
+    minute -= 60;
+    hour++;
+  }
+}
+
 
       await engineSendInteractiveList({
         accountId,
