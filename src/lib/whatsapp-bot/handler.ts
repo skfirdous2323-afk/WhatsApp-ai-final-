@@ -873,7 +873,9 @@ Please confirm your booking:`;
 
 
 
- age: currentSession?.age,
+age: session.age,
+
+
             status: "pending",
             created_at: new Date().toISOString(),
           };
