@@ -986,17 +986,31 @@ We'll send you a reminder before your appointment.
 
       // ❌ Cancel - Clear session
       if (command === "cancel_booking") {
-        clearSession(contactId);
 
-        await engineSendText({
-          accountId,
-          userId,
-          conversationId,
-          contactId,
-          text: "❌ *Booking Cancelled.*\n\nType *Hi* to start again.",
-        });
 
-        return true;
+await db
+  .from("appointments")
+  .update({ status: "cancelled" })
+  .eq("contact_id", contactId)
+  .eq("status", "pending");
+
+clearSession(contactId);
+
+await engineSendText({
+  accountId,
+  userId,
+  conversationId,
+  contactId,
+  text: "✅ Your appointment has been cancelled successfully.",
+});
+
+return true;
+
+
+
+
+
+
       }
 
       // Invalid confirmation option
