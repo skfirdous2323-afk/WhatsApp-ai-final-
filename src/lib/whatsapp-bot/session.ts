@@ -1,4 +1,4 @@
-export type Session = {
+export interface Session {
   step: string;
   serviceId?: string;
   serviceName?: string;
@@ -7,11 +7,11 @@ export type Session = {
   date?: string;
   time?: string;
   patientName?: string;
-  patientPhone?: string;
-page?: number;
-
-
-};
+  gender?: string;
+  age?: number;
+  page?: number;
+}
+;
 
 const sessions = new Map<string, Session>();
 
