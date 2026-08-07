@@ -190,7 +190,11 @@ async function getAvailableBookingDates(
   const today = new Date();
 
   // Check next 14 days (or more if needed)
-  for (let i = 0; i < 14; i++) {
+
+const bookingDays = settings?.advance_booking_days || 7;
+
+for (let i = 0; i < bookingDays; i++) {
+
     const d = new Date(today);
     d.setDate(today.getDate() + i);
 
@@ -298,12 +302,11 @@ export async function runWhatsAppBot({
   const clinicId = clinic.id;
 
   // Get appointment settings
-  const { data: settings } = await db
-    .from("clinic_appointment_settings")
-    .select("slot_duration")
-    .eq("clinic_id", clinicId)
-    .maybeSingle();
-
+const { data: settings } = await db
+  .from("clinic_appointment_settings")
+  .select("slot_duration, advance_booking_days")
+  .eq("clinic_id", clinicId)
+  .maybeSingle();
   const slotDuration = settings?.slot_duration || 30;
   let session = getSession(contactId) as SessionData | null;
 
@@ -1261,17 +1264,40 @@ We'll send you a reminder before your appointment.
   }
 
   // 7. Location
-  if (msg === "location" || command === "7" || command === "location") {
-    await engineSendText({
-      accountId,
-      userId,
-      conversationId,
-      contactId,
-      text: "📍 Location information not available.",
-    });
 
-    return true;
+
+
+// 7. Location
+if (msg === "location" || command === "7" || command === "location") {
+  const { data: clinicData } = await db
+    .from("clinics")
+    .select("clinic_name, address, google_maps")
+    .eq("id", clinicId)
+    .maybeSingle();
+
+  let locationText = `📍 *${clinicData?.clinic_name}*\n\n`;
+
+  if (clinicData?.address) {
+    locationText += `🏥 Address:\n${clinicData.address}\n\n`;
   }
+
+  if (clinicData?.google_maps) {
+    locationText += `🗺️ Google Maps:\n${clinicData.google_maps}`;
+  }
+
+  await engineSendText({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    text: locationText,
+  });
+
+  return true;
+}
+
+
+
 
   // Unknown command - show help
   await engineSendText({
