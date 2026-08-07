@@ -23,6 +23,8 @@ interface SessionData {
   date?: string;
   time?: string;
   patientName?: string;
+  gender?: string;
+  age?: number;
   page?: number;
 }
 
@@ -153,11 +155,9 @@ async function getAvailableBookingDates(
     const weekday = d.toLocaleDateString("en-US", {
       weekday: "long",
     });
-
     if (!workingMap.get(weekday.toLowerCase())) {
       continue;
     }
-
     dates.push({
       id: `date_${d.toISOString().split("T")[0]}`,
       title: d.toLocaleDateString("en-GB", {
@@ -201,7 +201,6 @@ export async function runWhatsAppBot({
     .replace(/^contact$/i, "6")
     .replace(/^location$/i, "7");
 
-
   const db = supabaseAdmin();
 
   // Get clinic ID
@@ -228,15 +227,12 @@ export async function runWhatsAppBot({
     .maybeSingle();
 
   const slotDuration = settings?.slot_duration || 30;
-let session = getSession(contactId) as SessionData | null;
+  let session = getSession(contactId) as SessionData | null;
 
-
-
-
-if (session && command !== "1" && ["2", "3", "4", "5", "6", "7"].includes(command)) {
-  clearSession(contactId);
-  session = null;
-}
+  if (session && command !== "1" && ["2", "3", "4", "5", "6", "7"].includes(command)) {
+    clearSession(contactId);
+    session = null;
+  }
   // ============================================================
   // Handle session-based flows
   // ============================================================
@@ -364,7 +360,7 @@ if (session && command !== "1" && ["2", "3", "4", "5", "6", "7"].includes(comman
         doctorName: selected.doctor_name,
       });
 
-const dates = await getAvailableBookingDates(db, clinicId);
+      const dates = await getAvailableBookingDates(db, clinicId);
       await engineSendInteractiveList({
         accountId,
         userId,
@@ -547,7 +543,7 @@ const dates = await getAvailableBookingDates(db, clinicId);
       return true;
     }
 
-    // ---- STEP: Name & Confirm ----
+    // ---- STEP: Name ----
     if (session.step === "name") {
       if (msg.length < 2) {
         await engineSendText({
@@ -560,8 +556,86 @@ const dates = await getAvailableBookingDates(db, clinicId);
         return true;
       }
 
+      setSession(contactId, {
+        ...session,
+        step: "gender",
+        patientName: text.trim(),
+      });
+
+      await engineSendInteractiveList({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        bodyText: "👤 Select Gender",
+        buttonLabel: "Choose",
+        footerText: "Please select",
+        sections: [
+          {
+            title: "Gender",
+            rows: [
+              { id: "gender_male", title: "Male" },
+              { id: "gender_female", title: "Female" },
+              { id: "gender_other", title: "Other" },
+            ],
+          },
+        ],
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Gender ----
+    if (session.step === "gender") {
+      const gender = command.replace("gender_", "");
+if (
+  command !== "gender_male" &&
+  command !== "gender_female" &&
+  command !== "gender_other"
+) {
+  await engineSendText({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    text: "❌ Please select your gender from the list.",
+  });
+  return true;
+}
+      setSession(contactId, {
+        ...session,
+        step: "age",
+        gender,
+      });
+
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "🎂 Please enter your age.",
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Age & Confirm ----
+    if (session.step === "age") {
+      const age = parseInt(msg);
+
+      if (isNaN(age) || age < 1 || age > 120) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Please enter a valid age (1-120).",
+        });
+        return true;
+      }
+
       try {
-        // Save appointment directly with name (no phone step)
+        // Save appointment with name, gender, age
         const appointmentData = {
           clinic_id: clinicId,
           user_id: userId,
@@ -570,7 +644,9 @@ const dates = await getAvailableBookingDates(db, clinicId);
           doctor_id: session.doctorId,
           appointment_date: session.date,
           appointment_time: session.time,
-          patient_name: msg,
+          patient_name: session.patientName,
+          gender: session.gender,
+          age: age,
           status: "pending",
           created_at: new Date().toISOString(),
         };
@@ -599,7 +675,7 @@ const dates = await getAvailableBookingDates(db, clinicId);
           userId,
           conversationId,
           contactId,
-          text: `✅ Appointment Confirmed!\n\n📋 Service: ${session.serviceName}\n👨‍⚕️ Doctor: ${session.doctorName}\n📅 Date: ${session.date}\n🕐 Time: ${session.time}\n👤 Patient: ${msg}\n\nThank you for booking with us! We'll send you a reminder.`,
+          text: `✅ Appointment Confirmed!\n\n📋 Service: ${session.serviceName}\n👨‍⚕️ Doctor: ${session.doctorName}\n📅 Date: ${session.date}\n🕐 Time: ${session.time}\n👤 Patient: ${session.patientName}\n⚥ Gender: ${session.gender}\n🎂 Age: ${age}\n\nThank you for booking with us! We'll send you a reminder.`,
         });
 
         return true;
