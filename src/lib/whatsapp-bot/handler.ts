@@ -172,7 +172,8 @@ async function getAvailableTimeSlots(
 async function getAvailableBookingDates(
   db: any,
   clinicId: string,
-  doctorId?: string
+  doctorId: string | undefined,
+  bookingDays: number
 ) {
   const { data: workingHours } = await db
     .from("clinic_working_hours")
@@ -189,19 +190,15 @@ async function getAvailableBookingDates(
   const dates = [];
   const today = new Date();
 
-  // Check next 14 days (or more if needed)
-
-const bookingDays = settings?.advance_booking_days || 7;
-
-for (let i = 0; i < bookingDays; i++) {
-
+  // Use dynamic bookingDays from settings
+  for (let i = 0; i < bookingDays; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
 
     const weekday = d.toLocaleDateString("en-US", {
       weekday: "long",
     });
-    
+
     // Skip if clinic is closed on this day
     if (!workingMap.get(weekday.toLowerCase())) {
       continue;
@@ -219,7 +216,7 @@ for (let i = 0; i < bookingDays; i++) {
         .in("status", ["pending", "confirmed"]);
 
       const allSlots = generateTimeSlots(30);
-      
+
       // Fix: Properly map booked times
       const bookedTimes = new Set<string>();
       if (bookedSlots && bookedSlots.length > 0) {
@@ -229,7 +226,7 @@ for (let i = 0; i < bookingDays; i++) {
           }
         }
       }
-      
+
       const availableSlots = allSlots.filter(
         (slot) => !bookedTimes.has(slot.id.replace("time_", ""))
       );
@@ -302,12 +299,15 @@ export async function runWhatsAppBot({
   const clinicId = clinic.id;
 
   // Get appointment settings
-const { data: settings } = await db
-  .from("clinic_appointment_settings")
-  .select("slot_duration, advance_booking_days")
-  .eq("clinic_id", clinicId)
-  .maybeSingle();
+  const { data: settings } = await db
+    .from("clinic_appointment_settings")
+    .select("slot_duration, advance_booking_days")
+    .eq("clinic_id", clinicId)
+    .maybeSingle();
+
   const slotDuration = settings?.slot_duration || 30;
+  const bookingDays = settings?.advance_booking_days || 7;
+
   let session = getSession(contactId) as SessionData | null;
 
   if (session && command !== "1" && ["2", "3", "4", "5", "6", "7"].includes(command)) {
@@ -442,8 +442,8 @@ const { data: settings } = await db
         doctorName: selected.doctor_name,
       });
 
-      const dates = await getAvailableBookingDates(db, clinicId, selected.id);
-      
+      const dates = await getAvailableBookingDates(db, clinicId, selected.id, bookingDays);
+
       if (dates.length === 0) {
         await engineSendText({
           accountId,
@@ -714,7 +714,7 @@ const { data: settings } = await db
     // ---- STEP: Gender ----
     if (session.step === "gender") {
       const gender = command.replace("gender_", "");
-      
+
       if (
         command !== "gender_male" &&
         command !== "gender_female" &&
@@ -785,16 +785,11 @@ const { data: settings } = await db
       }
 
       // ✅ Save age in session and move to confirmation step
-
-
-
-const updatedSession = {
-  ...session,
-  age,
-  step: "confirm",
-};
-
-setSession(contactId, updatedSession);
+      setSession(contactId, {
+        ...session,
+        age,
+        step: "confirm",
+      });
 
       // Format date for display
       const dateObj = new Date(session.date + "T00:00:00");
@@ -873,12 +868,7 @@ Please confirm your booking:`;
             appointment_time: session.time,
             patient_name: session.patientName,
             gender: session.gender,
-
-
-
-age: session.age,
-
-
+            age: session.age,
             status: "pending",
             created_at: new Date().toISOString(),
           };
@@ -957,8 +947,8 @@ We'll send you a reminder before your appointment.
           page: 0,
         });
 
-        const dates = await getAvailableBookingDates(db, clinicId, session.doctorId);
-        
+        const dates = await getAvailableBookingDates(db, clinicId, session.doctorId, bookingDays);
+
         if (dates.length === 0) {
           await engineSendText({
             accountId,
@@ -1264,40 +1254,33 @@ We'll send you a reminder before your appointment.
   }
 
   // 7. Location
+  if (msg === "location" || command === "7" || command === "location") {
+    const { data: clinicData } = await db
+      .from("clinics")
+      .select("clinic_name, address, google_maps")
+      .eq("id", clinicId)
+      .maybeSingle();
 
+    let locationText = `📍 *${clinicData?.clinic_name || "Clinic"}*\n\n`;
 
+    if (clinicData?.address) {
+      locationText += `🏥 Address:\n${clinicData.address}\n\n`;
+    }
 
-// 7. Location
-if (msg === "location" || command === "7" || command === "location") {
-  const { data: clinicData } = await db
-    .from("clinics")
-    .select("clinic_name, address, google_maps")
-    .eq("id", clinicId)
-    .maybeSingle();
+    if (clinicData?.google_maps) {
+      locationText += `🗺️ Google Maps:\n${clinicData.google_maps}`;
+    }
 
-  let locationText = `📍 *${clinicData?.clinic_name}*\n\n`;
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: locationText,
+    });
 
-  if (clinicData?.address) {
-    locationText += `🏥 Address:\n${clinicData.address}\n\n`;
+    return true;
   }
-
-  if (clinicData?.google_maps) {
-    locationText += `🗺️ Google Maps:\n${clinicData.google_maps}`;
-  }
-
-  await engineSendText({
-    accountId,
-    userId,
-    conversationId,
-    contactId,
-    text: locationText,
-  });
-
-  return true;
-}
-
-
-
 
   // Unknown command - show help
   await engineSendText({
