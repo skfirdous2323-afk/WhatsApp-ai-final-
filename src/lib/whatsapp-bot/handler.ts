@@ -115,17 +115,19 @@ async function getAvailableTimeSlots(
     .eq("appointment_date", date)
     .in("status", ["pending", "confirmed"]);
 
-  const bookedTimes = new Set(bookedSlots?.map((b: any) => b.appointment_time) || []);
+  // ✅ Fix: Properly map booked times
+  const bookedTimes = new Set<string>();
+  if (bookedSlots && bookedSlots.length > 0) {
+    for (const b of bookedSlots) {
+      if (b.appointment_time) {
+        bookedTimes.add(b.appointment_time);
+      }
+    }
+  }
 
   // Filter out booked slots
   const availableSlots = allSlots.filter(
-
-const bookedTimes = new Set(
-  (bookedSlots || []).map((b: any) =>
-    String(b.appointment_time).substring(0, 5)
-  )
-);
-
+    (slot) => !bookedTimes.has(slot.id.replace("time_", ""))
   );
 
   const pageSlots = availableSlots.slice(start, end);
@@ -212,7 +214,17 @@ async function getAvailableBookingDates(
         .in("status", ["pending", "confirmed"]);
 
       const allSlots = generateTimeSlots(30); // Use default 30 min slots for checking
-      const bookedTimes = new Set(bookedSlots?.map((b: any) => b.appointment_time) || []);
+      
+      // ✅ Fix: Properly map booked times
+      const bookedTimes = new Set<string>();
+      if (bookedSlots && bookedSlots.length > 0) {
+        for (const b of bookedSlots) {
+          if (b.appointment_time) {
+            bookedTimes.add(b.appointment_time);
+          }
+        }
+      }
+      
       const availableSlots = allSlots.filter(
         (slot) => !bookedTimes.has(slot.id.replace("time_", ""))
       );
@@ -752,10 +764,7 @@ export async function runWhatsAppBot({
         .select("id")
         .eq("doctor_id", session.doctorId)
         .eq("appointment_date", session.date)
-
-
-.eq("appointment_time", session.time + ":00")
-
+        .eq("appointment_time", session.time)
         .in("status", ["pending", "confirmed"])
         .maybeSingle();
 
