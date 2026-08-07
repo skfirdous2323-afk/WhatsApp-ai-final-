@@ -92,20 +92,58 @@ function generateTimeSlots(slotDuration: number) {
 }
 
 /**
- * Get paginated time slots with navigation buttons
+ * Get available time slots (filtering out booked ones)
  */
-function getTimeSlotPage(slotDuration: number, page: number) {
+async function getAvailableTimeSlots(
+  db: any,
+  doctorId: string,
+  date: string,
+  slotDuration: number,
+  page: number
+) {
+  // Get all time slots
   const allSlots = generateTimeSlots(slotDuration);
   const pageSize = 8;
   const start = page * pageSize;
   const end = start + pageSize;
-  const pageSlots = allSlots.slice(start, end);
+
+  // Get booked slots for this doctor on this date
+  const { data: bookedSlots } = await db
+    .from("appointments")
+    .select("appointment_time")
+    .eq("doctor_id", doctorId)
+    .eq("appointment_date", date)
+    .in("status", ["pending", "confirmed"]);
+
+  const bookedTimes = new Set(bookedSlots?.map((b: any) => b.appointment_time) || []);
+
+  // Filter out booked slots
+  const availableSlots = allSlots.filter(
+
+const bookedTimes = new Set(
+  (bookedSlots || []).map((b: any) =>
+    String(b.appointment_time).substring(0, 5)
+  )
+);
+
+  );
+
+  const pageSlots = availableSlots.slice(start, end);
 
   const rows = pageSlots.map((slot) => ({
     id: slot.id,
     title: slot.title,
     description: "Tap to select this time",
   }));
+
+  // If no slots available
+  if (rows.length === 0 && page === 0) {
+    rows.push({
+      id: "no_slots",
+      title: "❌ No slots available",
+      description: "Please select another date",
+    });
+  }
 
   // Add Previous button
   if (page > 0) {
@@ -117,7 +155,7 @@ function getTimeSlotPage(slotDuration: number, page: number) {
   }
 
   // Add Next button
-  if (end < allSlots.length) {
+  if (end < availableSlots.length) {
     rows.push({
       id: `next_slots_${page + 1}`,
       title: "➡️ View More Slots",
@@ -130,7 +168,8 @@ function getTimeSlotPage(slotDuration: number, page: number) {
 
 async function getAvailableBookingDates(
   db: any,
-  clinicId: string
+  clinicId: string,
+  doctorId?: string
 ) {
   const { data: workingHours } = await db
     .from("clinic_working_hours")
@@ -147,19 +186,45 @@ async function getAvailableBookingDates(
   const dates = [];
   const today = new Date();
 
-  // Only next 7 calendar days
-  for (let i = 0; i < 7; i++) {
+  // Check next 14 days (or more if needed)
+  for (let i = 0; i < 14; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
 
     const weekday = d.toLocaleDateString("en-US", {
       weekday: "long",
     });
+    
+    // Skip if clinic is closed on this day
     if (!workingMap.get(weekday.toLowerCase())) {
       continue;
     }
+
+    const dateStr = d.toISOString().split("T")[0];
+
+    // If doctor is selected, check if they have any slots available on this date
+    if (doctorId) {
+      const { data: bookedSlots } = await db
+        .from("appointments")
+        .select("appointment_time")
+        .eq("doctor_id", doctorId)
+        .eq("appointment_date", dateStr)
+        .in("status", ["pending", "confirmed"]);
+
+      const allSlots = generateTimeSlots(30); // Use default 30 min slots for checking
+      const bookedTimes = new Set(bookedSlots?.map((b: any) => b.appointment_time) || []);
+      const availableSlots = allSlots.filter(
+        (slot) => !bookedTimes.has(slot.id.replace("time_", ""))
+      );
+
+      // If no slots available on this date, skip it
+      if (availableSlots.length === 0) {
+        continue;
+      }
+    }
+
     dates.push({
-      id: `date_${d.toISOString().split("T")[0]}`,
+      id: `date_${dateStr}`,
       title: d.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
@@ -233,6 +298,7 @@ export async function runWhatsAppBot({
     clearSession(contactId);
     session = null;
   }
+
   // ============================================================
   // Handle session-based flows
   // ============================================================
@@ -360,7 +426,20 @@ export async function runWhatsAppBot({
         doctorName: selected.doctor_name,
       });
 
-      const dates = await getAvailableBookingDates(db, clinicId);
+      const dates = await getAvailableBookingDates(db, clinicId, selected.id);
+      
+      if (dates.length === 0) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ No available dates for this doctor. Please try another doctor.",
+        });
+        clearSession(contactId);
+        return true;
+      }
+
       await engineSendInteractiveList({
         accountId,
         userId,
@@ -371,7 +450,7 @@ export async function runWhatsAppBot({
         footerText: "Choose a date",
         sections: [
           {
-            title: "Next 7 Days",
+            title: "Available Dates",
             rows: dates.map((d) => ({
               id: d.id,
               title: d.title,
@@ -422,8 +501,14 @@ export async function runWhatsAppBot({
         page: 0,
       });
 
-      // Show first page of time slots
-      const rows = getTimeSlotPage(slotDuration, 0);
+      // Show first page of available time slots
+      const rows = await getAvailableTimeSlots(
+        db,
+        session.doctorId!,
+        selectedDate,
+        slotDuration,
+        0
+      );
 
       await engineSendInteractiveList({
         accountId,
@@ -446,12 +531,31 @@ export async function runWhatsAppBot({
 
     // ---- STEP: Time Selection ----
     if (session.step === "time") {
+      // Handle "No slots" selection
+      if (command === "no_slots") {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ No slots available. Please select another date.",
+        });
+        clearSession(contactId);
+        return true;
+      }
+
       // Handle navigation: Previous page
       if (command.startsWith("prev_slots_")) {
         const page = parseInt(command.replace("prev_slots_", ""));
         setSession(contactId, { ...session, page });
 
-        const rows = getTimeSlotPage(slotDuration, page);
+        const rows = await getAvailableTimeSlots(
+          db,
+          session.doctorId!,
+          session.date!,
+          slotDuration,
+          page
+        );
 
         await engineSendInteractiveList({
           accountId,
@@ -477,7 +581,13 @@ export async function runWhatsAppBot({
         const page = parseInt(command.replace("next_slots_", ""));
         setSession(contactId, { ...session, page });
 
-        const rows = getTimeSlotPage(slotDuration, page);
+        const rows = await getAvailableTimeSlots(
+          db,
+          session.doctorId!,
+          session.date!,
+          slotDuration,
+          page
+        );
 
         await engineSendInteractiveList({
           accountId,
@@ -588,20 +698,22 @@ export async function runWhatsAppBot({
     // ---- STEP: Gender ----
     if (session.step === "gender") {
       const gender = command.replace("gender_", "");
-if (
-  command !== "gender_male" &&
-  command !== "gender_female" &&
-  command !== "gender_other"
-) {
-  await engineSendText({
-    accountId,
-    userId,
-    conversationId,
-    contactId,
-    text: "❌ Please select your gender from the list.",
-  });
-  return true;
-}
+      
+      if (
+        command !== "gender_male" &&
+        command !== "gender_female" &&
+        command !== "gender_other"
+      ) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Please select your gender from the list.",
+        });
+        return true;
+      }
+
       setSession(contactId, {
         ...session,
         step: "age",
@@ -631,6 +743,31 @@ if (
           contactId,
           text: "❌ Please enter a valid age (1-120).",
         });
+        return true;
+      }
+
+      // ✅ Double-check: Ensure slot hasn't been booked in the meantime
+      const { data: existing } = await db
+        .from("appointments")
+        .select("id")
+        .eq("doctor_id", session.doctorId)
+        .eq("appointment_date", session.date)
+
+
+.eq("appointment_time", session.time + ":00")
+
+        .in("status", ["pending", "confirmed"])
+        .maybeSingle();
+
+      if (existing) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Sorry, this time slot was just booked by someone else.\n\nPlease select another time.",
+        });
+        clearSession(contactId);
         return true;
       }
 
