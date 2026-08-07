@@ -128,24 +128,25 @@ function getTimeSlotPage(slotDuration: number, page: number) {
 
 async function getAvailableBookingDates(
   db: any,
-  clinicId: string,
-  maxDays = 30
+  clinicId: string
 ) {
   const { data: workingHours } = await db
     .from("clinic_working_hours")
     .select("day_name, is_closed")
     .eq("clinic_id", clinicId);
 
-  const closedDays = new Set(
-    (workingHours || [])
-      .filter((d: any) => d.is_closed)
-      .map((d: any) => d.day_name.toLowerCase())
+  const workingMap = new Map(
+    (workingHours || []).map((d: any) => [
+      d.day_name.toLowerCase(),
+      !d.is_closed,
+    ])
   );
 
   const dates = [];
   const today = new Date();
 
-  for (let i = 0; i < maxDays && dates.length < 7; i++) {
+  // Only next 7 calendar days
+  for (let i = 0; i < 7; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
 
@@ -153,14 +154,12 @@ async function getAvailableBookingDates(
       weekday: "long",
     });
 
-    if (closedDays.has(weekday.toLowerCase())) {
+    if (!workingMap.get(weekday.toLowerCase())) {
       continue;
     }
 
-    const id = d.toISOString().split("T")[0];
-
     dates.push({
-      id: `date_${id}`,
+      id: `date_${d.toISOString().split("T")[0]}`,
       title: d.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
@@ -171,7 +170,6 @@ async function getAvailableBookingDates(
 
   return dates;
 }
-
 
 // ============================================================
 // Main Handler
