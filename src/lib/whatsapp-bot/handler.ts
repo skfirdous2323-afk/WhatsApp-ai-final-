@@ -1,6 +1,7 @@
 import {
   engineSendText,
   engineSendInteractiveList,
+  engineSendInteractiveButtons,
 } from "@/lib/flows/meta-send";
 import { supabaseAdmin } from "@/lib/ai/admin-client";
 import { sendMainMenu } from "@/lib/whatsapp-bot/menu";
@@ -115,7 +116,7 @@ async function getAvailableTimeSlots(
     .eq("appointment_date", date)
     .in("status", ["pending", "confirmed"]);
 
-  // ✅ Fix: Properly map booked times
+  // Fix: Properly map booked times
   const bookedTimes = new Set<string>();
   if (bookedSlots && bookedSlots.length > 0) {
     for (const b of bookedSlots) {
@@ -213,9 +214,9 @@ async function getAvailableBookingDates(
         .eq("appointment_date", dateStr)
         .in("status", ["pending", "confirmed"]);
 
-      const allSlots = generateTimeSlots(30); // Use default 30 min slots for checking
+      const allSlots = generateTimeSlots(30);
       
-      // ✅ Fix: Properly map booked times
+      // Fix: Properly map booked times
       const bookedTimes = new Set<string>();
       if (bookedSlots && bookedSlots.length > 0) {
         for (const b of bookedSlots) {
@@ -743,7 +744,7 @@ export async function runWhatsAppBot({
       return true;
     }
 
-    // ---- STEP: Age & Confirm ----
+    // ---- STEP: Age ----
     if (session.step === "age") {
       const age = parseInt(msg);
 
@@ -758,7 +759,7 @@ export async function runWhatsAppBot({
         return true;
       }
 
-      // ✅ Double-check: Ensure slot hasn't been booked in the meantime
+      // ✅ Check if this slot is already booked
       const { data: existing } = await db
         .from("appointments")
         .select("id")
@@ -774,69 +775,245 @@ export async function runWhatsAppBot({
           userId,
           conversationId,
           contactId,
-          text: "❌ Sorry, this time slot was just booked by someone else.\n\nPlease select another time.",
+          text: "❌ Sorry, this time slot is already booked.\n\nPlease book another time.",
         });
         clearSession(contactId);
         return true;
       }
 
-      try {
-        // Save appointment with name, gender, age
-        const appointmentData = {
-          clinic_id: clinicId,
-          user_id: userId,
-          contact_id: contactId,
-          service_id: session.serviceId,
-          doctor_id: session.doctorId,
-          appointment_date: session.date,
-          appointment_time: session.time,
-          patient_name: session.patientName,
-          gender: session.gender,
-          age: age,
-          status: "pending",
-          created_at: new Date().toISOString(),
-        };
+      // ✅ Save age in session and move to confirmation step
 
-        const { error: insertError } = await db
+
+
+const updatedSession = {
+  ...session,
+  age,
+  step: "confirm",
+};
+
+setSession(contactId, updatedSession);
+
+      // Format date for display
+      const dateObj = new Date(session.date + "T00:00:00");
+      const formattedDate = dateObj.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+
+      // Build confirmation summary
+      const summaryText = `📋 *Appointment Summary*
+
+👤 *Name:* ${session.patientName}
+⚥ *Gender:* ${session.gender}
+🎂 *Age:* ${age}
+🩺 *Service:* ${session.serviceName}
+👨‍⚕️ *Doctor:* ${session.doctorName}
+📅 *Date:* ${formattedDate}
+🕐 *Time:* ${session.time}
+
+Please confirm your booking:`;
+
+      // ✅ Show interactive buttons for confirmation
+      await engineSendInteractiveButtons({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        bodyText: summaryText,
+        buttons: [
+          { id: "confirm_booking", title: "✅ Confirm" },
+          { id: "reschedule_booking", title: "🔄 Reschedule" },
+          { id: "cancel_booking", title: "❌ Cancel" },
+        ],
+        footerText: "ZIVEXO CRM",
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Confirm ----
+    if (session.step === "confirm") {
+      // ✅ Confirm Booking
+      if (command === "confirm_booking") {
+        // Double-check: Ensure slot hasn't been booked in the meantime
+        const { data: existing } = await db
           .from("appointments")
-          .insert([appointmentData]);
+          .select("id")
+          .eq("doctor_id", session.doctorId)
+          .eq("appointment_date", session.date)
+          .eq("appointment_time", session.time)
+          .in("status", ["pending", "confirmed"])
+          .maybeSingle();
 
-        if (insertError) {
-          console.error("Error saving appointment:", insertError);
+        if (existing) {
           await engineSendText({
             accountId,
             userId,
             conversationId,
             contactId,
-            text: "❌ Failed to book appointment. Please try again later.",
+            text: "❌ Sorry, this time slot was just booked by someone else.\n\nPlease book another time.",
           });
           clearSession(contactId);
           return true;
         }
 
-        clearSession(contactId);
+        try {
+          // Save appointment to database
+          const appointmentData = {
+            clinic_id: clinicId,
+            user_id: userId,
+            contact_id: contactId,
+            service_id: session.serviceId,
+            doctor_id: session.doctorId,
+            appointment_date: session.date,
+            appointment_time: session.time,
+            patient_name: session.patientName,
+            gender: session.gender,
 
-        await engineSendText({
+
+
+ age: currentSession?.age,
+            status: "pending",
+            created_at: new Date().toISOString(),
+          };
+
+          const { data: inserted, error: insertError } = await db
+            .from("appointments")
+            .insert([appointmentData])
+            .select("id")
+            .single();
+
+          if (insertError) {
+            console.error("Error saving appointment:", insertError);
+            await engineSendText({
+              accountId,
+              userId,
+              conversationId,
+              contactId,
+              text: "❌ Failed to book appointment. Please try again later.",
+            });
+            clearSession(contactId);
+            return true;
+          }
+
+          // Format date for display
+          const dateObj = new Date(session.date + "T00:00:00");
+          const formattedDate = dateObj.toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          });
+
+          // Generate appointment ID
+          const appointmentId = `#APT-${String(inserted.id).substring(0, 8).toUpperCase()}`;
+
+          clearSession(contactId);
+
+          await engineSendText({
+            accountId,
+            userId,
+            conversationId,
+            contactId,
+            text: `✅ *Appointment Confirmed!*
+
+📋 *Service:* ${session.serviceName}
+👨‍⚕️ *Doctor:* ${session.doctorName}
+📅 *Date:* ${formattedDate}
+🕐 *Time:* ${session.time}
+👤 *Patient:* ${session.patientName}
+📋 *ID:* ${appointmentId}
+
+We'll send you a reminder before your appointment.
+
+*Thank you for booking with us!* 🏥`,
+          });
+
+          return true;
+        } catch (error) {
+          console.error("Error saving appointment:", error);
+          await engineSendText({
+            accountId,
+            userId,
+            conversationId,
+            contactId,
+            text: "❌ An error occurred. Please try again later.",
+          });
+          clearSession(contactId);
+          return true;
+        }
+      }
+
+      // 🔄 Reschedule - Go back to date selection
+      if (command === "reschedule_booking") {
+        setSession(contactId, {
+          ...session,
+          step: "date",
+          page: 0,
+        });
+
+        const dates = await getAvailableBookingDates(db, clinicId, session.doctorId);
+        
+        if (dates.length === 0) {
+          await engineSendText({
+            accountId,
+            userId,
+            conversationId,
+            contactId,
+            text: "❌ No available dates for this doctor. Please try another doctor.",
+          });
+          clearSession(contactId);
+          return true;
+        }
+
+        await engineSendInteractiveList({
           accountId,
           userId,
           conversationId,
           contactId,
-          text: `✅ Appointment Confirmed!\n\n📋 Service: ${session.serviceName}\n👨‍⚕️ Doctor: ${session.doctorName}\n📅 Date: ${session.date}\n🕐 Time: ${session.time}\n👤 Patient: ${session.patientName}\n⚥ Gender: ${session.gender}\n🎂 Age: ${age}\n\nThank you for booking with us! We'll send you a reminder.`,
+          bodyText: `📅 Select New Date for ${session.doctorName}`,
+          buttonLabel: "View Dates",
+          footerText: "Choose a date",
+          sections: [
+            {
+              title: "Available Dates",
+              rows: dates.map((d) => ({
+                id: d.id,
+                title: d.title,
+                description: d.description,
+              })),
+            },
+          ],
         });
 
-        return true;
-      } catch (error) {
-        console.error("Error saving appointment:", error);
-        await engineSendText({
-          accountId,
-          userId,
-          conversationId,
-          contactId,
-          text: "❌ An error occurred. Please try again later.",
-        });
-        clearSession(contactId);
         return true;
       }
+
+      // ❌ Cancel - Clear session
+      if (command === "cancel_booking") {
+        clearSession(contactId);
+
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ *Booking Cancelled.*\n\nType *Hi* to start again.",
+        });
+
+        return true;
+      }
+
+      // Invalid confirmation option
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ Please select an option from the buttons above.",
+      });
+
+      return true;
     }
   }
 
