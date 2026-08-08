@@ -120,15 +120,23 @@ export default function ServicesPage() {
       const clinicId = await getClinicId(user.id);
 
       // Check if services feature is enabled
-      const { data: clinic, error: clinicError } = await supabase
-        .from("clinics")
-        .select("services_enabled")
-        .eq("id", clinicId)
-        .single();
+      let isEnabled = true;
+      try {
+        const { data: clinic } = await supabase
+          .from("clinics")
+          .select("services_enabled")
+          .eq("id", clinicId)
+          .maybeSingle();
 
-      if (clinicError) throw clinicError;
+        if (clinic) {
+          isEnabled = clinic.services_enabled !== false;
+        }
+      } catch (err) {
+        console.warn('services_enabled column not found, defaulting to enabled');
+        isEnabled = true;
+      }
 
-      if (clinic?.services_enabled === false) {
+      if (!isEnabled) {
         setIsEnabled(false);
         setServices([]);
         setIsLoading(false);
@@ -198,7 +206,6 @@ export default function ServicesPage() {
     }
   };
 
-  // Toggle services section on/off
   const handleToggleServices = async () => {
     setIsSaving(true);
     try {
@@ -561,43 +568,43 @@ export default function ServicesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 md:p-6">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div className="mb-6 md:mb-8 flex flex-wrap items-center justify-between gap-3 md:gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">WhatsApp Bot Setup</h1>
-            <p className="mt-1 text-sm text-gray-500">Step 3 of 6 – Services</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">WhatsApp Bot Setup</h1>
+            <p className="text-sm text-gray-500">Step 3 of 6 – Services</p>
           </div>
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* Global On/Off Switch - Same as Doctors page */}
-            <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
-              <span className="text-sm font-medium text-gray-600">Services</span>
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
+            {/* Global On/Off Switch */}
+            <div className="flex items-center gap-2 bg-white px-3 py-1.5 md:px-4 md:py-2 rounded-full shadow-md border border-gray-200">
+              <span className="text-xs md:text-sm font-medium text-gray-600">Services</span>
               <button
                 onClick={handleToggleServices}
                 disabled={isSaving}
-                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                className={`relative inline-flex h-6 w-10 md:h-7 md:w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                   isEnabled ? 'bg-green-500' : 'bg-gray-300'
                 }`}
               >
                 <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform ${
-                    isEnabled ? 'translate-x-6' : 'translate-x-1'
+                  className={`inline-block h-4 w-4 md:h-5 md:w-5 transform rounded-full bg-white shadow-lg transition-transform ${
+                    isEnabled ? 'translate-x-5 md:translate-x-6' : 'translate-x-1'
                   }`}
                 />
               </button>
-              <span className={`text-sm font-semibold ${isEnabled ? 'text-green-600' : 'text-red-500'}`}>
+              <span className={`text-xs md:text-sm font-semibold ${isEnabled ? 'text-green-600' : 'text-red-500'}`}>
                 {isEnabled ? 'ON' : 'OFF'}
               </span>
             </div>
 
             <button
               onClick={exportCSV}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              className="hidden sm:inline-flex rounded-lg border border-gray-300 bg-white px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               📤 Export CSV
             </button>
-            <span className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-800">
+            <span className="rounded-full bg-blue-100 px-3 py-1 md:px-4 md:py-2 text-xs md:text-sm font-medium text-blue-800 whitespace-nowrap">
               {services.length} Services
             </span>
           </div>
@@ -605,12 +612,12 @@ export default function ServicesPage() {
 
         {/* Message Alert */}
         {message && (
-          <div className={`mb-6 rounded-lg p-4 ${
+          <div className={`mb-4 md:mb-6 rounded-lg p-3 md:p-4 ${
             message.type === 'success'
               ? 'bg-green-50 border border-green-200'
               : 'bg-red-50 border border-red-200'
           }`}>
-            <p className={`${
+            <p className={`text-sm md:text-base ${
               message.type === 'success' ? 'text-green-800' : 'text-red-800'
             }`}>
               {message.text}
@@ -618,74 +625,74 @@ export default function ServicesPage() {
           </div>
         )}
 
-        {/* Disabled State - Same as Doctors page */}
+        {/* Disabled State */}
         {!isEnabled ? (
-          <div className="rounded-2xl bg-white p-16 shadow-xl border border-gray-100 text-center">
+          <div className="rounded-2xl bg-white p-8 md:p-16 shadow-xl border border-gray-100 text-center">
             <div className="mx-auto max-w-md">
-              <div className="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-6">
-                <svg className="h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-16 h-16 md:w-24 md:h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <svg className="h-8 w-8 md:h-12 md:w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900">Services Section Disabled</h3>
-              <p className="mt-3 text-gray-500">Toggle the switch above to enable services management</p>
-              <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg">
-                <span className="text-sm text-gray-500">💡 Tip:</span>
-                <span className="text-sm text-gray-600">Enable to add and manage services</span>
+              <h3 className="text-xl md:text-2xl font-bold text-gray-900">Services Section Disabled</h3>
+              <p className="mt-2 md:mt-3 text-sm md:text-base text-gray-500">Toggle the switch above to enable services management</p>
+              <div className="mt-4 md:mt-6 inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-gray-50 rounded-lg">
+                <span className="text-xs md:text-sm text-gray-500">💡 Tip:</span>
+                <span className="text-xs md:text-sm text-gray-600">Enable to add and manage services</span>
               </div>
             </div>
           </div>
         ) : (
           <>
             {/* Analytics Dashboard Cards */}
-            <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl bg-white p-6 shadow-lg border border-gray-100">
+            <div className="mb-6 md:mb-8 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+              <div className="rounded-xl bg-white p-4 md:p-6 shadow-lg border border-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Total Services</p>
-                    <p className="mt-2 text-2xl font-bold text-gray-900">{analytics.total}</p>
+                    <p className="text-xs md:text-sm font-medium text-gray-500">Total Services</p>
+                    <p className="mt-1 md:mt-2 text-xl md:text-2xl font-bold text-gray-900">{analytics.total}</p>
                   </div>
-                  <div className="rounded-full bg-blue-100 p-3">
-                    <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="rounded-full bg-blue-100 p-2 md:p-3">
+                    <svg className="h-5 w-5 md:h-6 md:w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl bg-white p-6 shadow-lg border border-gray-100">
+              <div className="rounded-xl bg-white p-4 md:p-6 shadow-lg border border-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Active Services</p>
-                    <p className="mt-2 text-2xl font-bold text-green-600">{analytics.active}</p>
+                    <p className="text-xs md:text-sm font-medium text-gray-500">Active Services</p>
+                    <p className="mt-1 md:mt-2 text-xl md:text-2xl font-bold text-green-600">{analytics.active}</p>
                   </div>
-                  <div className="rounded-full bg-green-100 p-3">
-                    <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="rounded-full bg-green-100 p-2 md:p-3">
+                    <svg className="h-5 w-5 md:h-6 md:w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl bg-white p-6 shadow-lg border border-gray-100">
+              <div className="rounded-xl bg-white p-4 md:p-6 shadow-lg border border-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Featured Services</p>
-                    <p className="mt-2 text-2xl font-bold text-yellow-600">{analytics.featured}</p>
+                    <p className="text-xs md:text-sm font-medium text-gray-500">Featured</p>
+                    <p className="mt-1 md:mt-2 text-xl md:text-2xl font-bold text-yellow-600">{analytics.featured}</p>
                   </div>
-                  <div className="rounded-full bg-yellow-100 p-3">
-                    <svg className="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="rounded-full bg-yellow-100 p-2 md:p-3">
+                    <svg className="h-5 w-5 md:h-6 md:w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                     </svg>
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl bg-white p-6 shadow-lg border border-gray-100">
+              <div className="rounded-xl bg-white p-4 md:p-6 shadow-lg border border-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Avg. Price</p>
-                    <p className="mt-2 text-2xl font-bold text-purple-600">₹{analytics.avgPrice.toFixed(0)}</p>
+                    <p className="text-xs md:text-sm font-medium text-gray-500">Avg. Price</p>
+                    <p className="mt-1 md:mt-2 text-xl md:text-2xl font-bold text-purple-600">₹{analytics.avgPrice.toFixed(0)}</p>
                   </div>
-                  <div className="rounded-full bg-purple-100 p-3">
-                    <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="rounded-full bg-purple-100 p-2 md:p-3">
+                    <svg className="h-5 w-5 md:h-6 md:w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v1m0 4.5V15m0-1v-1m0 4.5V19m0-1v-1M9 11.5c.542.79 1.442 1.5 3 1.5s2.458-.71 3-1.5" />
                     </svg>
                   </div>
@@ -694,20 +701,20 @@ export default function ServicesPage() {
             </div>
 
             {/* Filters and Search */}
-            <div className="mb-6 flex flex-wrap items-center gap-4">
-              <div className="flex-1 min-w-[200px]">
+            <div className="mb-6 flex flex-wrap items-center gap-2 md:gap-3">
+              <div className="flex-1 min-w-[150px] md:min-w-[200px]">
                 <input
                   type="text"
                   placeholder="🔍 Search services..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                 />
               </div>
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
               >
                 <option value="">All Categories</option>
                 {categoryOptions.map(cat => (
@@ -717,7 +724,7 @@ export default function ServicesPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
               >
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
@@ -726,7 +733,7 @@ export default function ServicesPage() {
               <div className="flex rounded-lg border border-gray-300 overflow-hidden">
                 <button
                   onClick={() => setViewMode("card")}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm font-medium transition-colors ${
                     viewMode === "card"
                       ? "bg-blue-600 text-white"
                       : "bg-white text-gray-700 hover:bg-gray-50"
@@ -736,7 +743,7 @@ export default function ServicesPage() {
                 </button>
                 <button
                   onClick={() => setViewMode("table")}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm font-medium transition-colors ${
                     viewMode === "table"
                       ? "bg-blue-600 text-white"
                       : "bg-white text-gray-700 hover:bg-gray-50"
@@ -748,12 +755,12 @@ export default function ServicesPage() {
             </div>
 
             {/* Main Content */}
-            <div className="grid gap-8 lg:grid-cols-3">
+            <div className="grid gap-6 md:gap-8 lg:grid-cols-3">
               {/* Form Section */}
               <div className="lg:col-span-2">
-                <div id="service-form" className="rounded-xl bg-white p-6 shadow-xl border border-gray-100">
-                  <div className="mb-6">
-                    <h2 className="text-xl font-semibold text-gray-900">
+                <div id="service-form" className="rounded-xl bg-white p-4 md:p-6 shadow-xl border border-gray-100">
+                  <div className="mb-4 md:mb-6">
+                    <h2 className="text-lg md:text-xl font-semibold text-gray-900">
                       {editingId ? 'Edit Service' : 'Add New Service'}
                     </h2>
                     <p className="text-sm text-gray-500">
@@ -773,7 +780,7 @@ export default function ServicesPage() {
                           value={formData.service_name}
                           onChange={handleInputChange}
                           placeholder="Dental Cleaning"
-                          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                         />
                       </div>
                       <div>
@@ -786,7 +793,7 @@ export default function ServicesPage() {
                           value={formData.price}
                           onChange={handleInputChange}
                           placeholder="500"
-                          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                         />
                       </div>
                       <div>
@@ -797,7 +804,7 @@ export default function ServicesPage() {
                           name="duration_minutes"
                           value={formData.duration_minutes}
                           onChange={handleInputChange}
-                          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                         >
                           {durationOptions.map(opt => (
                             <option key={opt} value={opt}>{opt} min</option>
@@ -812,7 +819,7 @@ export default function ServicesPage() {
                           name="category"
                           value={formData.category}
                           onChange={handleInputChange}
-                          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                         >
                           <option value="">Select category</option>
                           {categoryOptions.map(cat => (
@@ -830,7 +837,7 @@ export default function ServicesPage() {
                           value={formData.description}
                           onChange={handleInputChange}
                           placeholder="Service description..."
-                          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -868,7 +875,7 @@ export default function ServicesPage() {
                               <img
                                 src={imagePreview}
                                 alt="Service preview"
-                                className="h-20 w-20 rounded-lg object-cover border border-gray-200"
+                                className="h-16 w-16 md:h-20 md:w-20 rounded-lg object-cover border border-gray-200"
                               />
                               <button
                                 type="button"
@@ -885,7 +892,7 @@ export default function ServicesPage() {
                                 type="file"
                                 accept="image/*"
                                 onChange={handleImageChange}
-                                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
+                                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm text-gray-900 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
                               />
                               <p className="mt-1 text-xs text-gray-500">
                                 Recommended: Square image, max 2MB
@@ -904,7 +911,7 @@ export default function ServicesPage() {
                           value={formData.whatsapp_reply}
                           onChange={handleInputChange}
                           placeholder="Your appointment for {service} has been confirmed..."
-                          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -917,7 +924,7 @@ export default function ServicesPage() {
                           value={formData.preparation_instructions}
                           onChange={handleInputChange}
                           placeholder="Please arrive 15 minutes before appointment..."
-                          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                         />
                       </div>
                       <div>
@@ -960,7 +967,7 @@ export default function ServicesPage() {
                       <button
                         type="submit"
                         disabled={isSaving}
-                        className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-2.5 font-semibold text-white hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2.5 md:px-6 md:py-2.5 text-sm md:text-base font-semibold text-white hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSaving ? (
                           <span className="flex items-center justify-center">
@@ -978,7 +985,7 @@ export default function ServicesPage() {
                         <button
                           type="button"
                           onClick={resetForm}
-                          className="px-6 py-2.5 rounded-lg border border-gray-300 font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                          className="px-4 py-2.5 md:px-6 md:py-2.5 rounded-lg border border-gray-300 font-medium text-gray-700 hover:bg-gray-50 transition-colors text-sm md:text-base"
                         >
                           Cancel
                         </button>
@@ -990,7 +997,7 @@ export default function ServicesPage() {
 
               {/* Services List Section */}
               <div className="lg:col-span-1">
-                <div className="rounded-xl bg-white p-6 shadow-xl border border-gray-100">
+                <div className="rounded-xl bg-white p-4 md:p-6 shadow-xl border border-gray-100">
                   <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-gray-900">Service List</h2>
                     <span className="text-sm text-gray-500">{filteredServices.length} shown</span>
@@ -1019,7 +1026,7 @@ export default function ServicesPage() {
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <h3 className="font-semibold text-gray-900 truncate">{service.service_name}</h3>
+                                <h3 className="font-semibold text-gray-900 truncate text-sm md:text-base">{service.service_name}</h3>
                                 {service.is_featured && (
                                   <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
                                     ⭐
@@ -1062,31 +1069,31 @@ export default function ServicesPage() {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50 sticky top-0">
                           <tr>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                            <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
+                            <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                            <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
                           {filteredServices.map((service) => (
                             <tr key={service.id} className="hover:bg-gray-50">
-                              <td className="px-3 py-2">
+                              <td className="px-2 py-1.5 md:px-3 md:py-2">
                                 <div className="flex items-center gap-2">
                                   {service.image_url && (
                                     <img
                                       src={service.image_url}
                                       alt={service.service_name}
-                                      className="h-8 w-8 rounded object-cover"
+                                      className="h-6 w-6 md:h-8 md:w-8 rounded object-cover"
                                     />
                                   )}
-                                  <span className="text-sm font-medium text-gray-900">{service.service_name}</span>
+                                  <span className="text-xs md:text-sm font-medium text-gray-900 truncate max-w-[80px] md:max-w-none">{service.service_name}</span>
                                 </div>
                               </td>
-                              <td className="px-3 py-2 text-sm text-gray-600">₹{service.price}</td>
-                              <td className="px-3 py-2 text-sm text-gray-600">{service.duration_minutes} min</td>
-                              <td className="px-3 py-2">
+                              <td className="px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm text-gray-600">₹{service.price}</td>
+                              <td className="px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm text-gray-600">{service.duration_minutes} min</td>
+                              <td className="px-2 py-1.5 md:px-3 md:py-2">
                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                                   service.is_active
                                     ? 'bg-green-100 text-green-800'
@@ -1095,8 +1102,8 @@ export default function ServicesPage() {
                                   {service.is_active ? 'Active' : 'Inactive'}
                                 </span>
                               </td>
-                              <td className="px-3 py-2">
-                                <div className="flex gap-2">
+                              <td className="px-2 py-1.5 md:px-3 md:py-2">
+                                <div className="flex flex-col md:flex-row gap-1 md:gap-2">
                                   <button
                                     onClick={() => handleEdit(service)}
                                     className="text-xs font-medium text-blue-600 hover:text-blue-800"
@@ -1130,7 +1137,7 @@ export default function ServicesPage() {
         )}
 
         {/* Navigation */}
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
+        <div className="mt-6 md:mt-8 flex flex-wrap items-center justify-between gap-3 md:gap-4">
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500">Step 3 of 6</span>
             <div className="flex gap-1">
@@ -1142,16 +1149,16 @@ export default function ServicesPage() {
               <div className="h-2 w-2 rounded-full bg-gray-300"></div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
             <Link
               href="/whatsapp-bot/doctors"
-              className="rounded-lg border border-gray-300 bg-white px-6 py-2.5 font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               ← Previous
             </Link>
             <Link
               href="/whatsapp-bot/faq"
-              className="rounded-lg bg-gradient-to-r from-green-600 to-green-700 px-6 py-2.5 font-semibold text-white hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg"
+              className="rounded-lg bg-gradient-to-r from-green-600 to-green-700 px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-semibold text-white hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg"
             >
               Next → FAQ
             </Link>
