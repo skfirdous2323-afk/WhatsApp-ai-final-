@@ -986,31 +986,17 @@ We'll send you a reminder before your appointment.
 
       // ❌ Cancel - Clear session
       if (command === "cancel_booking") {
+        clearSession(contactId);
 
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ *Booking Cancelled.*\n\nType *Hi* to start again.",
+        });
 
-await db
-  .from("appointments")
-  .update({ status: "cancelled" })
-  .eq("contact_id", contactId)
-  .eq("status", "pending");
-
-clearSession(contactId);
-
-await engineSendText({
-  accountId,
-  userId,
-  conversationId,
-  contactId,
-  text: "✅ Your appointment has been cancelled successfully.",
-});
-
-return true;
-
-
-
-
-
-
+        return true;
       }
 
       // Invalid confirmation option
@@ -1210,55 +1196,35 @@ return true;
     return true;
   }
 
+  // 5. View FAQ
+  if (msg === "faq" || command === "5" || command === "faq") {
+    const { data: faq, error: faqError } = await db
+      .from("clinic_knowledge_base")
+      .select("question, answer")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: true })
+      .limit(10);
 
-// 5. View FAQ
-if (msg === "faq" || command === "5" || command === "faq") {
-  const { data: faq, error: faqError } = await db
-    .from("clinic_knowledge_base")
-    .select("question, answer")
-    .eq("clinic_id", clinicId)
-    .order("created_at", { ascending: true })
-    .limit(10);
+    if (faqError) {
+      console.error("❌ FAQ fetch error:", faqError);
+    }
 
-  if (faqError) {
-    console.error("❌ FAQ fetch error:", faqError);
-  }
-
-  if (!faq || faq.length === 0) {
-    await engineSendText({
-      accountId,
-      userId,
-      conversationId,
-      contactId,
-      text: "❌ No FAQ available.",
-    });
-
-    return true;
-  }
-
-  const list = faq
-    .map(
-      (f: any, i: number) =>
-        `${i + 1}. *${f.question}*\n${f.answer}`
-    )
-    .join("\n\n");
-
-  await engineSendText({
-    accountId,
-    userId,
-    conversationId,
-    contactId,
-    text: `❓ *Frequently Asked Questions*\n\n${list}`,
-  });
-
-  return true;
-}
-
-
-
+    if (!faq || faq.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ No FAQ available.",
+      });
+      return true;
+    }
 
     const list = faq
-      .map((f: any, i: number) => `${i + 1}. ${f.question}\n   ${f.answer}`)
+      .map(
+        (f: any, i: number) =>
+          `${i + 1}. *${f.question}*\n${f.answer}`
+      )
       .join("\n\n");
 
     await engineSendText({
@@ -1266,7 +1232,7 @@ if (msg === "faq" || command === "5" || command === "faq") {
       userId,
       conversationId,
       contactId,
-      text: `❓ Frequently Asked Questions:\n\n${list}`,
+      text: `❓ *Frequently Asked Questions*\n\n${list}`,
     });
 
     return true;
