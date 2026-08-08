@@ -1,6 +1,8 @@
 import { supabaseAdmin } from "@/lib/ai/admin-client";
-import { engineSendInteractiveList } from "@/lib/flows/meta-send";
-
+import {
+  engineSendInteractiveList,
+  engineSendMedia,
+} from "@/lib/flows/meta-send";
 export async function sendMainMenu({
   accountId,
   userId,
@@ -20,18 +22,7 @@ export async function sendMainMenu({
   const { data: clinic, error: clinicError } = await db
     .from("clinics")
 
-.select(`
-  clinic_name,
-  whatsapp_number,
-  logo_url,
-  doctors_enabled,
-  services_enabled,
-  faq_enabled,
-  working_hours_enabled,
-  address,
-  google_maps
-`)
-
+.select("clinic_name, whatsapp_number, logo_url, clinic_logo")
     .eq("id", clinicId)
     .maybeSingle();
 
@@ -41,7 +32,24 @@ export async function sendMainMenu({
 
   const clinicName = clinic?.clinic_name || "Sunrise Health Clinic";
   const whatsappNumber = clinic?.whatsapp_number || "+91 9876543210";
+const logoUrl = clinic?.logo_url || clinic?.clinic_logo || null;
 
+// Send clinic logo first
+if (logoUrl) {
+  try {
+    await engineSendMedia({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      kind: "image",
+      link: logoUrl,
+      caption: `🏥 ${clinicName}`,
+    });
+  } catch (error) {
+    console.error("Failed to send clinic logo:", error);
+  }
+}
   // Get today's working hours
   const { data: hoursData } = await db
     .from("clinic_working_hours")
