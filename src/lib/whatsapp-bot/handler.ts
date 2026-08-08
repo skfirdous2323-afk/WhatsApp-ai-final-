@@ -1220,13 +1220,28 @@ We'll send you a reminder before your appointment.
       return true;
     }
 
-    const list = faq
-      .map(
-        (f: any, i: number) =>
-          `${i + 1}. *${f.question}*\n${f.answer}`
-      )
-      .join("\n\n");
+const list = faq
+  .map(
+    (f: any, i: number) =>
+      `━━━━━━━━━━━━━━\n\n` +
+      `❓ *${i + 1}. ${f.question}*\n` +
+      `👉 ${f.answer}`
+  )
+  .join("\n\n");
 
+await engineSendText({
+  accountId,
+  userId,
+  conversationId,
+  contactId,
+  text:
+    `❓ *Frequently Asked Questions*\n\n` +
+    `Here are some common questions about our clinic:\n\n` +
+    `${list}\n\n` +
+    `━━━━━━━━━━━━━━\n\n` +
+    `💬 *Need more help?*\n` +
+    `Please contact us for further assistance. 📱`,
+});
     await engineSendText({
       accountId,
       userId,
