@@ -137,13 +137,20 @@ export default function FAQPage() {
         return;
       }
 
-      const { error } = await supabase
-        .from("clinic_knowledge_base")
-        .insert({
-          clinic_id: clinic.id,
-          question: question.trim(),
-          answer: answer.trim(),
-        });
+
+
+const { error } = await supabase
+  .from("clinic_knowledge_base")
+  .insert({
+    clinic_id: clinic.id,
+    user_id: user.id,
+    question: question.trim(),
+    answer: answer.trim(),
+  });
+
+
+
+
 
       if (error) {
         console.error("FAQ save error:", error);
