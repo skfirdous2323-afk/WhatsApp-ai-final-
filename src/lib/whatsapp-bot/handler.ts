@@ -1197,61 +1197,165 @@ We'll send you a reminder before your appointment.
   }
 
   // 5. View FAQ
-  if (msg === "faq" || command === "5" || command === "faq") {
-    const { data: faq, error: faqError } = await db
-      .from("clinic_knowledge_base")
-      .select("question, answer")
-      .eq("clinic_id", clinicId)
-      .order("created_at", { ascending: true })
-      .limit(10);
 
-    if (faqError) {
-      console.error("❌ FAQ fetch error:", faqError);
-    }
+// ============================================================
+// 5. FAQ - Interactive FAQ List
+// ============================================================
 
-    if (!faq || faq.length === 0) {
-      await engineSendText({
-        accountId,
-        userId,
-        conversationId,
-        contactId,
-        text: "❌ No FAQ available.",
-      });
-      return true;
-    }
+// Open FAQ list
+if (msg === "faq" || command === "5" || command === "faq") {
+  const { data: faq, error: faqError } = await db
+    .from("clinic_knowledge_base")
+    .select("id, question")
+    .eq("clinic_id", clinicId)
+    .order("created_at", { ascending: true })
+    .limit(10);
 
-const list = faq
-  .map(
-    (f: any, i: number) =>
-      `━━━━━━━━━━━━━━\n\n` +
-      `❓ *${i + 1}. ${f.question}*\n` +
-      `👉 ${f.answer}`
-  )
-  .join("\n\n");
+  if (faqError) {
+    console.error("❌ FAQ fetch error:", faqError);
+  }
 
-await engineSendText({
-  accountId,
-  userId,
-  conversationId,
-  contactId,
-  text:
-    `❓ *Frequently Asked Questions*\n\n` +
-    `Here are some common questions about our clinic:\n\n` +
-    `${list}\n\n` +
-    `━━━━━━━━━━━━━━\n\n` +
-    `💬 *Need more help?*\n` +
-    `Please contact us for further assistance. 📱`,
-});
+  if (!faq || faq.length === 0) {
     await engineSendText({
       accountId,
       userId,
       conversationId,
       contactId,
-      text: `❓ *Frequently Asked Questions*\n\n${list}`,
+      text: "❌ No FAQs are available right now.",
     });
 
     return true;
   }
+
+  await engineSendInteractiveList({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    bodyText: "❓ Frequently Asked Questions",
+    footerText: "Select a question to view the answer",
+    buttonLabel: "View FAQs",
+    sections: [
+      {
+        title: "Common Questions",
+        rows: faq.map((f: any) => ({
+          id: `faq_${f.id}`,
+          title:
+            f.question.length > 24
+              ? f.question.substring(0, 21) + "..."
+              : f.question,
+          description: "Tap to view answer",
+        })),
+      },
+      {
+        title: "Other",
+        rows: [
+          {
+            id: "faq_main_menu",
+            title: "🏠 Main Menu",
+            description: "Back to main menu",
+          },
+        ],
+      },
+    ],
+  });
+
+  return true;
+}
+
+
+// ============================================================
+// FAQ - Show Selected Answer
+// ============================================================
+
+if (command.startsWith("faq_") && command !== "faq_main_menu") {
+  const faqId = command.replace("faq_", "");
+
+  const { data: selectedFaq, error: selectedFaqError } = await db
+    .from("clinic_knowledge_base")
+    .select("question, answer")
+    .eq("id", faqId)
+    .eq("clinic_id", clinicId)
+    .maybeSingle();
+
+  if (selectedFaqError) {
+    console.error("❌ Selected FAQ error:", selectedFaqError);
+  }
+
+  if (!selectedFaq) {
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: "❌ Sorry, this FAQ is no longer available.",
+    });
+
+    return true;
+  }
+
+  await engineSendText({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    text:
+      `❓ *${selectedFaq.question}*\n\n` +
+      `👉 ${selectedFaq.answer}`,
+  });
+
+  // Show FAQ menu again
+  await engineSendInteractiveList({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    bodyText: "❓ Have another question?",
+    footerText: "Choose another FAQ",
+    buttonLabel: "View FAQs",
+    sections: [
+      {
+        title: "FAQ",
+        rows: [
+          {
+            id: "faq",
+            title: "❓ More FAQs",
+            description: "View all questions",
+          },
+          {
+            id: "faq_main_menu",
+            title: "🏠 Main Menu",
+            description: "Back to main menu",
+          },
+        ],
+      },
+    ],
+  });
+
+  return true;
+}
+
+
+// ============================================================
+// FAQ - Back to Main Menu
+// ============================================================
+
+if (command === "faq_main_menu") {
+  clearSession(contactId);
+
+  await sendMainMenu({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    clinicId,
+  });
+
+  return true;
+}
+
+
+
 
   // 6. Contact Information
   if (msg === "contact" || command === "6" || command === "contact") {
