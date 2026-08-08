@@ -1,3 +1,5 @@
+// src/app/(dashboard)/whatsapp-bot/doctors/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -60,7 +62,7 @@ export default function DoctorsPage() {
 
       const clinicId = await getClinicId(user.id);
 
-      // ✅ Check if doctors feature is enabled
+      // Check if doctors feature is enabled
       const { data: clinic, error: clinicError } = await supabase
         .from("clinics")
         .select("doctors_enabled")
@@ -69,20 +71,14 @@ export default function DoctorsPage() {
 
       if (clinicError) throw clinicError;
 
-      // ✅ If disabled, show empty state with message
       if (clinic?.doctors_enabled === false) {
         setIsEnabled(false);
         setDoctors([]);
-        setMessage({
-          type: 'error',
-          text: '⚠️ Doctors section is currently disabled. Enable it to manage doctors.'
-        });
         setIsLoading(false);
         return;
       }
 
       setIsEnabled(true);
-      setMessage(null);
 
       // Load doctors for this clinic
       const { data, error } = await supabase
@@ -111,7 +107,7 @@ export default function DoctorsPage() {
     }
   };
 
-  // ✅ Toggle doctors section on/off
+  // Toggle doctors section on/off
   const handleToggleDoctors = async () => {
     setIsSaving(true);
     try {
@@ -210,7 +206,7 @@ export default function DoctorsPage() {
       await loadDoctors();
     } catch (error) {
       console.error('Error saving doctor:', error);
-      showMessage('error', `Failed to ${editingId ? 'update' : 'add'} doctor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showMessage('error', `Failed to ${editingId ? 'update' : 'add'} doctor`);
     } finally {
       setIsSaving(false);
     }
@@ -292,26 +288,26 @@ export default function DoctorsPage() {
             <h1 className="text-3xl font-bold text-gray-900">Doctor Management</h1>
             <p className="mt-1 text-sm text-gray-500">Step 2 of 6 – Manage your medical professionals</p>
           </div>
-          <div className="flex items-center gap-4">
-            {/* ✅ Global On/Off Switch */}
-            <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200">
-              <span className={`text-sm font-medium ${isEnabled ? 'text-green-600' : 'text-red-600'}`}>
-                {isEnabled ? '🟢 ON' : '🔴 OFF'}
-              </span>
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Global On/Off Switch - Improved UI */}
+            <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-full shadow-md border border-gray-200">
+              <span className="text-sm font-medium text-gray-600">Doctors</span>
               <button
                 onClick={handleToggleDoctors}
                 disabled={isSaving}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                  isEnabled ? 'bg-green-600' : 'bg-gray-300'
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                  isEnabled ? 'bg-green-500' : 'bg-gray-300'
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform ${
                     isEnabled ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
               </button>
-              <span className="text-xs text-gray-500">Doctors</span>
+              <span className={`text-sm font-semibold ${isEnabled ? 'text-green-600' : 'text-red-500'}`}>
+                {isEnabled ? 'ON' : 'OFF'}
+              </span>
             </div>
 
             <span className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-800">
@@ -350,15 +346,21 @@ export default function DoctorsPage() {
           </div>
         )}
 
-        {/* ✅ If disabled, show overlay message */}
+        {/* Disabled State - Better UI */}
         {!isEnabled ? (
-          <div className="rounded-xl bg-white p-12 shadow-xl border border-gray-100 text-center">
+          <div className="rounded-2xl bg-white p-16 shadow-xl border border-gray-100 text-center">
             <div className="mx-auto max-w-md">
-              <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-              </svg>
-              <h3 className="mt-4 text-2xl font-bold text-gray-900">Doctors Section Disabled</h3>
-              <p className="mt-2 text-gray-500">Toggle the switch above to enable doctors management</p>
+              <div className="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                <svg className="h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900">Doctors Section Disabled</h3>
+              <p className="mt-3 text-gray-500">Toggle the switch above to enable doctors management</p>
+              <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-500">💡 Tip:</span>
+                <span className="text-sm text-gray-600">Enable to add and manage doctors</span>
+              </div>
             </div>
           </div>
         ) : (
