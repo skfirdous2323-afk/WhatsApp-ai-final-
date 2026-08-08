@@ -1210,24 +1210,52 @@ return true;
     return true;
   }
 
-  // 5. View FAQ
-  if (msg === "faq" || command === "5" || command === "faq") {
-    const { data: faq } = await db
-      .from("clinic_knowledge_base")
-      .select("question, answer")
-      .eq("clinic_id", clinicId)
-      .limit(5);
 
-    if (!faq || faq.length === 0) {
-      await engineSendText({
-        accountId,
-        userId,
-        conversationId,
-        contactId,
-        text: "❌ No FAQ available.",
-      });
-      return true;
-    }
+// 5. View FAQ
+if (msg === "faq" || command === "5" || command === "faq") {
+  const { data: faq, error: faqError } = await db
+    .from("clinic_knowledge_base")
+    .select("question, answer")
+    .eq("clinic_id", clinicId)
+    .order("created_at", { ascending: true })
+    .limit(10);
+
+  if (faqError) {
+    console.error("❌ FAQ fetch error:", faqError);
+  }
+
+  if (!faq || faq.length === 0) {
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: "❌ No FAQ available.",
+    });
+
+    return true;
+  }
+
+  const list = faq
+    .map(
+      (f: any, i: number) =>
+        `${i + 1}. *${f.question}*\n${f.answer}`
+    )
+    .join("\n\n");
+
+  await engineSendText({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    text: `❓ *Frequently Asked Questions*\n\n${list}`,
+  });
+
+  return true;
+}
+
+
+
 
     const list = faq
       .map((f: any, i: number) => `${i + 1}. ${f.question}\n   ${f.answer}`)
