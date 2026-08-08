@@ -19,7 +19,19 @@ export async function sendMainMenu({
   // Get clinic data
   const { data: clinic, error: clinicError } = await db
     .from("clinics")
-    .select("clinic_name, whatsapp_number")
+
+.select(`
+  clinic_name,
+  whatsapp_number,
+  logo_url,
+  doctors_enabled,
+  services_enabled,
+  faq_enabled,
+  working_hours_enabled,
+  address,
+  google_maps
+`)
+
     .eq("id", clinicId)
     .maybeSingle();
 
