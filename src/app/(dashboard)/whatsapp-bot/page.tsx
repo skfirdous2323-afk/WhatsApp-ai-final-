@@ -79,14 +79,31 @@ useEffect(() => {
 
     const { data: clinic, error } = await supabase
       .from("clinics")
-      .select(`
-        doctors_enabled,
-        services_enabled,
-        faq_enabled,
-        working_hours_enabled,
-        logo_url,
-        clinic_logo
-      `)
+
+
+
+
+.select(`
+  clinic_name,
+  clinic_type,
+  whatsapp_number,
+  phone_number,
+  email,
+  address,
+  google_maps,
+  website,
+  language,
+  timezone,
+  doctors_enabled,
+  services_enabled,
+  faq_enabled,
+  working_hours_enabled,
+  logo_url,
+  clinic_logo
+`)
+
+
+
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -96,6 +113,18 @@ useEffect(() => {
     }
 
     if (!clinic) return;
+
+setClinicName(clinic.clinic_name || "");
+setClinicType(clinic.clinic_type || "Dental");
+setWhatsappNumber(clinic.whatsapp_number || "");
+setPhoneNumber(clinic.phone_number || "");
+setEmail(clinic.email || "");
+setAddress(clinic.address || "");
+setGoogleMaps(clinic.google_maps || "");
+setWebsite(clinic.website || "");
+setLanguage(clinic.language || "English");
+setTimezone(clinic.timezone || "Asia/Kolkata");
+
 
     setDoctorsEnabled(clinic.doctors_enabled ?? true);
     setServicesEnabled(clinic.services_enabled ?? true);
@@ -171,9 +200,6 @@ const { data: existingClinic } = await supabase
       }
 
 
-
-
-
 const clinicData = {
   clinic_name: clinicName,
   clinic_type: clinicType,
@@ -187,12 +213,17 @@ const clinicData = {
   language,
   timezone,
   website,
-
   doctors_enabled: doctorsEnabled,
   services_enabled: servicesEnabled,
   faq_enabled: faqEnabled,
   working_hours_enabled: workingHoursEnabled,
 };
+
+
+
+
+
+
       let error;
 
       if (existingClinic) {
