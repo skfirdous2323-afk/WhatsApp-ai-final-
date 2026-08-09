@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -23,23 +22,18 @@ export default function WhatsAppBotPage() {
   const [language, setLanguage] = useState("English");
   const [timezone, setTimezone] = useState("Asia/Kolkata");
   const [website, setWebsite] = useState("");
-  
 
-const [doctorsEnabled, setDoctorsEnabled] = useState(true);
-const [servicesEnabled, setServicesEnabled] = useState(true);
-const [faqEnabled, setFaqEnabled] = useState(true);
-const [workingHoursEnabled, setWorkingHoursEnabled] = useState(true);
+  const [doctorsEnabled, setDoctorsEnabled] = useState(true);
+  const [servicesEnabled, setServicesEnabled] = useState(true);
+  const [faqEnabled, setFaqEnabled] = useState(true);
+  const [workingHoursEnabled, setWorkingHoursEnabled] = useState(true);
 
-
-
-
-const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     if (file) {
-      // Validate file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
         showMessage('error', 'Logo size should be less than 2MB');
         return;
@@ -66,82 +60,73 @@ const [loading, setLoading] = useState(false);
     setTimeout(() => setMessage(null), 5000);
   };
 
+  // ✅ Load clinic settings - FIXED
+  useEffect(() => {
+    async function loadClinicSettings() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { data: clinic, error } = await supabase
+        .from("clinics")
+        .select(`
+          clinic_name,
+          clinic_type,
+          whatsapp_number,
+          phone_number,
+          email,
+          address,
+          google_maps,
+          website,
+          language,
+          timezone,
+          doctors_enabled,
+          services_enabled,
+          faq_enabled,
+          working_hours_enabled,
+          logo_url,
+          clinic_logo
+        `)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Failed to load clinic settings:", error);
+        return;
+      }
+
+      if (!clinic) return;
+
+      setClinicName(clinic.clinic_name || "");
+      setClinicType(clinic.clinic_type || "Dental");
+      setWhatsappNumber(clinic.whatsapp_number || "");
+      setPhoneNumber(clinic.phone_number || "");
+      setEmail(clinic.email || "");
+      setAddress(clinic.address || "");
+      setGoogleMaps(clinic.google_maps || "");
+      setWebsite(clinic.website || "");
+      setLanguage(clinic.language || "English");
+      setTimezone(clinic.timezone || "Asia/Kolkata");
+
+      setDoctorsEnabled(clinic.doctors_enabled ?? true);
+      setServicesEnabled(clinic.services_enabled ?? true);
+      setFaqEnabled(clinic.faq_enabled ?? true);
+      setWorkingHoursEnabled(clinic.working_hours_enabled ?? true);
+
+      const existingLogo = clinic.logo_url || clinic.clinic_logo;
+      if (existingLogo) {
+        setLogoPreview(existingLogo);
+      }
+    }
+
+    loadClinicSettings();
+  }, []);
+
+  // ✅ Save Clinic - FIXED
   async function saveClinic() {
-  
-
-useEffect(() => {
-  async function loadClinicSettings() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const { data: clinic, error } = await supabase
-      .from("clinics")
-
-
-
-
-.select(`
-  clinic_name,
-  clinic_type,
-  whatsapp_number,
-  phone_number,
-  email,
-  address,
-  google_maps,
-  website,
-  language,
-  timezone,
-  doctors_enabled,
-  services_enabled,
-  faq_enabled,
-  working_hours_enabled,
-  logo_url,
-  clinic_logo
-`)
-
-
-
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error("Failed to load clinic settings:", error);
-      return;
-    }
-
-    if (!clinic) return;
-
-setClinicName(clinic.clinic_name || "");
-setClinicType(clinic.clinic_type || "Dental");
-setWhatsappNumber(clinic.whatsapp_number || "");
-setPhoneNumber(clinic.phone_number || "");
-setEmail(clinic.email || "");
-setAddress(clinic.address || "");
-setGoogleMaps(clinic.google_maps || "");
-setWebsite(clinic.website || "");
-setLanguage(clinic.language || "English");
-setTimezone(clinic.timezone || "Asia/Kolkata");
-
-
-    setDoctorsEnabled(clinic.doctors_enabled ?? true);
-    setServicesEnabled(clinic.services_enabled ?? true);
-    setFaqEnabled(clinic.faq_enabled ?? true);
-    setWorkingHoursEnabled(clinic.working_hours_enabled ?? true);
-
-    const existingLogo = clinic.logo_url || clinic.clinic_logo;
-
-    if (existingLogo) {
-      setLogoPreview(existingLogo);
-    }
-  }
-
-  loadClinicSettings();
-}, []);
-
-  // Validation
+    // Validation
     if (!clinicName.trim()) {
       showMessage('error', 'Please enter clinic name');
       return;
@@ -169,13 +154,18 @@ setTimezone(clinic.timezone || "Asia/Kolkata");
       }
 
       // Check if clinic already exists for this user
+      const { data: existingClinic, error: fetchError } = await supabase
+        .from("clinics")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-const { data: existingClinic } = await supabase
-  .from("clinics")
-  .select("id")
-  .eq("user_id", user.id)
-  .single();
-
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        // PGRST116 means no rows found - not an error
+        console.error("Error checking existing clinic:", fetchError);
+        showMessage('error', 'Failed to check existing clinic');
+        return;
+      }
 
       // Upload logo if exists
       let logoUrl = null;
@@ -195,34 +185,28 @@ const { data: existingClinic } = await supabase
         const { data: { publicUrl } } = supabase.storage
           .from('clinic-logos')
           .getPublicUrl(fileName);
-        
+
         logoUrl = publicUrl;
       }
 
-
-const clinicData = {
-  clinic_name: clinicName,
-  clinic_type: clinicType,
-  whatsapp_number: whatsappNumber,
-  phone_number: phoneNumber,
-  email,
-  address,
-  google_maps: googleMaps,
-  clinic_logo: logoUrl,
-  logo_url: logoUrl,
-  language,
-  timezone,
-  website,
-  doctors_enabled: doctorsEnabled,
-  services_enabled: servicesEnabled,
-  faq_enabled: faqEnabled,
-  working_hours_enabled: workingHoursEnabled,
-};
-
-
-
-
-
+      const clinicData = {
+        clinic_name: clinicName,
+        clinic_type: clinicType,
+        whatsapp_number: whatsappNumber,
+        phone_number: phoneNumber,
+        email: email,
+        address: address,
+        google_maps: googleMaps,
+        clinic_logo: logoUrl,
+        logo_url: logoUrl,
+        language: language,
+        timezone: timezone,
+        website: website,
+        doctors_enabled: doctorsEnabled,
+        services_enabled: servicesEnabled,
+        faq_enabled: faqEnabled,
+        working_hours_enabled: workingHoursEnabled,
+      };
 
       let error;
 
@@ -245,12 +229,13 @@ const clinicData = {
       }
 
       if (error) {
-        showMessage('error', error.message);
+        console.error("Save error:", error);
+        showMessage('error', error.message || 'Failed to save clinic');
         return;
       }
 
       showMessage('success', '✅ Clinic information saved successfully!');
-      
+
       // Navigate to next page after successful save
       setTimeout(() => {
         router.push("/whatsapp-bot/doctors");
@@ -294,8 +279,8 @@ const clinicData = {
         {/* Message Alert */}
         {message && (
           <div className={`mb-6 rounded-lg p-4 ${
-            message.type === 'success' 
-              ? 'bg-green-50 border border-green-200' 
+            message.type === 'success'
+              ? 'bg-green-50 border border-green-200'
               : 'bg-red-50 border border-red-200'
           }`}>
             <p className={`${
@@ -495,7 +480,7 @@ const clinicData = {
                 <h3 className="mb-4 text-lg font-semibold text-gray-900">
                   ⚙️ Settings
                 </h3>
-                
+
                 <div className="space-y-4">
                   {/* Language */}
                   <div>
@@ -541,73 +526,61 @@ const clinicData = {
                   </div>
 
                   <div className="pt-4 border-t border-gray-200">
-                  
+                    <h4 className="mb-3 text-sm font-semibold text-gray-800">
+                      🤖 WhatsApp Bot Features
+                    </h4>
 
-<div className="pt-4 border-t border-gray-200">
-  <h4 className="mb-3 text-sm font-semibold text-gray-800">
-    🤖 WhatsApp Bot Features
-  </h4>
+                    <div className="space-y-3">
+                      <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
+                        <span className="text-sm text-gray-700">
+                          👨‍⚕️ Doctors
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={doctorsEnabled}
+                          onChange={(e) => setDoctorsEnabled(e.target.checked)}
+                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </label>
 
-  <div className="space-y-3">
+                      <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
+                        <span className="text-sm text-gray-700">
+                          🦷 Services
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={servicesEnabled}
+                          onChange={(e) => setServicesEnabled(e.target.checked)}
+                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </label>
 
-    <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
-      <span className="text-sm text-gray-700">
-        👨‍⚕️ Doctors
-      </span>
+                      <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
+                        <span className="text-sm text-gray-700">
+                          ❓ FAQ
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={faqEnabled}
+                          onChange={(e) => setFaqEnabled(e.target.checked)}
+                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </label>
 
-      <input
-        type="checkbox"
-        checked={doctorsEnabled}
-        onChange={(e) => setDoctorsEnabled(e.target.checked)}
-        className="h-5 w-5"
-      />
-    </label>
+                      <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
+                        <span className="text-sm text-gray-700">
+                          🕒 Working Hours
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={workingHoursEnabled}
+                          onChange={(e) => setWorkingHoursEnabled(e.target.checked)}
+                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </label>
+                    </div>
 
-    <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
-      <span className="text-sm text-gray-700">
-        🦷 Services
-      </span>
-
-      <input
-        type="checkbox"
-        checked={servicesEnabled}
-        onChange={(e) => setServicesEnabled(e.target.checked)}
-        className="h-5 w-5"
-      />
-    </label>
-
-    <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
-      <span className="text-sm text-gray-700">
-        ❓ FAQ
-      </span>
-
-      <input
-        type="checkbox"
-        checked={faqEnabled}
-        onChange={(e) => setFaqEnabled(e.target.checked)}
-        className="h-5 w-5"
-      />
-    </label>
-
-    <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
-      <span className="text-sm text-gray-700">
-        🕒 Working Hours
-      </span>
-
-      <input
-        type="checkbox"
-        checked={workingHoursEnabled}
-        onChange={(e) => setWorkingHoursEnabled(e.target.checked)}
-        className="h-5 w-5"
-      />
-    </label>
-
-  </div>
-</div>
-
-
-
-  <div className="rounded-lg bg-blue-50 p-3">
+                    <div className="mt-4 rounded-lg bg-blue-50 p-3">
                       <p className="text-xs text-blue-800">
                         💡 All settings will be applied to your WhatsApp bot configuration
                       </p>
