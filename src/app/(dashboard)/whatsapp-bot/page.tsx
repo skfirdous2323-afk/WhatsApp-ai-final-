@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -22,7 +23,17 @@ export default function WhatsAppBotPage() {
   const [language, setLanguage] = useState("English");
   const [timezone, setTimezone] = useState("Asia/Kolkata");
   const [website, setWebsite] = useState("");
-  const [loading, setLoading] = useState(false);
+  
+
+const [doctorsEnabled, setDoctorsEnabled] = useState(true);
+const [servicesEnabled, setServicesEnabled] = useState(true);
+const [faqEnabled, setFaqEnabled] = useState(true);
+const [workingHoursEnabled, setWorkingHoursEnabled] = useState(true);
+
+
+
+
+const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,7 +67,52 @@ export default function WhatsAppBotPage() {
   };
 
   async function saveClinic() {
-    // Validation
+  
+
+useEffect(() => {
+  async function loadClinicSettings() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const { data: clinic, error } = await supabase
+      .from("clinics")
+      .select(`
+        doctors_enabled,
+        services_enabled,
+        faq_enabled,
+        working_hours_enabled,
+        logo_url,
+        clinic_logo
+      `)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Failed to load clinic settings:", error);
+      return;
+    }
+
+    if (!clinic) return;
+
+    setDoctorsEnabled(clinic.doctors_enabled ?? true);
+    setServicesEnabled(clinic.services_enabled ?? true);
+    setFaqEnabled(clinic.faq_enabled ?? true);
+    setWorkingHoursEnabled(clinic.working_hours_enabled ?? true);
+
+    const existingLogo = clinic.logo_url || clinic.clinic_logo;
+
+    if (existingLogo) {
+      setLogoPreview(existingLogo);
+    }
+  }
+
+  loadClinicSettings();
+}, []);
+
+  // Validation
     if (!clinicName.trim()) {
       showMessage('error', 'Please enter clinic name');
       return;
@@ -114,20 +170,29 @@ const { data: existingClinic } = await supabase
         logoUrl = publicUrl;
       }
 
-      const clinicData = {
-        clinic_name: clinicName,
-        clinic_type: clinicType,
-        whatsapp_number: whatsappNumber,
-        phone_number: phoneNumber,
-        email,
-        address,
-        google_maps: googleMaps,
-clinic_logo: logoUrl,
-        language,
-        timezone,
-        website,
-      };
 
+
+
+
+const clinicData = {
+  clinic_name: clinicName,
+  clinic_type: clinicType,
+  whatsapp_number: whatsappNumber,
+  phone_number: phoneNumber,
+  email,
+  address,
+  google_maps: googleMaps,
+  clinic_logo: logoUrl,
+  logo_url: logoUrl,
+  language,
+  timezone,
+  website,
+
+  doctors_enabled: doctorsEnabled,
+  services_enabled: servicesEnabled,
+  faq_enabled: faqEnabled,
+  working_hours_enabled: workingHoursEnabled,
+};
       let error;
 
       if (existingClinic) {
@@ -445,7 +510,73 @@ clinic_logo: logoUrl,
                   </div>
 
                   <div className="pt-4 border-t border-gray-200">
-                    <div className="rounded-lg bg-blue-50 p-3">
+                  
+
+<div className="pt-4 border-t border-gray-200">
+  <h4 className="mb-3 text-sm font-semibold text-gray-800">
+    🤖 WhatsApp Bot Features
+  </h4>
+
+  <div className="space-y-3">
+
+    <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
+      <span className="text-sm text-gray-700">
+        👨‍⚕️ Doctors
+      </span>
+
+      <input
+        type="checkbox"
+        checked={doctorsEnabled}
+        onChange={(e) => setDoctorsEnabled(e.target.checked)}
+        className="h-5 w-5"
+      />
+    </label>
+
+    <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
+      <span className="text-sm text-gray-700">
+        🦷 Services
+      </span>
+
+      <input
+        type="checkbox"
+        checked={servicesEnabled}
+        onChange={(e) => setServicesEnabled(e.target.checked)}
+        className="h-5 w-5"
+      />
+    </label>
+
+    <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
+      <span className="text-sm text-gray-700">
+        ❓ FAQ
+      </span>
+
+      <input
+        type="checkbox"
+        checked={faqEnabled}
+        onChange={(e) => setFaqEnabled(e.target.checked)}
+        className="h-5 w-5"
+      />
+    </label>
+
+    <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
+      <span className="text-sm text-gray-700">
+        🕒 Working Hours
+      </span>
+
+      <input
+        type="checkbox"
+        checked={workingHoursEnabled}
+        onChange={(e) => setWorkingHoursEnabled(e.target.checked)}
+        className="h-5 w-5"
+      />
+    </label>
+
+  </div>
+</div>
+
+
+
+  <div className="rounded-lg bg-blue-50 p-3">
                       <p className="text-xs text-blue-800">
                         💡 All settings will be applied to your WhatsApp bot configuration
                       </p>
