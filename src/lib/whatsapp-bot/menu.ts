@@ -22,7 +22,11 @@ export async function sendMainMenu({
   const { data: clinic, error: clinicError } = await db
     .from("clinics")
 
-.select("clinic_name, whatsapp_number, logo_url, clinic_logo")
+
+
+.select("clinic_name, whatsapp_number, logo_url, clinic_logo, menu_labels")
+
+
     .eq("id", clinicId)
     .maybeSingle();
 
@@ -33,6 +37,20 @@ export async function sendMainMenu({
   const clinicName = clinic?.clinic_name || "Sunrise Health Clinic";
   const whatsappNumber = clinic?.whatsapp_number || "+91 9876543210";
 const logoUrl = clinic?.logo_url || clinic?.clinic_logo || null;
+const menuLabels = clinic?.menu_labels || {};
+
+const bookLabel = menuLabels.book || "📅 Book Appointment";
+const doctorsLabel = menuLabels.doctors || "👨‍⚕️ Doctors";
+const servicesLabel = menuLabels.services || "🦷 Services";
+const hoursLabel = menuLabels.hours || "🕒 Working Hours";
+const faqLabel = menuLabels.faq || "❓ FAQ";
+const contactLabel = menuLabels.contact || "📞 Contact";
+const locationLabel = menuLabels.location || "📍 Location";
+
+
+
+
+
 
 // Send clinic logo first
 if (logoUrl) {
@@ -98,37 +116,55 @@ if (logoUrl) {
         rows: [
           {
             id: "book",
-            title: "📅 Book Appointment",
+
+
+title: bookLabel,
             description: "Book a new appointment",
           },
           {
             id: "doctors",
-            title: "👨‍⚕️ Doctors",
+
+title: doctorsLabel,
+
             description: "View all doctors",
           },
           {
             id: "services",
-            title: "🦷 Services",
+
+
+
+title: servicesLabel,
+
             description: "Our treatments",
           },
           {
             id: "hours",
-            title: "🕒 Working Hours",
+
+
+
+
+title: hoursLabel,
+
             description: "Clinic timing",
           },
           {
             id: "faq",
-            title: "❓ FAQ",
+
+
+title: faqLabel,
             description: "Frequently asked questions",
           },
           {
             id: "contact",
-            title: "📞 Contact",
+title: contactLabel,
+
             description: "Contact clinic",
           },
           {
             id: "location",
-            title: "📍 Location",
+
+title: locationLabel,
+
             description: "Clinic address",
           },
         ],
