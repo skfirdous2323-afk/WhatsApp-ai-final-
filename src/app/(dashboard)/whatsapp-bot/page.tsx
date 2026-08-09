@@ -542,54 +542,6 @@ export default function WhatsAppBotPage() {
                     </select>
                   </div>
 
-                  <div className="pt-4 border-t border-gray-200">
-                    <h4 className="mb-3 text-sm font-semibold text-gray-800">
-                      🤖 WhatsApp Bot Features
-                    </h4>
-
-                    <div className="space-y-3">
-                      <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
-                        <span className="text-sm text-gray-700">👨‍⚕️ Doctors</span>
-                        <input
-                          type="checkbox"
-                          checked={doctorsEnabled}
-                          onChange={(e) => setDoctorsEnabled(e.target.checked)}
-                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </label>
-
-                      <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
-                        <span className="text-sm text-gray-700">🦷 Services</span>
-                        <input
-                          type="checkbox"
-                          checked={servicesEnabled}
-                          onChange={(e) => setServicesEnabled(e.target.checked)}
-                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </label>
-
-                      <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
-                        <span className="text-sm text-gray-700">❓ FAQ</span>
-                        <input
-                          type="checkbox"
-                          checked={faqEnabled}
-                          onChange={(e) => setFaqEnabled(e.target.checked)}
-                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </label>
-
-                      <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
-                        <span className="text-sm text-gray-700">🕒 Working Hours</span>
-                        <input
-                          type="checkbox"
-                          checked={workingHoursEnabled}
-                          onChange={(e) => setWorkingHoursEnabled(e.target.checked)}
-                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </label>
-                    </div>
-                  </div>
-
                   {/* ✅ Menu Labels Customization Section */}
                   <div className="pt-4 border-t border-gray-200">
                     <h4 className="mb-3 text-sm font-semibold text-gray-800">
