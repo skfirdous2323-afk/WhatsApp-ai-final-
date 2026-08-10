@@ -668,10 +668,29 @@ export default function WhatsAppBotPage() {
               >
                 Next → Doctors
               </Link>
-            </div>
-          </div>
         </div>
       </div>
+
+      {/* ✅ এখানে Policy Links যোগ করুন */}
+      <div className="mt-8 pt-6 border-t border-gray-200">
+        <div className="flex flex-wrap justify-center gap-3 text-sm">
+          <Link href="/privacy-policy" className="text-gray-500 hover:text-blue-600 transition-colors">
+            🔒 Privacy Policy
+          </Link>
+          <span className="text-gray-300">|</span>
+          <Link href="/terms" className="text-gray-500 hover:text-blue-600 transition-colors">
+            📋 Terms & Conditions
+          </Link>
+          <span className="text-gray-300">|</span>
+          <Link href="/refund-policy" className="text-gray-500 hover:text-blue-600 transition-colors">
+            💰 Refund Policy
+          </Link>
+        </div>
+        <p className="text-center text-xs text-gray-400 mt-2">
+          By using our services, you agree to our policies.
+        </p>
+      </div>
+
     </div>
   );
 }
