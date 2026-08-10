@@ -28,7 +28,6 @@ export default function WhatsAppBotPage() {
   const [faqEnabled, setFaqEnabled] = useState(true);
   const [workingHoursEnabled, setWorkingHoursEnabled] = useState(true);
 
-  // ✅ Menu Labels State
   const [menuLabels, setMenuLabels] = useState({
     book: "📅 Book Appointment",
     doctors: "👨‍⚕️ Doctors",
@@ -71,7 +70,6 @@ export default function WhatsAppBotPage() {
     setTimeout(() => setMessage(null), 5000);
   };
 
-  // ✅ Load clinic settings
   useEffect(() => {
     async function loadClinicSettings() {
       const {
@@ -127,7 +125,6 @@ export default function WhatsAppBotPage() {
       setFaqEnabled(clinic.faq_enabled ?? true);
       setWorkingHoursEnabled(clinic.working_hours_enabled ?? true);
 
-      // ✅ Load menu labels from database
       if (clinic.menu_labels) {
         setMenuLabels(prev => ({
           ...prev,
@@ -144,9 +141,7 @@ export default function WhatsAppBotPage() {
     loadClinicSettings();
   }, []);
 
-  // ✅ Save Clinic
   async function saveClinic() {
-    // Validation
     if (!clinicName.trim()) {
       showMessage('error', 'Please enter clinic name');
       return;
@@ -173,7 +168,6 @@ export default function WhatsAppBotPage() {
         return;
       }
 
-      // Check if clinic already exists for this user
       const { data: existingClinic, error: fetchError } = await supabase
         .from("clinics")
         .select("id")
@@ -186,7 +180,6 @@ export default function WhatsAppBotPage() {
         return;
       }
 
-      // Upload logo if exists
       let logoUrl = null;
       if (logo) {
         const fileExt = logo.name.split('.').pop();
@@ -225,7 +218,6 @@ export default function WhatsAppBotPage() {
         services_enabled: servicesEnabled,
         faq_enabled: faqEnabled,
         working_hours_enabled: workingHoursEnabled,
-        // ✅ Save menu labels
         menu_labels: menuLabels,
       };
 
@@ -542,85 +534,58 @@ export default function WhatsAppBotPage() {
                     </select>
                   </div>
 
-                  {/* ✅ Menu Labels Customization Section */}
                   <div className="pt-4 border-t border-gray-200">
                     <h4 className="mb-3 text-sm font-semibold text-gray-800">
-                      📝 Menu Labels
+                      🤖 WhatsApp Bot Features
                     </h4>
-                    <div className="space-y-2">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">Book Appointment</label>
-                        <input
-                          type="text"
-                          value={menuLabels.book}
-                          onChange={(e) => setMenuLabels(prev => ({ ...prev, book: e.target.value }))}
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">Doctors</label>
-                        <input
-                          type="text"
-                          value={menuLabels.doctors}
-                          onChange={(e) => setMenuLabels(prev => ({ ...prev, doctors: e.target.value }))}
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">Services</label>
-                        <input
-                          type="text"
-                          value={menuLabels.services}
-                          onChange={(e) => setMenuLabels(prev => ({ ...prev, services: e.target.value }))}
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">Working Hours</label>
-                        <input
-                          type="text"
-                          value={menuLabels.hours}
-                          onChange={(e) => setMenuLabels(prev => ({ ...prev, hours: e.target.value }))}
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">FAQ</label>
-                        <input
-                          type="text"
-                          value={menuLabels.faq}
-                          onChange={(e) => setMenuLabels(prev => ({ ...prev, faq: e.target.value }))}
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">Contact</label>
-                        <input
-                          type="text"
-                          value={menuLabels.contact}
-                          onChange={(e) => setMenuLabels(prev => ({ ...prev, contact: e.target.value }))}
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">Location</label>
-                        <input
-                          type="text"
-                          value={menuLabels.location}
-                          onChange={(e) => setMenuLabels(prev => ({ ...prev, location: e.target.value }))}
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                        />
-                      </div>
-                    </div>
-                    <p className="mt-2 text-xs text-gray-500">
-                      💡 Customize menu labels as shown in WhatsApp
-                    </p>
-                  </div>
 
-                  <div className="mt-4 rounded-lg bg-blue-50 p-3">
-                    <p className="text-xs text-blue-800">
-                      💡 All settings will be applied to your WhatsApp bot configuration
-                    </p>
+                    <div className="space-y-3">
+                      <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
+                        <span className="text-sm text-gray-700">👨‍⚕️ Doctors</span>
+                        <input
+                          type="checkbox"
+                          checked={doctorsEnabled}
+                          onChange={(e) => setDoctorsEnabled(e.target.checked)}
+                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
+                        <span className="text-sm text-gray-700">🦷 Services</span>
+                        <input
+                          type="checkbox"
+                          checked={servicesEnabled}
+                          onChange={(e) => setServicesEnabled(e.target.checked)}
+                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
+                        <span className="text-sm text-gray-700">❓ FAQ</span>
+                        <input
+                          type="checkbox"
+                          checked={faqEnabled}
+                          onChange={(e) => setFaqEnabled(e.target.checked)}
+                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200">
+                        <span className="text-sm text-gray-700">🕒 Working Hours</span>
+                        <input
+                          type="checkbox"
+                          checked={workingHoursEnabled}
+                          onChange={(e) => setWorkingHoursEnabled(e.target.checked)}
+                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="mt-4 rounded-lg bg-blue-50 p-3">
+                      <p className="text-xs text-blue-800">
+                        💡 All settings will be applied to your WhatsApp bot configuration
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -668,29 +633,31 @@ export default function WhatsAppBotPage() {
               >
                 Next → Doctors
               </Link>
+            </div>
+          </div>
+
+          {/* ✅ Policy Links - Footer */}
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <div className="flex flex-wrap justify-center gap-3 text-sm">
+              <Link href="/privacy-policy" className="text-gray-500 hover:text-blue-600 transition-colors">
+                🔒 Privacy Policy
+              </Link>
+              <span className="text-gray-300">|</span>
+              <Link href="/terms" className="text-gray-500 hover:text-blue-600 transition-colors">
+                📋 Terms & Conditions
+              </Link>
+              <span className="text-gray-300">|</span>
+              <Link href="/refund-policy" className="text-gray-500 hover:text-blue-600 transition-colors">
+                💰 Refund Policy
+              </Link>
+            </div>
+            <p className="text-center text-xs text-gray-400 mt-2">
+              By using our services, you agree to our policies.
+            </p>
+          </div>
+
         </div>
       </div>
-
-      {/* ✅ এখানে Policy Links যোগ করুন */}
-      <div className="mt-8 pt-6 border-t border-gray-200">
-        <div className="flex flex-wrap justify-center gap-3 text-sm">
-          <Link href="/privacy-policy" className="text-gray-500 hover:text-blue-600 transition-colors">
-            🔒 Privacy Policy
-          </Link>
-          <span className="text-gray-300">|</span>
-          <Link href="/terms" className="text-gray-500 hover:text-blue-600 transition-colors">
-            📋 Terms & Conditions
-          </Link>
-          <span className="text-gray-300">|</span>
-          <Link href="/refund-policy" className="text-gray-500 hover:text-blue-600 transition-colors">
-            💰 Refund Policy
-          </Link>
-        </div>
-        <p className="text-center text-xs text-gray-400 mt-2">
-          By using our services, you agree to our policies.
-        </p>
-      </div>
-
     </div>
   );
 }
