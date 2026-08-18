@@ -546,6 +546,48 @@ export default function WhatsAppBotPage() {
                     </select>
                   </div>
 
+                  {/* WhatsApp Menu Labels */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <h4 className="mb-3 text-sm font-semibold text-gray-800">
+                      ✏️ WhatsApp Menu Labels
+                    </h4>
+
+                    <div className="space-y-3">
+                      {[
+                        ["book", "📅 Book Appointment"],
+                        ["doctors", "👨‍⚕️ Doctors"],
+                        ["services", "🦷 Services"],
+                        ["hours", "🕒 Working Hours"],
+                        ["faq", "❓ FAQ"],
+                        ["contact", "📞 Contact"],
+                        ["location", "📍 Location"],
+                      ].map(([key, defaultLabel]) => (
+                        <div key={key}>
+                          <label className="mb-1 block text-xs font-medium text-gray-600">
+                            {defaultLabel}
+                          </label>
+
+                          <input
+                            type="text"
+                            value={menuLabels[key as keyof typeof menuLabels]}
+                            onChange={(e) =>
+                              setMenuLabels((prev) => ({
+                                ...prev,
+                                [key]: e.target.value,
+                              }))
+                            }
+                            placeholder={defaultLabel}
+                            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="mt-3 text-xs text-gray-500">
+                      💡 These names will appear in your WhatsApp menu.
+                    </p>
+                  </div>
+
                   {/* WhatsApp Menu Controls */}
                   <div className="pt-4 border-t border-gray-200">
                     <h4 className="mb-3 text-sm font-semibold text-gray-800">
