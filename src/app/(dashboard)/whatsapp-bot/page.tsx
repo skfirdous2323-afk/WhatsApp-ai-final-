@@ -23,10 +23,13 @@ export default function WhatsAppBotPage() {
   const [timezone, setTimezone] = useState("Asia/Kolkata");
   const [website, setWebsite] = useState("");
 
+  const [bookEnabled, setBookEnabled] = useState(true);
   const [doctorsEnabled, setDoctorsEnabled] = useState(true);
   const [servicesEnabled, setServicesEnabled] = useState(true);
   const [faqEnabled, setFaqEnabled] = useState(true);
   const [workingHoursEnabled, setWorkingHoursEnabled] = useState(true);
+  const [contactEnabled, setContactEnabled] = useState(true);
+  const [locationEnabled, setLocationEnabled] = useState(true);
 
   const [menuLabels, setMenuLabels] = useState({
     book: "📅 Book Appointment",
@@ -91,10 +94,13 @@ export default function WhatsAppBotPage() {
           website,
           language,
           timezone,
+          book_enabled,
           doctors_enabled,
           services_enabled,
           faq_enabled,
           working_hours_enabled,
+          contact_enabled,
+          location_enabled,
           logo_url,
           clinic_logo,
           menu_labels
@@ -120,10 +126,13 @@ export default function WhatsAppBotPage() {
       setLanguage(clinic.language || "English");
       setTimezone(clinic.timezone || "Asia/Kolkata");
 
+      setBookEnabled(clinic.book_enabled ?? true);
       setDoctorsEnabled(clinic.doctors_enabled ?? true);
       setServicesEnabled(clinic.services_enabled ?? true);
       setFaqEnabled(clinic.faq_enabled ?? true);
       setWorkingHoursEnabled(clinic.working_hours_enabled ?? true);
+      setContactEnabled(clinic.contact_enabled ?? true);
+      setLocationEnabled(clinic.location_enabled ?? true);
 
       if (clinic.menu_labels) {
         setMenuLabels(prev => ({
@@ -214,10 +223,13 @@ export default function WhatsAppBotPage() {
         language: language,
         timezone: timezone,
         website: website,
+        book_enabled: bookEnabled,
         doctors_enabled: doctorsEnabled,
         services_enabled: servicesEnabled,
         faq_enabled: faqEnabled,
         working_hours_enabled: workingHoursEnabled,
+        contact_enabled: contactEnabled,
+        location_enabled: locationEnabled,
         menu_labels: menuLabels,
       };
 
@@ -532,6 +544,49 @@ export default function WhatsAppBotPage() {
                       <option>Europe/Paris</option>
                       <option>Australia/Sydney</option>
                     </select>
+                  </div>
+
+                  {/* WhatsApp Menu Controls */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <h4 className="mb-3 text-sm font-semibold text-gray-800">
+                      📱 WhatsApp Menu Controls
+                    </h4>
+
+                    <div className="space-y-2">
+                      {[
+                        ["📅 Book Appointment", bookEnabled, setBookEnabled],
+                        ["👨‍⚕️ Doctors", doctorsEnabled, setDoctorsEnabled],
+                        ["🦷 Services", servicesEnabled, setServicesEnabled],
+                        ["🕒 Working Hours", workingHoursEnabled, setWorkingHoursEnabled],
+                        ["❓ FAQ", faqEnabled, setFaqEnabled],
+                        ["📞 Contact", contactEnabled, setContactEnabled],
+                        ["📍 Location", locationEnabled, setLocationEnabled],
+                      ].map(([label, enabled, setter]) => (
+                        <label
+                          key={label as string}
+                          className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200"
+                        >
+                          <span className="text-sm text-gray-700">
+                            {label as string}
+                          </span>
+
+                          <input
+                            type="checkbox"
+                            checked={enabled as boolean}
+                            onChange={(e) =>
+                              (setter as React.Dispatch<React.SetStateAction<boolean>>)(
+                                e.target.checked
+                              )
+                            }
+                            className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </label>
+                      ))}
+                    </div>
+
+                    <p className="mt-3 text-xs text-gray-500">
+                      💡 Turn menu options ON/OFF for your WhatsApp bot.
+                    </p>
                   </div>
 
                 </div>

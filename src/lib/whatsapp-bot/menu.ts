@@ -28,10 +28,13 @@ export async function sendMainMenu({
       logo_url,
       clinic_logo,
       menu_labels,
+      book_enabled,
       doctors_enabled,
       services_enabled,
       faq_enabled,
-      working_hours_enabled
+      working_hours_enabled,
+      contact_enabled,
+      location_enabled
     `)
     .eq("id", clinicId)
     .maybeSingle();
@@ -52,6 +55,9 @@ export async function sendMainMenu({
   const menuLabels = clinic?.menu_labels || {};
 
   // Feature settings
+  const bookEnabled =
+    clinic?.book_enabled !== false;
+
   const doctorsEnabled =
     clinic?.doctors_enabled !== false;
 
@@ -63,6 +69,12 @@ export async function sendMainMenu({
 
   const workingHoursEnabled =
     clinic?.working_hours_enabled !== false;
+
+  const contactEnabled =
+    clinic?.contact_enabled !== false;
+
+  const locationEnabled =
+    clinic?.location_enabled !== false;
 
   // Custom labels
   const bookLabel =
@@ -162,12 +174,14 @@ export async function sendMainMenu({
   // Build menu dynamically
   const rows: any[] = [];
 
-  // Book Appointment - currently always enabled
-  rows.push({
-    id: "book",
-    title: bookLabel,
-    description: "Book a new appointment",
-  });
+  // Book Appointment
+  if (bookEnabled) {
+    rows.push({
+      id: "book",
+      title: bookLabel,
+      description: "Book a new appointment",
+    });
+  }
 
   // Doctors
   if (doctorsEnabled) {
@@ -205,19 +219,23 @@ export async function sendMainMenu({
     });
   }
 
-  // Contact - always enabled
-  rows.push({
-    id: "contact",
-    title: contactLabel,
-    description: "Contact clinic",
-  });
+  // Contact
+  if (contactEnabled) {
+    rows.push({
+      id: "contact",
+      title: contactLabel,
+      description: "Contact clinic",
+    });
+  }
 
-  // Location - always enabled
-  rows.push({
-    id: "location",
-    title: locationLabel,
-    description: "Clinic address",
-  });
+  // Location
+  if (locationEnabled) {
+    rows.push({
+      id: "location",
+      title: locationLabel,
+      description: "Clinic address",
+    });
+  }
 
   // Send WhatsApp menu
   await engineSendInteractiveList({
