@@ -701,14 +701,29 @@ if (session.step === "date") {
       if (command.startsWith("time_")) {
         selectedTime = command.replace("time_", "");
       } else {
-        // Fallback: if user types time manually (HH:MM)
+        // Fallback: accept HH:MM and 12-hour formats like 11:30 AM
+        const time12Regex = /^(0?[1-9]|1[0-2]):[0-5]\d\s?(AM|PM)$/i;
+        const time24Regex = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
-const timeRegex = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+        if (time12Regex.test(text.trim())) {
+          const match = text.trim().match(time12Regex);
 
-if (timeRegex.test(msg)) {
-  selectedTime = msg;
-}
+          if (match) {
+            let hour = parseInt(match[1], 10);
+            const minute = text.trim().match(/:(\d{2})/)?.[1] || "00";
+            const period = match[2].toUpperCase();
 
+            if (period === "AM") {
+              if (hour === 12) hour = 0;
+            } else {
+              if (hour !== 12) hour += 12;
+            }
+
+            selectedTime = `${String(hour).padStart(2, "0")}:${minute}`;
+          }
+        } else if (time24Regex.test(msg)) {
+          selectedTime = msg;
+        }
       }
 
       if (!selectedTime) {
@@ -717,7 +732,7 @@ if (timeRegex.test(msg)) {
           userId,
           conversationId,
           contactId,
-          text: "❌ Invalid time. Please select from the list or use HH:MM format.",
+          text: "❌ Invalid time. Please select a time from the list or use HH:MM / 12-hour format.",
         });
         return true;
       }
@@ -745,7 +760,10 @@ if (timeRegex.test(msg)) {
 
     // ---- STEP: Name ----
     if (session.step === "name") {
-      if (msg.length < 2) {
+      const timeInputRegex =
+        /^(?:(?:0?[1-9]|1[0-2]):[0-5]\d\s?(?:AM|PM)|(?:[01]\d|2[0-3]):[0-5]\d)$/i;
+
+      if (timeInputRegex.test(text.trim()) || msg.length < 2) {
         await engineSendText({
           accountId,
           userId,
