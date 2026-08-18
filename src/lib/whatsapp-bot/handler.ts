@@ -173,7 +173,8 @@ async function getAvailableBookingDates(
   db: any,
   clinicId: string,
   doctorId: string | undefined,
-  bookingDays: number
+  bookingDays: number,
+  slotDuration: number
 ) {
   const { data: workingHours } = await db
     .from("clinic_working_hours")
@@ -215,7 +216,7 @@ async function getAvailableBookingDates(
         .eq("appointment_date", dateStr)
         .in("status", ["pending", "confirmed"]);
 
-      const allSlots = generateTimeSlots(30);
+      const allSlots = generateTimeSlots(slotDuration);
 
       // Fix: Properly map booked times
       const bookedTimes = new Set<string>();
@@ -457,7 +458,13 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
         doctorName: selected.doctor_name,
       });
 
-      const dates = await getAvailableBookingDates(db, clinicId, selected.id, bookingDays);
+      const dates = await getAvailableBookingDates(
+        db,
+        clinicId,
+        selected.id,
+        bookingDays,
+        slotDuration
+      );
 
       if (dates.length === 0) {
         await engineSendText({
@@ -1013,7 +1020,13 @@ We'll send you a reminder before your appointment.
           page: 0,
         });
 
-        const dates = await getAvailableBookingDates(db, clinicId, session.doctorId, bookingDays);
+        const dates = await getAvailableBookingDates(
+          db,
+          clinicId,
+          session.doctorId,
+          bookingDays,
+          slotDuration
+        );
 
         if (dates.length === 0) {
           await engineSendText({
