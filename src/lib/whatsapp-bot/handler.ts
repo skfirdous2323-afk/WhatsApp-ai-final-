@@ -309,7 +309,22 @@ export async function runWhatsAppBot({
   const bookingDays = settings?.advance_booking_days || 7;
 
   let session = getSession(contactId) as SessionData | null;
+// ============================================================
+// Global navigation commands
+// ============================================================
+if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
+  clearSession(contactId);
 
+  await sendMainMenu({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    clinicId,
+  });
+
+  return true;
+}
   if (session && command !== "1" && ["2", "3", "4", "5", "6", "7"].includes(command)) {
     clearSession(contactId);
     session = null;
@@ -480,70 +495,118 @@ export async function runWhatsAppBot({
     }
 
     // ---- STEP: Date Selection ----
-    if (session.step === "date") {
-      let selectedDate: string | null = null;
 
-      if (command.startsWith("date_")) {
-        selectedDate = command.replace("date_", "");
-      } else {
-        // Fallback: if user types date manually
-        const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
-        if (dateRegex.test(msg)) {
-          const parts = msg.split("-");
-          selectedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-        } else {
-          selectedDate = msg;
-        }
+
+// ---- STEP: Date Selection ----
+if (session.step === "date") {
+  let selectedDate: string | null = null;
+
+  // Date selected from WhatsApp interactive list
+  if (command.startsWith("date_")) {
+    selectedDate = command.replace("date_", "");
+  } else {
+    // Manual date: DD-MM-YYYY
+    const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
+
+    if (dateRegex.test(msg)) {
+      const parts = msg.split("-");
+
+      const day = Number(parts[0]);
+      const month = Number(parts[1]);
+      const year = Number(parts[2]);
+
+      const dateObj = new Date(year, month - 1, day);
+
+      // Make sure the date itself is valid
+      if (
+        dateObj.getFullYear() === year &&
+        dateObj.getMonth() === month - 1 &&
+        dateObj.getDate() === day
+      ) {
+        selectedDate = `${year}-${String(month).padStart(2, "0")}-${String(
+          day
+        ).padStart(2, "0")}`;
       }
-
-      if (!selectedDate) {
-        await engineSendText({
-          accountId,
-          userId,
-          conversationId,
-          contactId,
-          text: "❌ Please select a date from the list or use DD-MM-YYYY format.",
-        });
-        return true;
-      }
-
-      setSession(contactId, {
-        step: "time",
-        serviceId: session.serviceId,
-        serviceName: session.serviceName,
-        doctorId: session.doctorId,
-        doctorName: session.doctorName,
-        date: selectedDate,
-        page: 0,
-      });
-
-      // Show first page of available time slots
-      const rows = await getAvailableTimeSlots(
-        db,
-        session.doctorId!,
-        selectedDate,
-        slotDuration,
-        0
-      );
-
-      await engineSendInteractiveList({
-        accountId,
-        userId,
-        conversationId,
-        contactId,
-        bodyText: `🕐 Select Appointment Time for ${session.serviceName} with ${session.doctorName}`,
-        footerText: "Choose a time slot",
-        buttonLabel: "View Time Slots",
-        sections: [
-          {
-            title: "Available Time Slots",
-            rows: rows,
-          },
-        ],
-      });
-
-      return true;
     }
+  }
+
+  // ❌ Invalid date
+  if (!selectedDate) {
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: "❌ Invalid date.\n\nPlease select a date from the list or use DD-MM-YYYY format.",
+    });
+    return true;
+  }
+
+  // Get currently available dates
+  const availableDates = await getAvailableBookingDates(
+    db,
+    clinicId,
+    session.doctorId,
+    bookingDays
+  );
+
+  // Check whether selected date is actually available
+  const isAvailableDate = availableDates.some(
+    (d) => d.id === `date_${selectedDate}`
+  );
+
+  if (!isAvailableDate) {
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: "❌ This date is not available for the selected doctor.\n\nPlease select a date from the available list.",
+    });
+    return true;
+  }
+
+  // Valid date → move to time selection
+  setSession(contactId, {
+    step: "time",
+    serviceId: session.serviceId,
+    serviceName: session.serviceName,
+    doctorId: session.doctorId,
+    doctorName: session.doctorName,
+    date: selectedDate,
+    page: 0,
+  });
+
+  // Show first page of available time slots
+  const rows = await getAvailableTimeSlots(
+    db,
+    session.doctorId!,
+    selectedDate,
+    slotDuration,
+    0
+  );
+
+  await engineSendInteractiveList({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    bodyText: `🕐 Select Appointment Time for ${session.serviceName} with ${session.doctorName}`,
+    footerText: "Choose a time slot",
+    buttonLabel: "View Time Slots",
+    sections: [
+      {
+        title: "Available Time Slots",
+        rows,
+      },
+    ],
+  });
+
+  return true;
+}
+
+
+
 
     // ---- STEP: Time Selection ----
     if (session.step === "time") {
@@ -631,10 +694,13 @@ export async function runWhatsAppBot({
         selectedTime = command.replace("time_", "");
       } else {
         // Fallback: if user types time manually (HH:MM)
-        const timeRegex = /^\d{2}:\d{2}$/;
-        if (timeRegex.test(msg)) {
-          selectedTime = msg;
-        }
+
+const timeRegex = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+if (timeRegex.test(msg)) {
+  selectedTime = msg;
+}
+
       }
 
       if (!selectedTime) {
