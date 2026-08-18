@@ -306,8 +306,16 @@ export async function runWhatsAppBot({
     .eq("clinic_id", clinicId)
     .maybeSingle();
 
-  const slotDuration = settings?.slot_duration || 30;
-  const bookingDays = settings?.advance_booking_days || 7;
+  const slotDuration = Number(settings?.slot_duration) || 30;
+  const bookingDays = Number(settings?.advance_booking_days) || 7;
+
+  console.log("🕐 WHATSAPP BOT SLOT DEBUG:", {
+    clinicId,
+    dbSlotDuration: settings?.slot_duration,
+    finalSlotDuration: slotDuration,
+    dbBookingDays: settings?.advance_booking_days,
+    finalBookingDays: bookingDays,
+  });
 
   let session = getSession(contactId) as SessionData | null;
 // ============================================================
