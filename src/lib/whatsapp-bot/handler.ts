@@ -554,7 +554,8 @@ if (session.step === "date") {
     db,
     clinicId,
     session.doctorId,
-    bookingDays
+    bookingDays,
+    slotDuration
   );
 
   // Check whether selected date is actually available
