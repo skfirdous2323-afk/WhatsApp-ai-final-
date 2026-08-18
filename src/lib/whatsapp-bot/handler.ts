@@ -299,21 +299,31 @@ export async function runWhatsAppBot({
 
   const clinicId = clinic.id;
 
-  // Get appointment settings
-  const { data: settings } = await db
+  // Get appointment settings from CRM
+  const { data: settings, error: settingsError } = await db
     .from("clinic_appointment_settings")
-    .select("slot_duration, advance_booking_days")
+    .select("slot_duration, max_booking_days")
     .eq("clinic_id", clinicId)
     .maybeSingle();
 
+  if (settingsError) {
+    console.error("❌ Appointment settings fetch error:", settingsError);
+  }
+
+  console.log("⚙️ CRM APPOINTMENT SETTINGS:", {
+    clinicId,
+    settings,
+    settingsError,
+  });
+
   const slotDuration = Number(settings?.slot_duration) || 30;
-  const bookingDays = Number(settings?.advance_booking_days) || 7;
+  const bookingDays = Number(settings?.max_booking_days) || 7;
 
   console.log("🕐 WHATSAPP BOT SLOT DEBUG:", {
     clinicId,
     dbSlotDuration: settings?.slot_duration,
     finalSlotDuration: slotDuration,
-    dbBookingDays: settings?.advance_booking_days,
+    dbBookingDays: settings?.max_booking_days,
     finalBookingDays: bookingDays,
   });
 
