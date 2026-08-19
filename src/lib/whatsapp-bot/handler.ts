@@ -392,6 +392,14 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
       });
 
       // Get ONLY doctors assigned to this service
+      console.log("🔍 SERVICE ASSIGNED DOCTORS DEBUG:", {
+        serviceId: selected.id,
+        serviceName: selected.service_name,
+        assignedDoctors: selected.assigned_doctors,
+        assignedDoctorsType: typeof selected.assigned_doctors,
+        isArray: Array.isArray(selected.assigned_doctors),
+      });
+
       const assignedDoctorIds = Array.isArray(selected.assigned_doctors)
         ? selected.assigned_doctors.map((id: any) => String(id))
         : [];
