@@ -361,14 +361,14 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
         const serviceId = command.replace("service_", "");
         const { data: services } = await db
           .from("clinic_services")
-          .select("id, service_name")
+          .select("id, service_name, assigned_doctors")
           .eq("clinic_id", clinicId);
         selected = services?.find((s: any) => String(s.id) === serviceId);
       } else {
         const serviceIndex = parseInt(command) - 1;
         const { data: services } = await db
           .from("clinic_services")
-          .select("id, service_name")
+          .select("id, service_name, assigned_doctors")
           .eq("clinic_id", clinicId)
           .order("created_at", { ascending: false });
         selected = services?.[serviceIndex];
@@ -391,12 +391,30 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
         serviceName: selected.service_name,
       });
 
-      // Get doctors for this clinic
+      // Get ONLY doctors assigned to this service
+      const assignedDoctorIds = Array.isArray(selected.assigned_doctors)
+        ? selected.assigned_doctors.map((id: any) => String(id))
+        : [];
+
+      if (assignedDoctorIds.length === 0) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: `❌ No doctors are assigned to ${selected.service_name}.\\n\\nPlease contact the clinic or choose another service.`,
+        });
+
+        clearSession(contactId);
+        return true;
+      }
+
       const { data: doctors } = await db
         .from("clinic_doctors")
         .select("id, doctor_name, specialization")
         .eq("clinic_id", clinicId)
-        .order("created_at", { ascending: false });
+        .in("id", assignedDoctorIds)
+        .order("doctor_name", { ascending: true });
 
       if (!doctors || doctors.length === 0) {
         await engineSendText({
