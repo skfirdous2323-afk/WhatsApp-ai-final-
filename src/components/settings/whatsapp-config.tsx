@@ -43,7 +43,23 @@ export function WhatsAppConfig() {
 
   const metaAppId = process.env.NEXT_PUBLIC_META_APP_ID;
   const metaConfigId = process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID;
+  const handleEmbeddedSignup = () => {
+    if (!metaAppId || !metaConfigId) {
+      toast.error('Meta Embedded Signup is not configured');
+      return;
+    }
 
+    const width = 900;
+    const height = 700;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    window.open(
+      `/api/whatsapp/embedded-signup?app_id=${encodeURIComponent(metaAppId)}&config_id=${encodeURIComponent(metaConfigId)}`,
+      'whatsapp-embedded-signup',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+  };
   const t = useTranslations('Settings.whatsapp');
   const supabase = createClient();
   // After multi-user, whatsapp_config is one-row-per-account, not
@@ -714,6 +730,15 @@ if (!metaAppId || !metaConfigId) {
             </div>
           </CardContent>
         </Card>
+
+
+<Button
+  onClick={handleEmbeddedSignup}
+  disabled={!metaAppId || !metaConfigId}
+  className="bg-green-600 hover:bg-green-700 text-white"
+>
+  Connect WhatsApp with Meta
+</Button>
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-3">
