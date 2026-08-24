@@ -416,23 +416,7 @@ const handleEmbeddedSignup = () => {
   if (loading) {
   return (
     <>
-<Script
-  id="facebook-jssdk"
-  src="https://connect.facebook.net/en_US/sdk.js"
-  strategy="afterInteractive"
-  onLoad={() => {
-    const FB = (window as any).FB;
 
-    if (FB && metaAppId) {
-      FB.init({
-        appId: metaAppId,
-        cookie: true,
-        xfbml: true,
-        version: 'v23.0',
-      });
-    }
-  }}
-/>
 
 
 
@@ -465,11 +449,27 @@ if (!metaAppId || !metaConfigId) {
 }
   return (
     <>
-      <Script
-        id="facebook-jssdk"
-        src="https://connect.facebook.net/en_US/sdk.js"
-        strategy="afterInteractive"
-      />
+
+<Script
+  id="facebook-jssdk"
+  src="https://connect.facebook.net/en_US/sdk.js"
+  strategy="afterInteractive"
+  onLoad={() => {
+    const FB = (window as any).FB;
+
+    if (FB && metaAppId) {
+      FB.init({
+        appId: metaAppId,
+        cookie: true,
+        xfbml: true,
+        version: 'v23.0',
+      });
+    }
+  }}
+/>
+
+
+
 
       <section className="animate-in fade-in-50 duration-200">
       <SettingsPanelHead
