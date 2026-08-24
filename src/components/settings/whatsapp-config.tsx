@@ -402,6 +402,9 @@ export function WhatsAppConfig() {
           <Loader2 className="size-6 animate-spin text-primary" />
         </div>
       </section>
+        </>
+
+
     );
   }
 
