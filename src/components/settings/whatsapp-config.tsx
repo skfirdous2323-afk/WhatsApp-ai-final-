@@ -49,7 +49,10 @@ const handleEmbeddedSignup = () => {
     toast.error('Meta Embedded Signup is not configured');
     return;
   }
-
+console.log('[Meta Signup]', {
+  hasAppId: Boolean(metaAppId),
+  hasConfigId: Boolean(metaConfigId),
+});
   const FB = (window as any).FB;
 
   if (!FB) {
