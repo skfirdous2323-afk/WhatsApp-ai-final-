@@ -43,7 +43,12 @@ export function WhatsAppConfig() {
 
   const metaAppId = process.env.NEXT_PUBLIC_META_APP_ID;
   const metaConfigId = process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID;
-
+console.log('[META CONFIG CHECK]', {
+  metaAppId,
+  metaConfigId,
+  hasAppId: Boolean(metaAppId),
+  hasConfigId: Boolean(metaConfigId),
+});
 const handleEmbeddedSignup = () => {
   if (!metaAppId || !metaConfigId) {
     toast.error('Meta Embedded Signup is not configured');
