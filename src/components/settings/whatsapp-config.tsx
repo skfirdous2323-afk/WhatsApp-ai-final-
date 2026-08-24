@@ -50,10 +50,16 @@ console.log('[META CONFIG CHECK]', {
   hasConfigId: Boolean(metaConfigId),
 });
 const handleEmbeddedSignup = () => {
-  if (!metaAppId || !metaConfigId) {
-    toast.error('Meta Embedded Signup is not configured');
-    return;
-  }
+if (!metaAppId || !metaConfigId) {
+  toast.error(
+    `Meta config missing — App ID: ${Boolean(metaAppId)}, Config ID: ${Boolean(metaConfigId)}`
+  );
+  return;
+}
+
+
+
+
 console.log('[Meta Signup]', {
   hasAppId: Boolean(metaAppId),
   hasConfigId: Boolean(metaConfigId),
