@@ -1,5 +1,5 @@
 'use client';
-
+import Script from 'next/script';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
@@ -37,6 +37,13 @@ type ConnectionStatus = 'connected' | 'disconnected' | 'unknown';
 type ResetReason = 'token_corrupted' | 'meta_api_error' | null;
 
 export function WhatsAppConfig() {
+
+
+
+
+  const metaAppId = process.env.NEXT_PUBLIC_META_APP_ID;
+  const metaConfigId = process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID;
+
   const t = useTranslations('Settings.whatsapp');
   const supabase = createClient();
   // After multi-user, whatsapp_config is one-row-per-account, not
@@ -372,9 +379,22 @@ export function WhatsAppConfig() {
   }
 
   if (loading) {
-    return (
+  return (
+    <>
+      <Script
+        id="facebook-jssdk"
+        src="https://connect.facebook.net/en_US/sdk.js"
+        strategy="afterInteractive"
+      />
+
       <section className="animate-in fade-in-50 duration-200">
+
+
+
+
+
         <SettingsPanelHead
+
           title={t("title")}
           description={t("description")}
         />
@@ -386,9 +406,18 @@ export function WhatsAppConfig() {
   }
 
   const showResetBanner = resetReason === 'token_corrupted';
-
+if (!metaAppId || !metaConfigId) {
+  console.warn('Meta Embedded Signup configuration is missing');
+}
   return (
-    <section className="animate-in fade-in-50 duration-200">
+    <>
+      <Script
+        id="facebook-jssdk"
+        src="https://connect.facebook.net/en_US/sdk.js"
+        strategy="afterInteractive"
+      />
+
+      <section className="animate-in fade-in-50 duration-200">
       <SettingsPanelHead
         title={t("title")}
         description={t("description")}
@@ -836,5 +865,6 @@ export function WhatsAppConfig() {
       </div>
     </div>
     </section>
+    </>
   );
 }
