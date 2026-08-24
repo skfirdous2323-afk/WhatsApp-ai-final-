@@ -772,7 +772,6 @@ if (!metaAppId || !metaConfigId) {
 
 <Button
   onClick={handleEmbeddedSignup}
-  disabled={!metaAppId || !metaConfigId}
   className="bg-green-600 hover:bg-green-700 text-white"
 >
   Connect WhatsApp with Meta
