@@ -1,0 +1,1488 @@
+import {
+  engineSendText,
+  engineSendInteractiveList,
+  engineSendInteractiveButtons,
+} from "@/lib/flows/meta-send";
+import { supabaseAdmin } from "@/lib/ai/admin-client";
+import { sendMainMenu } from "@/lib/whatsapp-bot/menu";
+import {
+  getSession,
+  setSession,
+  clearSession,
+} from "@/lib/whatsapp-bot/session";
+
+// ============================================================
+// Type Definitions
+// ============================================================
+
+interface SessionData {
+  step: string;
+  serviceId?: string;
+  serviceName?: string;
+  doctorId?: string;
+  doctorName?: string;
+  date?: string;
+  time?: string;
+  patientName?: string;
+  gender?: string;
+  age?: number;
+  page?: number;
+}
+
+// ============================================================
+// Helper Functions
+// ============================================================
+
+/**
+ * Generate next 7 days for date selection
+ */
+function getNext7Days() {
+  const days = [];
+  const today = new Date();
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+
+    const id = d.toISOString().split("T")[0];
+    days.push({
+      id: `date_${id}`,
+      title: d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+      }),
+      description: d.toLocaleDateString("en-US", {
+        weekday: "long",
+      }),
+    });
+  }
+
+  return days;
+}
+
+/**
+ * Generate time slots based on slot duration
+ * Default: 9:00 AM to 6:00 PM
+ */
+function generateTimeSlots(slotDuration: number) {
+  const timeSlots = [];
+  let hour = 9;
+  let minute = 0;
+
+  while (hour < 18 || (hour === 18 && minute === 0)) {
+    const hh = String(hour).padStart(2, "0");
+    const mm = String(minute).padStart(2, "0");
+
+    const hour12 = hour > 12 ? hour - 12 : hour;
+    const ampm = hour >= 12 ? "PM" : "AM";
+
+    timeSlots.push({
+      id: `time_${hh}:${mm}`,
+      title: `${String(hour12).padStart(2, "0")}:${mm} ${ampm}`,
+    });
+
+    minute += slotDuration;
+
+    while (minute >= 60) {
+      minute -= 60;
+      hour++;
+    }
+  }
+
+  return timeSlots;
+}
+
+/**
+ * Get available time slots (filtering out booked ones)
+ */
+async function getAvailableTimeSlots(
+  db: any,
+  doctorId: string,
+  date: string,
+  slotDuration: number,
+  page: number
+) {
+  // Get all time slots
+  const allSlots = generateTimeSlots(slotDuration);
+  const pageSize = 8;
+  const start = page * pageSize;
+  const end = start + pageSize;
+
+  // Get booked slots for this doctor on this date
+  const { data: bookedSlots } = await db
+    .from("appointments")
+    .select("appointment_time")
+    .eq("doctor_id", doctorId)
+    .eq("appointment_date", date)
+    .in("status", ["pending", "confirmed"]);
+
+  // Fix: Properly map booked times
+  const bookedTimes = new Set<string>();
+  if (bookedSlots && bookedSlots.length > 0) {
+    for (const b of bookedSlots) {
+      if (b.appointment_time) {
+        bookedTimes.add(b.appointment_time);
+      }
+    }
+  }
+
+  // Filter out booked slots
+  const availableSlots = allSlots.filter(
+    (slot) => !bookedTimes.has(slot.id.replace("time_", ""))
+  );
+
+  const pageSlots = availableSlots.slice(start, end);
+
+  const rows = pageSlots.map((slot) => ({
+    id: slot.id,
+    title: slot.title,
+    description: "Tap to select this time",
+  }));
+
+  // If no slots available
+  if (rows.length === 0 && page === 0) {
+    rows.push({
+      id: "no_slots",
+      title: "❌ No slots available",
+      description: "Please select another date",
+    });
+  }
+
+  // Add Previous button
+  if (page > 0) {
+    rows.push({
+      id: `prev_slots_${page - 1}`,
+      title: "⬅️ Previous Slots",
+      description: "Go back to previous slots",
+    });
+  }
+
+  // Add Next button
+  if (end < availableSlots.length) {
+    rows.push({
+      id: `next_slots_${page + 1}`,
+      title: "➡️ View More Slots",
+      description: "Show more available time slots",
+    });
+  }
+
+  return rows;
+}
+
+async function getAvailableBookingDates(
+  db: any,
+  clinicId: string,
+  doctorId: string | undefined,
+  bookingDays: number
+) {
+  const { data: workingHours } = await db
+    .from("clinic_working_hours")
+    .select("day_name, is_closed")
+    .eq("clinic_id", clinicId);
+
+  const workingMap = new Map(
+    (workingHours || []).map((d: any) => [
+      d.day_name.toLowerCase(),
+      !d.is_closed,
+    ])
+  );
+
+  const dates = [];
+  const today = new Date();
+
+  // Use dynamic bookingDays from settings
+  for (let i = 0; i < bookingDays; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+
+    const weekday = d.toLocaleDateString("en-US", {
+      weekday: "long",
+    });
+
+    // Skip if clinic is closed on this day
+    if (!workingMap.get(weekday.toLowerCase())) {
+      continue;
+    }
+
+    const dateStr = d.toISOString().split("T")[0];
+
+    // If doctor is selected, check if they have any slots available on this date
+    if (doctorId) {
+      const { data: bookedSlots } = await db
+        .from("appointments")
+        .select("appointment_time")
+        .eq("doctor_id", doctorId)
+        .eq("appointment_date", dateStr)
+        .in("status", ["pending", "confirmed"]);
+
+      const allSlots = generateTimeSlots(30);
+
+      // Fix: Properly map booked times
+      const bookedTimes = new Set<string>();
+      if (bookedSlots && bookedSlots.length > 0) {
+        for (const b of bookedSlots) {
+          if (b.appointment_time) {
+            bookedTimes.add(b.appointment_time);
+          }
+        }
+      }
+
+      const availableSlots = allSlots.filter(
+        (slot) => !bookedTimes.has(slot.id.replace("time_", ""))
+      );
+
+      // If no slots available on this date, skip it
+      if (availableSlots.length === 0) {
+        continue;
+      }
+    }
+
+    dates.push({
+      id: `date_${dateStr}`,
+      title: d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+      }),
+      description: weekday,
+    });
+  }
+
+  return dates;
+}
+
+// ============================================================
+// Main Handler
+// ============================================================
+
+export async function runWhatsAppBot({
+  accountId,
+  userId,
+  conversationId,
+  contactId,
+  text,
+}: {
+  accountId: string;
+  userId: string;
+  conversationId: string;
+  contactId: string;
+  text: string;
+}) {
+  const msg = text.trim().toLowerCase();
+  console.log("📩 Message received:", text);
+
+  // Convert text commands to numbers
+  const command = msg
+    .replace(/^book$/i, "1")
+    .replace(/^doctors$/i, "2")
+    .replace(/^services$/i, "3")
+    .replace(/^hours$/i, "4")
+    .replace(/^faq$/i, "5")
+    .replace(/^contact$/i, "6")
+    .replace(/^location$/i, "7");
+
+  const db = supabaseAdmin();
+
+  // Get clinic ID
+  const { data: clinic, error: clinicError } = await db
+    .from("clinics")
+    .select("id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (clinicError || !clinic) {
+    console.error("❌ Clinic not found", clinicError);
+    return false;
+  }
+
+  const clinicId = clinic.id;
+
+  // Get appointment settings
+  const { data: settings } = await db
+    .from("clinic_appointment_settings")
+    .select("slot_duration, advance_booking_days")
+    .eq("clinic_id", clinicId)
+    .maybeSingle();
+
+  const slotDuration = settings?.slot_duration || 30;
+  const bookingDays = settings?.advance_booking_days || 7;
+
+  let session = getSession(contactId) as SessionData | null;
+// ============================================================
+// Global navigation commands
+// ============================================================
+if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
+  clearSession(contactId);
+
+  await sendMainMenu({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    clinicId,
+  });
+
+  return true;
+}
+  if (session && command !== "1" && ["2", "3", "4", "5", "6", "7"].includes(command)) {
+    clearSession(contactId);
+    session = null;
+  }
+
+  // ============================================================
+  // Handle session-based flows
+  // ============================================================
+  if (session) {
+    // ---- STEP: Service Selection ----
+    if (session.step === "service") {
+      let selected;
+
+      if (command.startsWith("service_")) {
+        const serviceId = command.replace("service_", "");
+        const { data: services } = await db
+          .from("clinic_services")
+          .select("id, service_name")
+          .eq("clinic_id", clinicId);
+        selected = services?.find((s: any) => String(s.id) === serviceId);
+      } else {
+        const serviceIndex = parseInt(command) - 1;
+        const { data: services } = await db
+          .from("clinic_services")
+          .select("id, service_name")
+          .eq("clinic_id", clinicId)
+          .order("created_at", { ascending: false });
+        selected = services?.[serviceIndex];
+      }
+
+      if (!selected) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Invalid service. Please select again.",
+        });
+        return true;
+      }
+
+      setSession(contactId, {
+        step: "doctor",
+        serviceId: selected.id,
+        serviceName: selected.service_name,
+      });
+
+      // Get doctors for this clinic
+      const { data: doctors } = await db
+        .from("clinic_doctors")
+        .select("id, doctor_name, specialization")
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false });
+
+      if (!doctors || doctors.length === 0) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ No doctors available. Please contact the clinic.",
+        });
+        clearSession(contactId);
+        return true;
+      }
+
+      await engineSendInteractiveList({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        bodyText: `👨‍⚕️ Select a Doctor for ${selected.service_name}`,
+        footerText: "Please choose a doctor",
+        buttonLabel: "View Doctors",
+        sections: [
+          {
+            title: "Available Doctors",
+            rows: doctors.map((d: any) => ({
+              id: `doctor_${d.id}`,
+              title:
+                d.doctor_name.length > 24
+                  ? d.doctor_name.substring(0, 21) + "..."
+                  : d.doctor_name,
+              description: d.specialization,
+            })),
+          },
+        ],
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Doctor Selection ----
+    if (session.step === "doctor") {
+      let selected;
+
+      if (command.startsWith("doctor_")) {
+        const doctorId = command.replace("doctor_", "");
+        const { data: doctors } = await db
+          .from("clinic_doctors")
+          .select("id, doctor_name, specialization")
+          .eq("clinic_id", clinicId);
+        selected = doctors?.find((d: any) => String(d.id) === doctorId);
+      } else {
+        const doctorIndex = parseInt(command) - 1;
+        const { data: doctors } = await db
+          .from("clinic_doctors")
+          .select("id, doctor_name, specialization")
+          .eq("clinic_id", clinicId)
+          .order("created_at", { ascending: false });
+        selected = doctors?.[doctorIndex];
+      }
+
+      if (!selected) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Invalid doctor. Please select again.",
+        });
+        return true;
+      }
+
+      setSession(contactId, {
+        step: "date",
+        serviceId: session.serviceId,
+        serviceName: session.serviceName,
+        doctorId: selected.id,
+        doctorName: selected.doctor_name,
+      });
+
+      const dates = await getAvailableBookingDates(db, clinicId, selected.id, bookingDays);
+
+      if (dates.length === 0) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ No available dates for this doctor. Please try another doctor.",
+        });
+        clearSession(contactId);
+        return true;
+      }
+
+      await engineSendInteractiveList({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        bodyText: `📅 Select Appointment Date for ${selected.doctor_name}`,
+        buttonLabel: "View Dates",
+        footerText: "Choose a date",
+        sections: [
+          {
+            title: "Available Dates",
+            rows: dates.map((d) => ({
+              id: d.id,
+              title: d.title,
+              description: d.description,
+            })),
+          },
+        ],
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Date Selection ----
+
+
+// ---- STEP: Date Selection ----
+if (session.step === "date") {
+  let selectedDate: string | null = null;
+
+  // Date selected from WhatsApp interactive list
+  if (command.startsWith("date_")) {
+    selectedDate = command.replace("date_", "");
+  } else {
+    // Manual date: DD-MM-YYYY
+    const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
+
+    if (dateRegex.test(msg)) {
+      const parts = msg.split("-");
+
+      const day = Number(parts[0]);
+      const month = Number(parts[1]);
+      const year = Number(parts[2]);
+
+      const dateObj = new Date(year, month - 1, day);
+
+      // Make sure the date itself is valid
+      if (
+        dateObj.getFullYear() === year &&
+        dateObj.getMonth() === month - 1 &&
+        dateObj.getDate() === day
+      ) {
+        selectedDate = `${year}-${String(month).padStart(2, "0")}-${String(
+          day
+        ).padStart(2, "0")}`;
+      }
+    }
+  }
+
+  // ❌ Invalid date
+  if (!selectedDate) {
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: "❌ Invalid date.\n\nPlease select a date from the list or use DD-MM-YYYY format.",
+    });
+    return true;
+  }
+
+  // Get currently available dates
+  const availableDates = await getAvailableBookingDates(
+    db,
+    clinicId,
+    session.doctorId,
+    bookingDays
+  );
+
+  // Check whether selected date is actually available
+  const isAvailableDate = availableDates.some(
+    (d) => d.id === `date_${selectedDate}`
+  );
+
+  if (!isAvailableDate) {
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: "❌ This date is not available for the selected doctor.\n\nPlease select a date from the available list.",
+    });
+    return true;
+  }
+
+  // Valid date → move to time selection
+  setSession(contactId, {
+    step: "time",
+    serviceId: session.serviceId,
+    serviceName: session.serviceName,
+    doctorId: session.doctorId,
+    doctorName: session.doctorName,
+    date: selectedDate,
+    page: 0,
+  });
+
+  // Show first page of available time slots
+  const rows = await getAvailableTimeSlots(
+    db,
+    session.doctorId!,
+    selectedDate,
+    slotDuration,
+    0
+  );
+
+  await engineSendInteractiveList({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    bodyText: `🕐 Select Appointment Time for ${session.serviceName} with ${session.doctorName}`,
+    footerText: "Choose a time slot",
+    buttonLabel: "View Time Slots",
+    sections: [
+      {
+        title: "Available Time Slots",
+        rows,
+      },
+    ],
+  });
+
+  return true;
+}
+
+
+
+
+    // ---- STEP: Time Selection ----
+    if (session.step === "time") {
+      // Handle "No slots" selection
+      if (command === "no_slots") {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ No slots available. Please select another date.",
+        });
+        clearSession(contactId);
+        return true;
+      }
+
+      // Handle navigation: Previous page
+      if (command.startsWith("prev_slots_")) {
+        const page = parseInt(command.replace("prev_slots_", ""));
+        setSession(contactId, { ...session, page });
+
+        const rows = await getAvailableTimeSlots(
+          db,
+          session.doctorId!,
+          session.date!,
+          slotDuration,
+          page
+        );
+
+        await engineSendInteractiveList({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          bodyText: `🕐 Select Appointment Time for ${session.serviceName} with ${session.doctorName}`,
+          footerText: "Choose a time slot",
+          buttonLabel: "View Time Slots",
+          sections: [
+            {
+              title: "Available Time Slots",
+              rows: rows,
+            },
+          ],
+        });
+
+        return true;
+      }
+
+      // Handle navigation: Next page
+      if (command.startsWith("next_slots_")) {
+        const page = parseInt(command.replace("next_slots_", ""));
+        setSession(contactId, { ...session, page });
+
+        const rows = await getAvailableTimeSlots(
+          db,
+          session.doctorId!,
+          session.date!,
+          slotDuration,
+          page
+        );
+
+        await engineSendInteractiveList({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          bodyText: `🕐 Select Appointment Time for ${session.serviceName} with ${session.doctorName}`,
+          footerText: "Choose a time slot",
+          buttonLabel: "View Time Slots",
+          sections: [
+            {
+              title: "Available Time Slots",
+              rows: rows,
+            },
+          ],
+        });
+
+        return true;
+      }
+
+      // Select a specific time slot
+      let selectedTime: string | null = null;
+
+      if (command.startsWith("time_")) {
+        selectedTime = command.replace("time_", "");
+      } else {
+        // Fallback: if user types time manually (HH:MM)
+
+const timeRegex = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+if (timeRegex.test(msg)) {
+  selectedTime = msg;
+}
+
+      }
+
+      if (!selectedTime) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Invalid time. Please select from the list or use HH:MM format.",
+        });
+        return true;
+      }
+
+      setSession(contactId, {
+        step: "name",
+        serviceId: session.serviceId,
+        serviceName: session.serviceName,
+        doctorId: session.doctorId,
+        doctorName: session.doctorName,
+        date: session.date,
+        time: selectedTime,
+      });
+
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: `👤 Please enter your full name.`,
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Name ----
+    if (session.step === "name") {
+      if (msg.length < 2) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Please enter a valid name (at least 2 characters).",
+        });
+        return true;
+      }
+
+      setSession(contactId, {
+        ...session,
+        step: "gender",
+        patientName: text.trim(),
+      });
+
+      await engineSendInteractiveList({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        bodyText: "👤 Select Gender",
+        buttonLabel: "Choose",
+        footerText: "Please select",
+        sections: [
+          {
+            title: "Gender",
+            rows: [
+              { id: "gender_male", title: "Male" },
+              { id: "gender_female", title: "Female" },
+              { id: "gender_other", title: "Other" },
+            ],
+          },
+        ],
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Gender ----
+    if (session.step === "gender") {
+      const gender = command.replace("gender_", "");
+
+      if (
+        command !== "gender_male" &&
+        command !== "gender_female" &&
+        command !== "gender_other"
+      ) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Please select your gender from the list.",
+        });
+        return true;
+      }
+
+      setSession(contactId, {
+        ...session,
+        step: "age",
+        gender,
+      });
+
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "🎂 Please enter your age.",
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Age ----
+    if (session.step === "age") {
+      const age = parseInt(msg);
+
+      if (isNaN(age) || age < 1 || age > 120) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Please enter a valid age (1-120).",
+        });
+        return true;
+      }
+
+      // ✅ Check if this slot is already booked
+      const { data: existing } = await db
+        .from("appointments")
+        .select("id")
+        .eq("doctor_id", session.doctorId)
+        .eq("appointment_date", session.date)
+        .eq("appointment_time", session.time)
+        .in("status", ["pending", "confirmed"])
+        .maybeSingle();
+
+      if (existing) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Sorry, this time slot is already booked.\n\nPlease book another time.",
+        });
+        clearSession(contactId);
+        return true;
+      }
+
+      // ✅ Save age in session and move to confirmation step
+      setSession(contactId, {
+        ...session,
+        age,
+        step: "confirm",
+      });
+
+      // Format date for display
+      const dateObj = new Date(session.date + "T00:00:00");
+      const formattedDate = dateObj.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+
+      // Build confirmation summary
+      const summaryText = `📋 *Appointment Summary*
+
+👤 *Name:* ${session.patientName}
+⚥ *Gender:* ${session.gender}
+🎂 *Age:* ${age}
+🩺 *Service:* ${session.serviceName}
+👨‍⚕️ *Doctor:* ${session.doctorName}
+📅 *Date:* ${formattedDate}
+🕐 *Time:* ${session.time}
+
+Please confirm your booking:`;
+
+      // ✅ Show interactive buttons for confirmation
+      await engineSendInteractiveButtons({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        bodyText: summaryText,
+        buttons: [
+          { id: "confirm_booking", title: "✅ Confirm" },
+          { id: "reschedule_booking", title: "🔄 Reschedule" },
+          { id: "cancel_booking", title: "❌ Cancel" },
+        ],
+        footerText: "ZIVEXO CRM",
+      });
+
+      return true;
+    }
+
+    // ---- STEP: Confirm ----
+    if (session.step === "confirm") {
+      // ✅ Confirm Booking
+      if (command === "confirm_booking") {
+        // Double-check: Ensure slot hasn't been booked in the meantime
+        const { data: existing } = await db
+          .from("appointments")
+          .select("id")
+          .eq("doctor_id", session.doctorId)
+          .eq("appointment_date", session.date)
+          .eq("appointment_time", session.time)
+          .in("status", ["pending", "confirmed"])
+          .maybeSingle();
+
+        if (existing) {
+          await engineSendText({
+            accountId,
+            userId,
+            conversationId,
+            contactId,
+            text: "❌ Sorry, this time slot was just booked by someone else.\n\nPlease book another time.",
+          });
+          clearSession(contactId);
+          return true;
+        }
+
+        try {
+          // Save appointment to database
+          const appointmentData = {
+            clinic_id: clinicId,
+            user_id: userId,
+            contact_id: contactId,
+            service_id: session.serviceId,
+            doctor_id: session.doctorId,
+            appointment_date: session.date,
+            appointment_time: session.time,
+            patient_name: session.patientName,
+            gender: session.gender,
+            age: session.age,
+            status: "pending",
+            created_at: new Date().toISOString(),
+          };
+
+          const { data: inserted, error: insertError } = await db
+            .from("appointments")
+            .insert([appointmentData])
+            .select("id")
+            .single();
+
+          if (insertError) {
+            console.error("Error saving appointment:", insertError);
+            await engineSendText({
+              accountId,
+              userId,
+              conversationId,
+              contactId,
+              text: "❌ Failed to book appointment. Please try again later.",
+            });
+            clearSession(contactId);
+            return true;
+          }
+
+          // Format date for display
+          const dateObj = new Date(session.date + "T00:00:00");
+          const formattedDate = dateObj.toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          });
+
+          // Generate appointment ID
+          const appointmentId = `#APT-${String(inserted.id).substring(0, 8).toUpperCase()}`;
+
+          clearSession(contactId);
+
+          await engineSendText({
+            accountId,
+            userId,
+            conversationId,
+            contactId,
+            text: `✅ *Appointment Confirmed!*
+
+📋 *Service:* ${session.serviceName}
+👨‍⚕️ *Doctor:* ${session.doctorName}
+📅 *Date:* ${formattedDate}
+🕐 *Time:* ${session.time}
+👤 *Patient:* ${session.patientName}
+📋 *ID:* ${appointmentId}
+
+We'll send you a reminder before your appointment.
+
+*Thank you for booking with us!* 🏥`,
+          });
+
+          return true;
+        } catch (error) {
+          console.error("Error saving appointment:", error);
+          await engineSendText({
+            accountId,
+            userId,
+            conversationId,
+            contactId,
+            text: "❌ An error occurred. Please try again later.",
+          });
+          clearSession(contactId);
+          return true;
+        }
+      }
+
+      // 🔄 Reschedule - Go back to date selection
+      if (command === "reschedule_booking") {
+        setSession(contactId, {
+          ...session,
+          step: "date",
+          page: 0,
+        });
+
+        const dates = await getAvailableBookingDates(db, clinicId, session.doctorId, bookingDays);
+
+        if (dates.length === 0) {
+          await engineSendText({
+            accountId,
+            userId,
+            conversationId,
+            contactId,
+            text: "❌ No available dates for this doctor. Please try another doctor.",
+          });
+          clearSession(contactId);
+          return true;
+        }
+
+        await engineSendInteractiveList({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          bodyText: `📅 Select New Date for ${session.doctorName}`,
+          buttonLabel: "View Dates",
+          footerText: "Choose a date",
+          sections: [
+            {
+              title: "Available Dates",
+              rows: dates.map((d) => ({
+                id: d.id,
+                title: d.title,
+                description: d.description,
+              })),
+            },
+          ],
+        });
+
+        return true;
+      }
+
+      // ❌ Cancel - Clear session
+      if (command === "cancel_booking") {
+        clearSession(contactId);
+
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ *Booking Cancelled.*\n\nType *Hi* to start again.",
+        });
+
+        return true;
+      }
+
+      // Invalid confirmation option
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ Please select an option from the buttons above.",
+      });
+
+      return true;
+    }
+  }
+
+  // ============================================================
+  // Main Menu Handlers
+  // ============================================================
+
+  // Hi / Hello / Menu - Show Interactive List
+  if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
+    clearSession(contactId);
+
+    await sendMainMenu({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      clinicId,
+    });
+
+    return true;
+  }
+
+  // ============================================================
+  // Interactive List Direct Selections
+  // ============================================================
+
+  // 1. Book Appointment
+  if (msg === "book" || command === "1" || command === "book") {
+    const { data: services } = await db
+      .from("clinic_services")
+      .select("id, service_name")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false });
+
+    if (!services || services.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ No services available. Please contact the clinic.",
+      });
+      return true;
+    }
+
+    setSession(contactId, { step: "service" });
+
+    await engineSendInteractiveList({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      bodyText: "📋 Select a Service",
+      footerText: "Please choose a service",
+      buttonLabel: "View Services",
+      sections: [
+        {
+          title: "Available Services",
+          rows: services.map((s: any) => ({
+            id: `service_${s.id}`,
+            title:
+              s.service_name.length > 24
+                ? s.service_name.substring(0, 21) + "..."
+                : s.service_name,
+            description: "Tap to select",
+          })),
+        },
+      ],
+    });
+
+    return true;
+  }
+
+  // 2. View Doctors
+  if (msg === "doctors" || command === "2" || command === "doctors") {
+    const { data: doctors } = await db
+      .from("clinic_doctors")
+      .select("doctor_name, specialization")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false });
+
+    if (!doctors || doctors.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ No doctors available.",
+      });
+      return true;
+    }
+
+    const list = doctors
+      .map(
+        (d: any, i: number) =>
+          `${i + 1}. ${d.doctor_name} (${d.specialization})`
+      )
+      .join("\n");
+
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: `👨‍⚕️ Our Doctors:\n\n${list}`,
+    });
+
+    return true;
+  }
+
+  // 3. View Services
+  if (msg === "services" || command === "3" || command === "services") {
+    const { data: services } = await db
+      .from("clinic_services")
+      .select("service_name, price, duration_minutes")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false });
+
+    if (!services || services.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ No services available.",
+      });
+      return true;
+    }
+
+    const list = services
+      .map(
+        (s: any) =>
+          `🩺 ${s.service_name}${s.price ? ` - ₹${s.price}` : ""}${
+            s.duration_minutes ? ` (${s.duration_minutes} min)` : ""
+          }`
+      )
+      .join("\n");
+
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: `🩺 Our Services:\n\n${list}`,
+    });
+
+    return true;
+  }
+
+  // 4. View Working Hours
+  if (msg === "hours" || command === "4" || command === "hours") {
+    const { data: hours } = await db
+      .from("clinic_working_hours")
+      .select("day_name, open_time, close_time, is_closed")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: true });
+
+    if (!hours || hours.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ Working hours not available.",
+      });
+      return true;
+    }
+
+    const list = hours
+      .map((h: any) =>
+        h.is_closed
+          ? `${h.day_name}: Closed`
+          : `${h.day_name}: ${h.open_time} - ${h.close_time}`
+      )
+      .join("\n");
+
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: `🕒 Working Hours:\n\n${list}`,
+    });
+
+    return true;
+  }
+
+  // 5. View FAQ
+
+// ============================================================
+// 5. FAQ - Interactive FAQ List
+// ============================================================
+
+// Open FAQ list
+if (msg === "faq" || command === "5" || command === "faq") {
+  const { data: faq, error: faqError } = await db
+    .from("clinic_knowledge_base")
+    .select("id, question")
+    .eq("clinic_id", clinicId)
+    .order("created_at", { ascending: true })
+    .limit(10);
+
+  if (faqError) {
+    console.error("❌ FAQ fetch error:", faqError);
+  }
+
+  if (!faq || faq.length === 0) {
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: "❌ No FAQs are available right now.",
+    });
+
+    return true;
+  }
+
+  await engineSendInteractiveList({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    bodyText: "❓ Frequently Asked Questions",
+    footerText: "Select a question to view the answer",
+    buttonLabel: "View FAQs",
+    sections: [
+      {
+        title: "Common Questions",
+        rows: faq.map((f: any) => ({
+          id: `faq_${f.id}`,
+          title:
+            f.question.length > 24
+              ? f.question.substring(0, 21) + "..."
+              : f.question,
+          description: "Tap to view answer",
+        })),
+      },
+      {
+        title: "Other",
+        rows: [
+          {
+            id: "faq_main_menu",
+            title: "🏠 Main Menu",
+            description: "Back to main menu",
+          },
+        ],
+      },
+    ],
+  });
+
+  return true;
+}
+
+
+// ============================================================
+// FAQ - Show Selected Answer
+// ============================================================
+
+if (command.startsWith("faq_") && command !== "faq_main_menu") {
+  const faqId = command.replace("faq_", "");
+
+  const { data: selectedFaq, error: selectedFaqError } = await db
+    .from("clinic_knowledge_base")
+    .select("question, answer")
+    .eq("id", faqId)
+    .eq("clinic_id", clinicId)
+    .maybeSingle();
+
+  if (selectedFaqError) {
+    console.error("❌ Selected FAQ error:", selectedFaqError);
+  }
+
+  if (!selectedFaq) {
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: "❌ Sorry, this FAQ is no longer available.",
+    });
+
+    return true;
+  }
+
+  await engineSendText({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    text:
+      `❓ *${selectedFaq.question}*\n\n` +
+      `👉 ${selectedFaq.answer}`,
+  });
+
+  // Show FAQ menu again
+  await engineSendInteractiveList({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    bodyText: "❓ Have another question?",
+    footerText: "Choose another FAQ",
+    buttonLabel: "View FAQs",
+    sections: [
+      {
+        title: "FAQ",
+        rows: [
+          {
+            id: "faq",
+            title: "❓ More FAQs",
+            description: "View all questions",
+          },
+          {
+            id: "faq_main_menu",
+            title: "🏠 Main Menu",
+            description: "Back to main menu",
+          },
+        ],
+      },
+    ],
+  });
+
+  return true;
+}
+
+
+// ============================================================
+// FAQ - Back to Main Menu
+// ============================================================
+
+if (command === "faq_main_menu") {
+  clearSession(contactId);
+
+  await sendMainMenu({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    clinicId,
+  });
+
+  return true;
+}
+
+
+
+
+  // 6. Contact Information
+  if (msg === "contact" || command === "6" || command === "contact") {
+    const { data: clinicData } = await db
+      .from("clinics")
+      .select("clinic_name, whatsapp_number")
+      .eq("id", clinicId)
+      .maybeSingle();
+
+    let contactText = `📞 Contact ${clinicData?.clinic_name || "Us"}:\n\n`;
+    if (clinicData?.whatsapp_number)
+      contactText += `📱 WhatsApp: ${clinicData.whatsapp_number}\n`;
+
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: contactText || "📞 Contact information not available.",
+    });
+
+    return true;
+  }
+
+  // 7. Location
+  if (msg === "location" || command === "7" || command === "location") {
+    const { data: clinicData } = await db
+      .from("clinics")
+      .select("clinic_name, address, google_maps")
+      .eq("id", clinicId)
+      .maybeSingle();
+
+    let locationText = `📍 *${clinicData?.clinic_name || "Clinic"}*\n\n`;
+
+    if (clinicData?.address) {
+      locationText += `🏥 Address:\n${clinicData.address}\n\n`;
+    }
+
+    if (clinicData?.google_maps) {
+      locationText += `🗺️ Google Maps:\n${clinicData.google_maps}`;
+    }
+
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text: locationText,
+    });
+
+    return true;
+  }
+
+  // Unknown command - show help
+  await engineSendText({
+    accountId,
+    userId,
+    conversationId,
+    contactId,
+    text: `❌ I didn't understand that.\n\nPlease reply with:\n1️⃣ Book Appointment\n2️⃣ Doctors\n3️⃣ Services\n4️⃣ Working Hours\n5️⃣ FAQ\n6️⃣ Contact\n7️⃣ Location\n\nOr type "Hi" to see the menu.`,
+  });
+
+  return true;
+}

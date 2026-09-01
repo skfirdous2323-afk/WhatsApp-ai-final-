@@ -12,13 +12,17 @@
     "signingIn": "Signing in...",
     "signIn": "Sign in",
     "noAccount": "Don't have an account?",
-    "createAccount": "Create account"
+    "createAccount": "Create account",
+    "secureMessage": "Your data is protected and securely encrypted."
   },
   "Sidebar": {
     "title": "CRM Template for WhatsApp",
     "dashboard": "Dashboard",
-    "inbox": "Inbox",
-    "notifications": "Notifications",
+
+"inbox": "Inbox",
+"notifications": "Notifications",
+
+
     "contacts": "Contacts",
     "pipelines": "Pipelines",
     "broadcasts": "Broadcasts",
