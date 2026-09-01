@@ -1,186 +1,145 @@
-// src/app/page.tsx
+# ১. ফোল্ডার তৈরি করুন
+mkdir -p src/app/auth/login
+
+# ২. ফাইল তৈরি করুন
+cat > src/app/auth/login/page.tsx << 'EOF'
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
-export default function HomePage() {
-  const [scrolled, setScrolled] = useState(false);
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
+  const supabase = createClient();
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        router.push("/dashboard");
+      }
     };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    checkSession();
   }, []);
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      router.push("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Invalid email or password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
-      {/* Navbar */}
-      <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-        scrolled ? "bg-white/80 backdrop-blur-md shadow-sm" : "bg-transparent"
-      }`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-lg shadow-blue-200">
-                <span className="text-white font-bold text-sm">Z</span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <Link href="/" className="inline-flex items-center gap-2.5">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
+              <span className="text-white font-bold text-lg">Z</span>
+            </div>
+            <span className="text-2xl font-bold text-[#0a1628]">ZIVEXO</span>
+          </Link>
+          <h2 className="text-2xl font-bold text-[#0a1628] mt-6">Welcome back</h2>
+          <p className="text-gray-500 text-sm mt-1">Sign in to your account</p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 md:p-8">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-[#0a1628] mb-1.5">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition"
+              />
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-sm font-medium text-[#0a1628]">Password</label>
+                <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                  Forgot password?
+                </Link>
               </div>
-              <span className="text-xl font-bold text-[#0a1628]">ZIVEXO</span>
-            </Link>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition"
+              />
+            </div>
 
-            {/* Navigation */}
-            <div className="hidden md:flex items-center gap-8">
-              <Link href="#features" className="text-sm text-gray-600 hover:text-gray-900">Features</Link>
-              <Link href="#pricing" className="text-sm text-gray-600 hover:text-gray-900">Pricing</Link>
-              <Link href="#testimonials" className="text-sm text-gray-600 hover:text-gray-900">Testimonials</Link>
-              <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-gray-900">Log in</Link>
-              <Link
-                href="/signup"
-                className="bg-[#0a1628] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1a2a4a] transition"
-              >
-                Get started
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#0a1628] text-white py-3.5 rounded-xl font-semibold hover:bg-[#1a2a4a] transition shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                "Sign in"
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-500">
+              Don't have an account?{" "}
+              <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+                Create account
               </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center">
-            <div className="inline-flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-full mb-6">
-              <span className="text-blue-600 text-sm font-medium">🚀 New Update</span>
-            </div>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-[#0a1628] leading-tight max-w-4xl mx-auto">
-              WhatsApp CRM for
-              <span className="text-blue-600 block">Clinics & Doctors</span>
-            </h1>
-            <p className="text-lg text-gray-500 max-w-2xl mx-auto mt-4">
-              Automate appointments, patient communication, and clinic management — all from one platform.
             </p>
-            <div className="flex flex-wrap justify-center gap-4 mt-8">
-              <Link
-                href="/signup"
-                className="bg-[#0a1628] text-white px-8 py-3.5 rounded-xl font-semibold hover:bg-[#1a2a4a] transition shadow-lg"
-              >
-                Start for free
-              </Link>
-              <Link
-                href="#demo"
-                className="border border-gray-300 text-gray-700 px-8 py-3.5 rounded-xl font-semibold hover:bg-gray-50 transition"
-              >
-                Talk to sales
-              </Link>
-            </div>
-            <p className="text-sm text-gray-400 mt-4">Trusted by 50+ clinics</p>
           </div>
         </div>
-      </section>
 
-      {/* Trusted By */}
-      <section className="py-12 border-y border-gray-100 bg-white">
-        <div className="max-w-7xl mx-auto px-4">
-          <p className="text-center text-sm text-gray-400 font-medium uppercase tracking-wider mb-6">
-            Trusted by clinics worldwide
-          </p>
-          <div className="flex flex-wrap justify-center gap-8 md:gap-12 items-center opacity-60">
-            <span className="text-xl font-semibold text-gray-700">🏥 Apollo</span>
-            <span className="text-xl font-semibold text-gray-700">💊 MedPlus</span>
-            <span className="text-xl font-semibold text-gray-700">🦷 Clove</span>
-            <span className="text-xl font-semibold text-gray-700">❤️ HeartCare</span>
-            <span className="text-xl font-semibold text-gray-700">👁️ EyeQ</span>
+        <div className="mt-6 text-center">
+          <div className="flex justify-center gap-4 text-xs text-gray-400">
+            <Link href="/privacy-policy" className="hover:text-gray-600">Privacy</Link>
+            <span>·</span>
+            <Link href="/terms" className="hover:text-gray-600">Terms</Link>
+            <span>·</span>
+            <Link href="/refund-policy" className="hover:text-gray-600">Refund</Link>
           </div>
+          <p className="text-xs text-gray-400 mt-2">© 2026 ZIVEXO. All rights reserved.</p>
         </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="py-20 px-4 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-[#0a1628]">
-              Click, click, done.
-            </h2>
-            <p className="text-gray-500 mt-2">Everything you need to run your clinic</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Feature 1 */}
-            <div className="bg-slate-50 rounded-2xl p-8 border border-gray-100 hover:shadow-lg transition">
-              <div className="text-3xl mb-4">📱</div>
-              <h3 className="text-xl font-bold text-[#0a1628]">WhatsApp Auto</h3>
-              <p className="text-gray-500 text-sm mt-2">
-                24/7 automated messaging, appointment booking, and patient support.
-              </p>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="bg-slate-50 rounded-2xl p-8 border border-gray-100 hover:shadow-lg transition">
-              <div className="text-3xl mb-4">👨‍⚕️</div>
-              <h3 className="text-xl font-bold text-[#0a1628]">Doctor & Patient Mgmt</h3>
-              <p className="text-gray-500 text-sm mt-2">
-                Manage doctors, services, working hours, and patient records.
-              </p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="bg-slate-50 rounded-2xl p-8 border border-gray-100 hover:shadow-lg transition">
-              <div className="text-3xl mb-4">📊</div>
-              <h3 className="text-xl font-bold text-[#0a1628]">Analytics Dashboard</h3>
-              <p className="text-gray-500 text-sm mt-2">
-                Real-time insights, appointment reports, and revenue tracking.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-[#0a1628] text-white py-12 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div>
-              <h4 className="font-semibold text-sm uppercase tracking-wider text-gray-400">Product</h4>
-              <ul className="mt-3 space-y-2 text-sm text-gray-300">
-                <li><Link href="#features">Features</Link></li>
-                <li><Link href="#pricing">Pricing</Link></li>
-                <li><Link href="#demo">Demo</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-sm uppercase tracking-wider text-gray-400">Company</h4>
-              <ul className="mt-3 space-y-2 text-sm text-gray-300">
-                <li><Link href="/about">About</Link></li>
-                <li><Link href="/blog">Blog</Link></li>
-                <li><Link href="/careers">Careers</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-sm uppercase tracking-wider text-gray-400">Legal</h4>
-              <ul className="mt-3 space-y-2 text-sm text-gray-300">
-                <li><Link href="/privacy-policy">Privacy Policy</Link></li>
-                <li><Link href="/terms">Terms of Service</Link></li>
-                <li><Link href="/refund-policy">Refund Policy</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-sm uppercase tracking-wider text-gray-400">Social</h4>
-              <ul className="mt-3 space-y-2 text-sm text-gray-300">
-                <li><a href="#">Twitter</a></li>
-                <li><a href="#">LinkedIn</a></li>
-                <li><a href="#">YouTube</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-white/10 mt-8 pt-6 flex flex-wrap justify-between items-center text-sm text-gray-400">
-            <span>© 2026 ZIVEXO. All rights reserved.</span>
-            <span>v3.0.1</span>
-          </div>
-        </div>
-      </footer>
+      </div>
     </div>
   );
 }
+EOF
