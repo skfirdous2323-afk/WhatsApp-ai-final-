@@ -16,7 +16,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
       {/* Navbar */}
       <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${
         scrolled ? "bg-white/80 backdrop-blur-md shadow-sm" : "bg-transparent"
@@ -25,10 +25,10 @@ export default function HomePage() {
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-lg shadow-blue-200">
                 <span className="text-white font-bold text-sm">Z</span>
               </div>
-              <span className="text-xl font-bold text-gray-900">ZIVEXO</span>
+              <span className="text-xl font-bold text-[#0a1628]">ZIVEXO</span>
             </Link>
 
             {/* Navigation */}
@@ -49,7 +49,7 @@ export default function HomePage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 bg-gradient-to-b from-slate-50 to-white">
+      <section className="pt-32 pb-20 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="text-center">
             <div className="inline-flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-full mb-6">
@@ -82,7 +82,7 @@ export default function HomePage() {
       </section>
 
       {/* Trusted By */}
-      <section className="py-12 border-y border-gray-100">
+      <section className="py-12 border-y border-gray-100 bg-white">
         <div className="max-w-7xl mx-auto px-4">
           <p className="text-center text-sm text-gray-400 font-medium uppercase tracking-wider mb-6">
             Trusted by clinics worldwide
@@ -109,7 +109,7 @@ export default function HomePage() {
 
           <div className="grid md:grid-cols-3 gap-6">
             {/* Feature 1 */}
-            <div className="bg-slate-50 rounded-2xl p-8 border border-gray-100">
+            <div className="bg-slate-50 rounded-2xl p-8 border border-gray-100 hover:shadow-lg transition">
               <div className="text-3xl mb-4">📱</div>
               <h3 className="text-xl font-bold text-[#0a1628]">WhatsApp Auto</h3>
               <p className="text-gray-500 text-sm mt-2">
@@ -118,7 +118,7 @@ export default function HomePage() {
             </div>
 
             {/* Feature 2 */}
-            <div className="bg-slate-50 rounded-2xl p-8 border border-gray-100">
+            <div className="bg-slate-50 rounded-2xl p-8 border border-gray-100 hover:shadow-lg transition">
               <div className="text-3xl mb-4">👨‍⚕️</div>
               <h3 className="text-xl font-bold text-[#0a1628]">Doctor & Patient Mgmt</h3>
               <p className="text-gray-500 text-sm mt-2">
@@ -127,7 +127,7 @@ export default function HomePage() {
             </div>
 
             {/* Feature 3 */}
-            <div className="bg-slate-50 rounded-2xl p-8 border border-gray-100">
+            <div className="bg-slate-50 rounded-2xl p-8 border border-gray-100 hover:shadow-lg transition">
               <div className="text-3xl mb-4">📊</div>
               <h3 className="text-xl font-bold text-[#0a1628]">Analytics Dashboard</h3>
               <p className="text-gray-500 text-sm mt-2">
