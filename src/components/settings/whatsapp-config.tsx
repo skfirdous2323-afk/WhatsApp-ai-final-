@@ -476,7 +476,9 @@ if (!metaAppId || !metaConfigId) {
         appId: metaAppId,
         cookie: true,
         xfbml: true,
-        version: 'v23.0',
+
+
+version: 'v26.0',
       });
     }
   }}
