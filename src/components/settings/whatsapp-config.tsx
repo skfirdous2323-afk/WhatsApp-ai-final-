@@ -70,7 +70,7 @@ console.log('[Meta Signup]', {
     toast.error('Meta SDK is still loading. Please try again.');
     return;
   }
-
+alert("FB.login START");
   FB.login(
 (response: any) => {
   console.log('[Meta Signup Response]', response);
