@@ -72,8 +72,12 @@ console.log('[Meta Signup]', {
   }
 
   FB.login(
-    (response: any) => {
-      if (response?.authResponse?.code) {
+(response: any) => {
+  console.log('[Meta Signup Response]', response);
+
+  if (response?.authResponse?.code) {
+
+
         const code = response.authResponse.code;
 
         window.location.href =
