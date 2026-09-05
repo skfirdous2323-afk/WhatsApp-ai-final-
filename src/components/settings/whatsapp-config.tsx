@@ -74,7 +74,14 @@ console.log('[Meta Signup]', {
   FB.login(
 (response: any) => {
   console.log('[Meta Signup Response]', response);
-
+alert(JSON.stringify({
+  status: response?.status,
+  hasCode: !!response?.authResponse?.code,
+  hasAccessToken: !!response?.authResponse?.accessToken,
+  error: response?.error,
+  errorReason: response?.errorReason,
+  errorDescription: response?.errorDescription,
+}, null, 2));
   if (response?.authResponse?.code) {
 
 
