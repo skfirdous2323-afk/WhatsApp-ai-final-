@@ -39,6 +39,14 @@ async function metaJson(
 }
 
 export async function GET(request: Request) {
+console.log('[Embedded Signup Callback] REQUEST RECEIVED');
+
+console.log(
+  '[Embedded Signup Callback] URL:',
+  request.url.replace(/code=[^&]+/, 'code=REDACTED')
+);
+
+
   try {
     const url = new URL(request.url)
 
