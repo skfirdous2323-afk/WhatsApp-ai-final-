@@ -825,7 +825,7 @@ export function WhatsAppConfig() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Accordion type="single" collapsible className="space-y-2">
+                <Accordion collapsible className="space-y-2">
                   <AccordionItem className="border-border">
                     <AccordionTrigger className="text-muted-foreground hover:text-foreground hover:no-underline">
                       <span className="flex items-center gap-2">
