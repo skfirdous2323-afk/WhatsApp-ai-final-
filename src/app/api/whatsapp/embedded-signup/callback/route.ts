@@ -179,6 +179,14 @@ console.log(
 
     const tokenInfo = debugData?.data
 
+    console.log("[META TOKEN INFO]", {
+      is_valid: tokenInfo?.is_valid,
+      app_id: tokenInfo?.app_id,
+      user_id: tokenInfo?.user_id,
+      scopes: tokenInfo?.scopes || [],
+      granular_scopes: tokenInfo?.granular_scopes || [],
+    })
+
     if (!tokenInfo?.is_valid) {
       throw new Error('Meta returned an invalid Embedded Signup token.')
     }
