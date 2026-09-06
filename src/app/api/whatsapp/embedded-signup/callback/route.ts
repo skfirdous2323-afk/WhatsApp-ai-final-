@@ -24,15 +24,31 @@ async function metaJson(
   url: string,
   options?: RequestInit,
 ) {
+  console.log("[META API REQUEST]", {
+    url: url.replace(/client_secret=[^&]+/g, "client_secret=***"),
+    method: options?.method || "GET",
+  })
+
   const response = await fetch(url, options)
   const data = await response.json().catch(() => null)
+
+  console.log("[META API RESPONSE]", {
+    status: response.status,
+    ok: response.ok,
+    error: data?.error || null,
+  })
 
   if (!response.ok) {
     const message =
       data?.error?.message ||
       `Meta API error: ${response.status}`
 
-    throw new Error(message)
+    const code = data?.error?.code
+    const subcode = data?.error?.error_subcode
+
+    throw new Error(
+      `Meta API error${code ? ` (#${code})` : ""}${subcode ? ` subcode ${subcode}` : ""}: ${message}`
+    )
   }
 
   return data
