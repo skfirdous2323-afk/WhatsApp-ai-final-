@@ -197,7 +197,8 @@ export function WhatsAppConfig() {
     FB.login(
       (response: any) => {
         setIsEmbeddedSignupLoading(false);
-
+console.log('[META FULL RESPONSE]', JSON.stringify(response, null, 2));
+alert('[META FULL RESPONSE]\n\n' + JSON.stringify(response, null, 2));
         if (response?.authResponse?.code) {
           const code = response.authResponse.code;
           window.location.href = `/api/whatsapp/embedded-signup/callback?code=${encodeURIComponent(code)}`;
