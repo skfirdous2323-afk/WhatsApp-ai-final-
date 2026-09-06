@@ -89,10 +89,23 @@ alert(JSON.stringify({
 
         window.location.href =
           `/api/whatsapp/embedded-signup/callback?code=${encodeURIComponent(code)}`;
-      } else {
-        toast.error('Meta Embedded Signup was cancelled or failed.');
-      }
-    },
+
+
+
+} else {
+  console.error('[Meta Signup] No authorization code returned:', response);
+
+  alert(
+    'Meta signup finished, but no authorization code was returned.\n\n' +
+    'Status: ' + (response?.status || 'unknown') + '\n' +
+    'Error: ' + (response?.error || 'none') + '\n' +
+    'Reason: ' + (response?.errorReason || 'none') + '\n' +
+    'Description: ' + (response?.errorDescription || 'none')
+  );
+}
+
+
+
     {
       config_id: metaConfigId,
       response_type: 'code',
