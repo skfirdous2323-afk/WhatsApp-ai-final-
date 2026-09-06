@@ -825,69 +825,46 @@ export function WhatsAppConfig() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Accordion collapsible className="space-y-2">
-                  <AccordionItem className="border-border">
-                    <AccordionTrigger className="text-muted-foreground hover:text-foreground hover:no-underline">
-                      <span className="flex items-center gap-2">
-                        <span className="flex size-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">1</span>
-                        Create a Meta App
-                      </span>
-                    </AccordionTrigger>
-                    <AccordionContent className="text-muted-foreground text-sm space-y-1">
-                      <p>1. Go to developers.facebook.com</p>
-                      <p>2. Click "My Apps" → "Create App"</p>
-                      <p>3. Select "Business" as the app type</p>
-                      <p>4. Enter your app name and contact email</p>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem className="border-border">
-                    <AccordionTrigger className="text-muted-foreground hover:text-foreground hover:no-underline">
-                      <span className="flex items-center gap-2">
-                        <span className="flex size-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">2</span>
-                        Add WhatsApp Product
-                      </span>
-                    </AccordionTrigger>
-                    <AccordionContent className="text-muted-foreground text-sm space-y-1">
-                      <p>1. In your app dashboard, click "Add Product"</p>
-                      <p>2. Select "WhatsApp" from the list</p>
-                      <p>3. Click "Set Up" to configure WhatsApp</p>
-                      <p>4. Get your API credentials from the API Setup tab</p>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem className="border-border">
-                    <AccordionTrigger className="text-muted-foreground hover:text-foreground hover:no-underline">
-                      <span className="flex items-center gap-2">
-                        <span className="flex size-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">3</span>
-                        Configure Webhook
-                      </span>
-                    </AccordionTrigger>
-                    <AccordionContent className="text-muted-foreground text-sm space-y-1">
-                      <p>1. Copy the Webhook URL from above</p>
-                      <p>2. In Meta Dashboard → WhatsApp → API Setup</p>
-                      <p>3. Paste the URL in the Callback URL field</p>
-                      <p>4. Enter the Verify Token you set in the form</p>
-                      <p>5. Click "Save" and "Verify"</p>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem className="border-border">
-                    <AccordionTrigger className="text-muted-foreground hover:text-foreground hover:no-underline">
-                      <span className="flex items-center gap-2">
-                        <span className="flex size-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">4</span>
-                        Get Credentials
-                      </span>
-                    </AccordionTrigger>
-                    <AccordionContent className="text-muted-foreground text-sm space-y-1">
-                      <p>1. In Meta Dashboard → WhatsApp → API Setup</p>
-                      <p>2. Find your Permanent Access Token</p>
-                      <p>3. Find your Phone Number ID</p>
-                      <p>4. Find your WhatsApp Business Account ID</p>
-                      <p>5. Enter them in the form above and click "Save Configuration"</p>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
+<div className="space-y-4">
+  <div className="border-border">
+    <h4 className="font-medium text-foreground">1. Create a Meta App</h4>
+    <div className="text-muted-foreground text-sm space-y-1 mt-2">
+      <p>• Go to developers.facebook.com</p>
+      <p>• Click "My Apps" → "Create App"</p>
+      <p>• Select "Business" as the app type</p>
+      <p>• Enter your app name and contact email</p>
+    </div>
+  </div>
+  <div className="border-border pt-4">
+    <h4 className="font-medium text-foreground">2. Add WhatsApp Product</h4>
+    <div className="text-muted-foreground text-sm space-y-1 mt-2">
+      <p>• In your app dashboard, click "Add Product"</p>
+      <p>• Select "WhatsApp" from the list</p>
+      <p>• Click "Set Up" to configure WhatsApp</p>
+      <p>• Get your API credentials from the API Setup tab</p>
+    </div>
+  </div>
+  <div className="border-border pt-4">
+    <h4 className="font-medium text-foreground">3. Configure Webhook</h4>
+    <div className="text-muted-foreground text-sm space-y-1 mt-2">
+      <p>• Copy the Webhook URL from above</p>
+      <p>• In Meta Dashboard → WhatsApp → API Setup</p>
+      <p>• Paste the URL in the Callback URL field</p>
+      <p>• Enter the Verify Token you set in the form</p>
+      <p>• Click "Save" and "Verify"</p>
+    </div>
+  </div>
+  <div className="border-border pt-4">
+    <h4 className="font-medium text-foreground">4. Get Credentials</h4>
+    <div className="text-muted-foreground text-sm space-y-1 mt-2">
+      <p>• In Meta Dashboard → WhatsApp → API Setup</p>
+      <p>• Find your Permanent Access Token</p>
+      <p>• Find your Phone Number ID</p>
+      <p>• Find your WhatsApp Business Account ID</p>
+      <p>• Enter them in the form above and click "Save Configuration"</p>
+    </div>
+  </div>
+</div>
 
                 <div className="mt-4 pt-4 border-t border-border">
                   <a
