@@ -194,6 +194,25 @@ export function WhatsAppConfig() {
 
     setIsEmbeddedSignupLoading(true);
 
+    // Meta Embedded Signup Session Info
+    const handleMetaMessage = (event: MessageEvent) => {
+      if (event.origin !== 'https://www.facebook.com') return;
+
+      try {
+        const data =
+          typeof event.data === 'string'
+            ? JSON.parse(event.data)
+            : event.data;
+
+        console.log('[META SESSION INFO]', data);
+        alert('[META SESSION INFO]\n\n' + JSON.stringify(data, null, 2));
+      } catch {
+        // Ignore non-JSON messages
+      }
+    };
+
+    window.addEventListener('message', handleMetaMessage);
+
     FB.login(
       (response: any) => {
         setIsEmbeddedSignupLoading(false);

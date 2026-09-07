@@ -25,7 +25,7 @@ async function metaJson(
   options?: RequestInit,
 ) {
   console.log("[META API REQUEST]", {
-    url: url.replace(/client_secret=[^&]+/g, "client_secret=***"),
+    url: url.replace(/(client_secret|input_token|access_token)=[^&]+/g, "$1=***"),
     method: options?.method || "GET",
   })
 

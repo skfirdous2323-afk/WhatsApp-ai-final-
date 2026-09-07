@@ -306,7 +306,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
 setAccount(null);
-window.location.href = "/login";
+window.location.href = "/auth/login";
 
 
   }, []);
@@ -371,7 +371,7 @@ export function useAuth(): AuthContextValue {
       loading: false,
       profileLoading: false,
       signOut: async () => {
-        window.location.href = "/login";
+        window.location.href = "/auth/login";
       },
       refreshProfile: async () => {},
       account: null,

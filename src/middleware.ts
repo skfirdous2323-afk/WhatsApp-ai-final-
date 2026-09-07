@@ -49,7 +49,7 @@ export async function middleware(request: NextRequest) {
   // a forwarded invite link to someone who's already signed in
   // would silently drop them on /dashboard.
   if (user && (
-    request.nextUrl.pathname === '/login' ||
+    request.nextUrl.pathname === '/auth/login' ||
     request.nextUrl.pathname === '/signup' ||
     request.nextUrl.pathname === '/forgot-password'
   )) {
@@ -57,7 +57,7 @@ export async function middleware(request: NextRequest) {
     const inviteToken = request.nextUrl.searchParams.get('invite')
     if (
       inviteToken &&
-      (request.nextUrl.pathname === '/login' ||
+      (request.nextUrl.pathname === '/auth/login' ||
         request.nextUrl.pathname === '/signup')
     ) {
       url.pathname = `/join/${encodeURIComponent(inviteToken)}`
@@ -73,7 +73,7 @@ export async function middleware(request: NextRequest) {
   const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/settings']
   if (!user && protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    url.pathname = '/auth/login'
     return withRefreshedCookies(NextResponse.redirect(url))
   }
 
