@@ -275,7 +275,7 @@ export default function JoinPage() {
                   Create a new account instead
                 </Button>
               </Link>
-              <Link href="/auth/login">
+              <Link href="/login">
                 <Button
                   variant="outline"
                   className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
