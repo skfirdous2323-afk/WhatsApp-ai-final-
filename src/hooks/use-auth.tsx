@@ -306,7 +306,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
 setAccount(null);
-window.location.href = "/auth/login";
+window.location.href = "/login";
 
 
   }, []);
