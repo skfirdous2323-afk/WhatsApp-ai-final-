@@ -62,6 +62,11 @@ export default function SignupPage() {
             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
               <span className="text-white font-bold text-lg">Z</span>
             </div>
+            <img
+              src="/branding/zivexo-logo.png"
+              alt="ZIVEXO"
+              className="h-10 w-10 object-contain"
+            />
             <span className="text-2xl font-bold text-[#0a1628]">ZIVEXO</span>
           </Link>
 

@@ -244,5 +244,6 @@ export default function LoginPage() {
         </footer>
       </div>
     </div>
+    </div>
   );
 }
