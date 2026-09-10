@@ -45,10 +45,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#06111f] flex items-center justify-center p-4">
-      <div className="absolute -top-32 -left-32 h-80 w-80 rounded-full bg-blue-900/20 blur-3xl" />
-      <div className="absolute -bottom-32 -right-32 h-80 w-80 rounded-full bg-indigo-900/20 blur-3xl" />
-      <div className="absolute top-1/2 left-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/5 blur-3xl" />
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 to-white flex items-center justify-center p-4">
+      <div className="absolute -top-32 -left-32 h-80 w-80 rounded-full bg-blue-100/50 blur-3xl" />
+      <div className="absolute -bottom-32 -right-32 h-80 w-80 rounded-full bg-indigo-100/50 blur-3xl" />
+      <div className="absolute top-1/2 left-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 blur-3xl" />
       <div className="relative z-10 w-full max-w-6xl grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
         <div className="hidden lg:block">
           <div className="max-w-xl">
@@ -185,7 +185,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-[#06111f] border border-slate-100 px-4 py-3">
+          <div className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-100 px-4 py-3">
             <span className="text-sm">🔒</span>
             <span className="text-xs font-medium text-slate-600">
               Secure login • Your account is protected
