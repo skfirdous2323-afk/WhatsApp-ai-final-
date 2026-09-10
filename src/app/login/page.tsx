@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -44,9 +45,55 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
+    <div className="relative min-h-screen overflow-hidden bg-slate-50 flex items-center justify-center p-4">
+      <div className="absolute -top-32 -left-32 h-80 w-80 rounded-full bg-blue-100/50 blur-3xl" />
+      <div className="absolute -bottom-32 -right-32 h-80 w-80 rounded-full bg-indigo-100/50 blur-3xl" />
+      <div className="absolute top-1/2 left-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 blur-3xl" />
+      <div className="relative z-10 w-full max-w-6xl grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+        <div className="hidden lg:block">
+          <div className="max-w-xl">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/80 border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm mb-6">
+              <span className="h-2 w-2 rounded-full bg-green-500" />
+              Business Management Platform
+            </div>
+
+            <h1 className="text-5xl xl:text-6xl font-bold tracking-tight text-[#0a1628] leading-tight">
+              One Platform.
+              <br />
+              Every Business.
+            </h1>
+
+            <p className="mt-6 text-lg text-slate-500 leading-8 max-w-lg">
+              Manage customers, appointments, sales, teams and conversations
+              with powerful tools built for modern businesses.
+            </p>
+
+            <div className="mt-8 grid grid-cols-2 gap-3 max-w-md">
+              <div className="rounded-xl bg-white/80 border border-slate-200 px-4 py-3 shadow-sm">
+                <p className="text-sm font-semibold text-[#0a1628]">Customers</p>
+                <p className="text-xs text-slate-500 mt-1">Manage relationships</p>
+              </div>
+
+              <div className="rounded-xl bg-white/80 border border-slate-200 px-4 py-3 shadow-sm">
+                <p className="text-sm font-semibold text-[#0a1628]">Automation</p>
+                <p className="text-xs text-slate-500 mt-1">Save valuable time</p>
+              </div>
+
+              <div className="rounded-xl bg-white/80 border border-slate-200 px-4 py-3 shadow-sm">
+                <p className="text-sm font-semibold text-[#0a1628]">Appointments</p>
+                <p className="text-xs text-slate-500 mt-1">Stay organized</p>
+              </div>
+
+              <div className="rounded-xl bg-white/80 border border-slate-200 px-4 py-3 shadow-sm">
+                <p className="text-sm font-semibold text-[#0a1628]">WhatsApp</p>
+                <p className="text-xs text-slate-500 mt-1">Connect instantly</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="w-full max-w-md mx-auto lg:mx-0 lg:ml-auto">
+          <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5">
             <img
               src="/branding/zivexo-logo.png"
@@ -55,8 +102,12 @@ export default function LoginPage() {
             />
             <span className="text-2xl font-bold text-[#0a1628]">ZIVEXO</span>
           </Link>
-          <h2 className="text-2xl font-bold text-[#0a1628] mt-6">Welcome back</h2>
-          <p className="text-gray-500 text-sm mt-1">Sign in to your account</p>
+          <h2 className="text-2xl font-bold text-[#0a1628] mt-6">
+            One Platform. Every Business.
+          </h2>
+          <p className="text-gray-500 text-sm mt-2">
+            Manage your business, customers, teams and conversations — all in one place.
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 md:p-8">
@@ -65,6 +116,15 @@ export default function LoginPage() {
               {error}
             </div>
           )}
+
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-[#0a1628]">
+              Sign in to ZIVEXO
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Access your business workspace securely.
+            </p>
+          </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
@@ -86,20 +146,30 @@ export default function LoginPage() {
                   Forgot password?
                 </Link>
               </div>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                required
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-200 rounded-xl text-[#0a1628] caret-[#0a1628] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-sm font-medium"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#0a1628] text-white py-3.5 rounded-xl font-semibold hover:bg-[#1a2a4a] transition shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-[#0a1628] to-[#1d3557] text-white py-3.5 rounded-xl font-semibold hover:from-[#12213a] hover:to-[#27466f] transition-all duration-200 shadow-lg shadow-slate-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
@@ -115,11 +185,21 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+            <span className="text-sm">🔒</span>
+            <span className="text-xs font-medium text-slate-600">
+              Secure login • Your account is protected
+            </span>
+          </div>
+
+          <div className="mt-6 pt-5 border-t border-gray-100 text-center">
             <p className="text-sm text-gray-500">
-              Don't have an account?{" "}
-              <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-                Create account
+              New to ZIVEXO?{" "}
+              <Link
+                href="/signup"
+                className="text-[#0a1628] hover:text-blue-600 font-semibold transition-colors"
+              >
+                Create your account
               </Link>
             </p>
           </div>
@@ -134,6 +214,7 @@ export default function LoginPage() {
             <Link href="/refund-policy" className="hover:text-gray-600">Refund</Link>
           </div>
           <p className="text-xs text-gray-400 mt-2">© 2026 ZIVEXO. All rights reserved.</p>
+        </div>
         </div>
       </div>
     </div>
