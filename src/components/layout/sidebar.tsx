@@ -194,9 +194,11 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
 
 
 
-<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold">
-  Z
-</div>
+<img
+  src="/branding/zivexo-logo.png"
+  alt="ZIVEXO"
+  className="h-9 w-9 object-contain"
+/>
 
 <span className="text-sm font-semibold text-foreground">
   ZIVEXO CRM
