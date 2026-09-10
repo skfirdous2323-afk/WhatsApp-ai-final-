@@ -205,17 +205,43 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="mt-6 text-center">
-          <div className="flex justify-center gap-4 text-xs text-gray-400">
-            <Link href="/privacy-policy" className="hover:text-gray-600">Privacy</Link>
-            <span>·</span>
-            <Link href="/terms" className="hover:text-gray-600">Terms</Link>
-            <span>·</span>
-            <Link href="/refund-policy" className="hover:text-gray-600">Refund</Link>
+        <footer className="mt-8 text-center">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <img
+              src="/branding/zivexo-logo.png"
+              alt="ZIVEXO"
+              className="h-6 w-6 object-contain"
+            />
+            <span className="text-sm font-bold tracking-wide text-[#0a1628]">
+              ZIVEXO
+            </span>
           </div>
-          <p className="text-xs text-gray-400 mt-2">© 2026 ZIVEXO. All rights reserved.</p>
-        </div>
-        </div>
+
+          <p className="text-xs text-slate-500 mb-4">
+            One Platform. Every Business.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-slate-400">
+            <Link href="/privacy-policy" className="hover:text-[#0a1628] transition-colors">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-[#0a1628] transition-colors">
+              Terms
+            </Link>
+            <Link href="/refund-policy" className="hover:text-[#0a1628] transition-colors">
+              Refund Policy
+            </Link>
+            <Link href="/" className="hover:text-[#0a1628] transition-colors">
+              Contact
+            </Link>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-slate-200/70">
+            <p className="text-[11px] text-slate-400">
+              © 2026 ZIVEXO Enterprises. All rights reserved.
+            </p>
+          </div>
+        </footer>
       </div>
     </div>
   );
