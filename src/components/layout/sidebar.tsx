@@ -100,6 +100,10 @@ const navItems: NavItem[] = [
   { href: "/flows", labelKey: "flows", icon: Workflow, beta: true },
   { href: "/agents", labelKey: "aiAgents", icon: Bot },
 { href: "/whatsapp-bot", labelKey: "whatsappBot", icon: Bot },
+
+{ href: "/customer-management", labelKey: "customerManagement", icon: UsersRound },
+
+
 ];
 
 const bottomNavItems = [
