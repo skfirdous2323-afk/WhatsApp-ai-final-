@@ -48,6 +48,9 @@ export default function CustomerManagementPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] =
     useState<Customer | null>(null);
+  const [customerNotes, setCustomerNotes] = useState<{ id: string; note_text: string; created_at: string }[]>([]);
+  const [newNote, setNewNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -94,6 +97,57 @@ export default function CustomerManagementPage() {
       (appointment) => appointment.contact_id === customerId
     );
 
+  const loadCustomerNotes = async (contactId: string) => {
+    const { data, error } = await supabase
+      .from("contact_notes")
+      .select("*")
+      .eq("contact_id", contactId)
+      .order("created_at", { ascending: false });
+
+    if (!error) {
+      setCustomerNotes(data || []);
+    }
+  };
+
+  const addCustomerNote = async () => {
+    if (!selectedCustomer || !newNote.trim()) return;
+
+    setSavingNote(true);
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      setSavingNote(false);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("contacts")
+      .select("account_id")
+      .eq("id", selectedCustomer.id)
+      .single();
+
+    if (!profile?.account_id) {
+      setSavingNote(false);
+      return;
+    }
+
+    const { error } = await supabase.from("contact_notes").insert({
+      contact_id: selectedCustomer.id,
+      account_id: profile.account_id,
+      user_id: user.id,
+      note_text: newNote.trim(),
+    });
+
+    if (!error) {
+      setNewNote("");
+      await loadCustomerNotes(selectedCustomer.id);
+    }
+
+    setSavingNote(false);
+  };
+
+
   const pendingAppointments = appointments.filter(
     (appointment) => appointment.status === "pending"
   ).length;
@@ -103,6 +157,30 @@ export default function CustomerManagementPage() {
       appointment.status === "cancelled" ||
       appointment.status === "canceled"
   ).length;
+
+const rescheduleAppointment = async (
+  appointmentId: string,
+  newDate: string,
+  newTime: string
+) => {
+  const { error } = await supabase
+    .from("appointments")
+    .update({
+      appointment_date: newDate,
+      appointment_time: newTime,
+    })
+    .eq("id", appointmentId);
+
+  if (error) {
+    console.error("Reschedule error:", error);
+    return false;
+  }
+
+  await loadData();
+  return true;
+};
+
+
 
   const cancelAppointment = async (appointmentId: string) => {
     const { error } = await supabase
@@ -120,6 +198,10 @@ export default function CustomerManagementPage() {
     const customerAppointments = getCustomerAppointments(
       selectedCustomer.id
     );
+
+    if (customerNotes.length === 0) {
+      loadCustomerNotes(selectedCustomer.id);
+    }
 
     return (
       <div className="min-h-screen bg-white p-4 text-[#0a1628] md:p-6">
@@ -198,6 +280,52 @@ export default function CustomerManagementPage() {
               }
               icon={<Clock className="h-5 w-5" />}
             />
+          </div>
+
+          {/* Customer Notes */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 p-5">
+              <h2 className="text-lg font-semibold">Customer Notes</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Internal notes about this customer
+              </p>
+            </div>
+
+            <div className="p-5">
+              <textarea
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                placeholder="Write a note about this customer..."
+                rows={3}
+                className="w-full rounded-xl border border-slate-200 p-3 text-sm text-[#0a1628] outline-none focus:border-blue-500"
+              />
+
+              <button
+                onClick={addCustomerNote}
+                disabled={savingNote || !newNote.trim()}
+                className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savingNote ? "Saving..." : "Add Note"}
+              </button>
+
+              <div className="mt-5 space-y-3">
+                {customerNotes.length === 0 ? (
+                  <p className="text-sm text-slate-400">No notes yet.</p>
+                ) : (
+                  customerNotes.map((note: { id: string; note_text: string; created_at: string }) => (
+                    <div
+                      key={note.id}
+                      className="rounded-xl border border-slate-100 bg-slate-50 p-4"
+                    >
+                      <p className="text-sm text-slate-700">{note.note_text}</p>
+                      <p className="mt-2 text-xs text-slate-400">
+                        {new Date(note.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Appointment History */}
@@ -281,14 +409,27 @@ export default function CustomerManagementPage() {
 
                         {(appointment.status === "pending" ||
                           appointment.status === "confirmed") && (
-                          <button
-                            onClick={() =>
-                              cancelAppointment(appointment.id)
-                            }
-                            className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
-                          >
-                            Cancel
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                const newDate = window.prompt("Enter new date (YYYY-MM-DD):");
+                                if (!newDate) return;
+                                const newTime = window.prompt("Enter new time (HH:MM):");
+                                if (!newTime) return;
+                                rescheduleAppointment(appointment.id, newDate, newTime);
+                              }}
+                              className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                            >
+                              Reschedule
+                            </button>
+
+                            <button
+                              onClick={() => cancelAppointment(appointment.id)}
+                              className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
