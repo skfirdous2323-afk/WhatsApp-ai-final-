@@ -64,16 +64,7 @@ function readInitialTheme(): ThemeId {
 }
 
 function readInitialMode(): Mode {
-  if (typeof window === "undefined") return DEFAULT_MODE;
-  const fromAttr = document.documentElement.dataset.mode;
-  if (isMode(fromAttr)) return fromAttr;
-  try {
-    const stored = localStorage.getItem(MODE_STORAGE_KEY);
-    if (isMode(stored)) return stored;
-  } catch {
-    // localStorage can throw in private-browsing / sandboxed contexts.
-  }
-  return DEFAULT_MODE;
+  return "light";
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
