@@ -10,6 +10,11 @@ import {
   XCircle,
   RefreshCw,
   Loader2,
+  Phone,
+  Mail,
+  Building2,
+  ArrowLeft,
+  User,
 } from "lucide-react";
 
 type Customer = {
@@ -41,6 +46,8 @@ export default function CustomerManagementPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [selectedCustomer, setSelectedCustomer] =
+    useState<Customer | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -83,16 +90,12 @@ export default function CustomerManagementPage() {
   }, [customers, search]);
 
   const getCustomerAppointments = (customerId: string) =>
-    appointments.filter((appointment) => appointment.contact_id === customerId);
-
-  const totalAppointments = appointments.length;
+    appointments.filter(
+      (appointment) => appointment.contact_id === customerId
+    );
 
   const pendingAppointments = appointments.filter(
     (appointment) => appointment.status === "pending"
-  ).length;
-
-  const confirmedAppointments = appointments.filter(
-    (appointment) => appointment.status === "confirmed"
   ).length;
 
   const cancelledAppointments = appointments.filter(
@@ -112,13 +115,204 @@ export default function CustomerManagementPage() {
     }
   };
 
+  // Customer Details View
+  if (selectedCustomer) {
+    const customerAppointments = getCustomerAppointments(
+      selectedCustomer.id
+    );
+
+    return (
+      <div className="min-h-screen bg-white p-4 text-[#0a1628] md:p-6">
+        <div className="mx-auto max-w-5xl space-y-6">
+          {/* Back */}
+          <button
+            onClick={() => setSelectedCustomer(null)}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Customers
+          </button>
+
+          {/* Profile */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 bg-slate-50 p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-2xl font-bold text-blue-600">
+                  {(selectedCustomer.name ||
+                    selectedCustomer.phone ||
+                    "?")
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
+
+                <div>
+                  <h1 className="text-2xl font-bold">
+                    {selectedCustomer.name || "Unnamed Customer"}
+                  </h1>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Customer ID: {selectedCustomer.id}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information */}
+            <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+              <InfoCard
+                icon={<Phone className="h-4 w-4" />}
+                label="Phone"
+                value={selectedCustomer.phone || "Not available"}
+              />
+
+              <InfoCard
+                icon={<Mail className="h-4 w-4" />}
+                label="Email"
+                value={selectedCustomer.email || "Not available"}
+              />
+
+              <InfoCard
+                icon={<Building2 className="h-4 w-4" />}
+                label="Company"
+                value={selectedCustomer.company || "Not available"}
+              />
+            </div>
+          </div>
+
+          {/* Appointment Summary */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <StatCard
+              title="Total Appointments"
+              value={customerAppointments.length}
+              icon={<CalendarDays className="h-5 w-5" />}
+            />
+
+            <StatCard
+              title="Active Appointments"
+              value={
+                customerAppointments.filter(
+                  (a) =>
+                    a.status === "pending" ||
+                    a.status === "confirmed"
+                ).length
+              }
+              icon={<Clock className="h-5 w-5" />}
+            />
+          </div>
+
+          {/* Appointment History */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 p-5">
+              <h2 className="text-lg font-semibold">
+                Appointment History
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                All appointments for this customer
+              </p>
+            </div>
+
+            {customerAppointments.length === 0 ? (
+              <div className="py-16 text-center">
+                <CalendarDays className="mx-auto h-10 w-10 text-slate-300" />
+
+                <p className="mt-3 text-sm font-medium text-slate-600">
+                  No appointments yet
+                </p>
+
+                <p className="mt-1 text-xs text-slate-400">
+                  Appointment history will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {customerAppointments.map((appointment) => (
+                  <div
+                    key={appointment.id}
+                    className="p-5 hover:bg-slate-50"
+                  >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-blue-600" />
+
+                          <span className="font-semibold">
+                            {appointment.patient_name ||
+                              selectedCustomer.name ||
+                              "Patient"}
+                          </span>
+                        </div>
+
+                        <div className="grid gap-2 text-sm text-slate-500 sm:grid-cols-3">
+                          <span>
+                            📅 {appointment.appointment_date}
+                          </span>
+
+                          <span>
+                            🕐 {appointment.appointment_time}
+                          </span>
+
+                          {appointment.gender && (
+                            <span>
+                              ⚥ {appointment.gender}
+                            </span>
+                          )}
+
+                          {appointment.age && (
+                            <span>🎂 Age: {appointment.age}</span>
+                          )}
+                        </div>
+
+                        {appointment.doctor_id && (
+                          <p className="text-xs text-slate-400">
+                            Doctor ID: {appointment.doctor_id}
+                          </p>
+                        )}
+
+                        {appointment.service_id && (
+                          <p className="text-xs text-slate-400">
+                            Service ID: {appointment.service_id}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <StatusBadge status={appointment.status} />
+
+                        {(appointment.status === "pending" ||
+                          appointment.status === "confirmed") && (
+                          <button
+                            onClick={() =>
+                              cancelAppointment(appointment.id)
+                            }
+                            className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Customer List
   return (
-    <div className="min-h-screen bg-white p-6 text-[#0a1628]">
+    <div className="min-h-screen bg-white p-4 text-[#0a1628] md:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Customer Management</h1>
+            <h1 className="text-2xl font-bold">
+              Customer Management
+            </h1>
+
             <p className="mt-1 text-sm text-slate-500">
               Manage customers and their appointments from one place.
             </p>
@@ -143,7 +337,7 @@ export default function CustomerManagementPage() {
 
           <StatCard
             title="Total Appointments"
-            value={totalAppointments}
+            value={appointments.length}
             icon={<CalendarDays className="h-5 w-5" />}
           />
 
@@ -169,15 +363,16 @@ export default function CustomerManagementPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search customer by name, phone or email..."
-              className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-[#0a1628] outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm text-[#0a1628] outline-none focus:border-blue-500"
             />
           </div>
         </div>
 
-        {/* Customers */}
+        {/* Customer List */}
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-200 px-5 py-4">
             <h2 className="font-semibold">Customers</h2>
+
             <p className="text-sm text-slate-500">
               {filteredCustomers.length} customer
               {filteredCustomers.length === 1 ? "" : "s"} found
@@ -203,96 +398,49 @@ export default function CustomerManagementPage() {
                     key={customer.id}
                     className="p-5 transition hover:bg-slate-50"
                   >
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 font-semibold text-blue-600">
-                            {(customer.name || customer.phone || "?")
-                              .charAt(0)
-                              .toUpperCase()}
-                          </div>
-
-                          <div>
-                            <h3 className="font-semibold">
-                              {customer.name || "Unnamed Customer"}
-                            </h3>
-
-                            <p className="text-sm text-slate-500">
-                              {customer.phone}
-                            </p>
-                          </div>
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 font-semibold text-blue-600">
+                          {(customer.name ||
+                            customer.phone ||
+                            "?")
+                            .charAt(0)
+                            .toUpperCase()}
                         </div>
 
-                        {customer.email && (
-                          <p className="mt-2 text-sm text-slate-500">
-                            {customer.email}
+                        <div className="min-w-0">
+                          <h3 className="font-semibold">
+                            {customer.name || "Unnamed Customer"}
+                          </h3>
+
+                          <p className="text-sm text-slate-500">
+                            {customer.phone}
                           </p>
-                        )}
+
+                          {customer.email && (
+                            <p className="truncate text-xs text-slate-400">
+                              {customer.email}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="text-left lg:text-right">
-                        <p className="text-sm font-medium">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="text-sm text-slate-500">
                           {customerAppointments.length} appointment
-                          {customerAppointments.length === 1 ? "" : "s"}
-                        </p>
+                          {customerAppointments.length === 1
+                            ? ""
+                            : "s"}
+                        </div>
 
-                        {customerAppointments.length > 0 && (
-                          <p className="mt-1 text-xs text-slate-500">
-                            Latest:{" "}
-                            {customerAppointments[0].appointment_date}
-                          </p>
-                        )}
+                        <button
+                          onClick={() => setSelectedCustomer(customer)}
+                          className="rounded-lg bg-[#0a1628] px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                        >
+                          View Details
+                        </button>
                       </div>
                     </div>
-
-                    {/* Appointment history */}
-                    {customerAppointments.length > 0 && (
-                      <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Appointment History
-                        </p>
-
-                        <div className="space-y-2">
-                          {customerAppointments.slice(0, 5).map((appointment) => (
-                            <div
-                              key={appointment.id}
-                              className="flex flex-col gap-2 rounded-lg bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
-                            >
-                              <div>
-                                <p className="text-sm font-medium">
-                                  {appointment.patient_name ||
-                                    customer.name ||
-                                    "Patient"}
-                                </p>
-
-                                <p className="text-xs text-slate-500">
-                                  {appointment.appointment_date} •{" "}
-                                  {appointment.appointment_time}
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <StatusBadge
-                                  status={appointment.status}
-                                />
-
-                                {(appointment.status === "pending" ||
-                                  appointment.status === "confirmed") && (
-                                  <button
-                                    onClick={() =>
-                                      cancelAppointment(appointment.id)
-                                    }
-                                    className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-                                  >
-                                    Cancel
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -300,6 +448,31 @@ export default function CustomerManagementPage() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function InfoCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 p-4">
+      <div className="flex items-center gap-2 text-blue-600">
+        {icon}
+        <span className="text-xs font-semibold uppercase tracking-wide">
+          {label}
+        </span>
+      </div>
+
+      <p className="mt-2 break-words text-sm font-medium text-[#0a1628]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -318,6 +491,7 @@ function StatCard({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-slate-500">{title}</p>
+
           <p className="mt-1 text-2xl font-bold">{value}</p>
         </div>
 
@@ -342,7 +516,7 @@ function StatusBadge({ status }: { status: string }) {
       : status;
 
   return (
-    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium capitalize text-slate-700">
+    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium capitalize text-slate-700">
       {label}
     </span>
   );
