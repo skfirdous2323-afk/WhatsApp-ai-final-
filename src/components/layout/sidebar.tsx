@@ -101,7 +101,7 @@ const navItems: NavItem[] = [
   { href: "/agents", labelKey: "aiAgents", icon: Bot },
 { href: "/whatsapp-bot", labelKey: "whatsappBot", icon: Bot },
 
-{ href: "/customer-management", labelKey: "customerManagement", icon: UsersRound },
+{ href: "/customer-management", labelKey: "Customer Management", icon: UsersRound },
 
 
 ];
@@ -119,7 +119,7 @@ interface SidebarProps {
 import { useTranslations } from "next-intl";
 
 export function Sidebar({ open = false, onClose }: SidebarProps) {
-  const t = useTranslations("Sidebar");
+  const t = useTranslations("sidebar");
   const pathname = usePathname();
   const { profile, profileLoading, account, accountRole, signOut } = useAuth();
   const totalUnread = useTotalUnread();
