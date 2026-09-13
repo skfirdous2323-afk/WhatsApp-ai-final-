@@ -261,6 +261,7 @@
       "send": "Send template"
     },
     "sidebar": {
+      "customerManagement": "Customer Management",
       "contactInfo": "Contact info",
       "tags": "Tags",
       "notes": "Notes",
