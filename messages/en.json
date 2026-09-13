@@ -31,6 +31,7 @@
     "aiAgents": "AI Agents",
 
 "whatsappBot": "WhatsApp Bot",
+    "customerManagement": "Customer Management",
     "settings": "Settings",
     "beta": "Beta",
     "unreadConversations": "{count} unread {count, plural, =1 {conversation} other {conversations}}",
