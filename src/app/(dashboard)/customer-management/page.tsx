@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { ContactForm } from "@/components/contacts/contact-form";
 import {
   Search,
   Users,
@@ -48,9 +49,69 @@ export default function CustomerManagementPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] =
     useState<Customer | null>(null);
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
+  const [appointmentOpen, setAppointmentOpen] = useState(false);
+  const [doctors, setDoctors] = useState<{ id: string; doctor_name: string }[]>([]);
+  const [services, setServices] = useState<{ id: string; service_name: string; duration_minutes?: number; assigned_doctors?: string[] }[]>([]);
   const [customerNotes, setCustomerNotes] = useState<{ id: string; note_text: string; created_at: string }[]>([]);
   const [newNote, setNewNote] = useState("");
   const [savingNote, setSavingNote] = useState(false);
+  const [appointmentDoctor, setAppointmentDoctor] = useState("");
+  const [appointmentService, setAppointmentService] = useState("");
+  const [appointmentDate, setAppointmentDate] = useState("");
+  const [appointmentTime, setAppointmentTime] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [appointmentPatientName, setAppointmentPatientName] = useState("");
+  const [appointmentGender, setAppointmentGender] = useState("");
+  const [appointmentAge, setAppointmentAge] = useState("");
+  const [savingAppointment, setSavingAppointment] = useState(false);
+
+  const getClinicId = async (userId: string) => {
+    const { data: clinic, error: clinicError } = await supabase
+      .from("clinics")
+      .select("id")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (clinicError || !clinic) {
+      throw new Error("Clinic not found");
+    }
+
+    return clinic.id;
+  };
+
+  const loadAppointmentOptions = async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) return;
+
+      const clinicId = await getClinicId(user.id);
+
+      const [{ data: doctorData }, { data: serviceData }] = await Promise.all([
+        supabase
+          .from("clinic_doctors")
+          .select("id, doctor_name")
+          .eq("clinic_id", clinicId)
+          .order("created_at", { ascending: false }),
+
+        supabase
+          .from("clinic_services")
+          .select("id, service_name, duration_minutes")
+          .eq("clinic_id", clinicId)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      setDoctors(doctorData || []);
+      setServices(serviceData || []);
+    } catch (error) {
+      console.error("Appointment options error:", error);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -182,6 +243,157 @@ const rescheduleAppointment = async (
 
 
 
+  const loadAvailableSlots = async (doctorId: string, date: string) => {
+    if (!doctorId || !date) return [];
+
+    const { data: settings } = await supabase
+      .from("clinic_appointment_settings")
+      .select("slot_duration")
+      .limit(1)
+      .single();
+
+    const duration = settings?.slot_duration || 30;
+
+    const selectedDate = new Date(`${date}T00:00:00`);
+    const weekday = selectedDate.toLocaleDateString("en-US", {
+      weekday: "long",
+    });
+
+    const { data: workingHour } = await supabase
+      .from("clinic_working_hours")
+      .select("day_name, open_time, close_time, is_closed")
+      .eq("day_name", weekday)
+      .limit(1)
+      .maybeSingle();
+
+    if (!workingHour || workingHour.is_closed) {
+      return [];
+    }
+
+    const { data: booked } = await supabase
+      .from("appointments")
+      .select("appointment_time")
+      .eq("doctor_id", doctorId)
+      .eq("appointment_date", date)
+      .in("status", ["pending", "confirmed"]);
+
+    const bookedTimes = new Set(
+      (booked || []).map((item) => item.appointment_time)
+    );
+
+    const slots: string[] = [];
+    const [openHour, openMinute] = String(workingHour.open_time || "09:00")
+      .slice(0, 5)
+      .split(":")
+      .map(Number);
+    const [closeHour, closeMinute] = String(workingHour.close_time || "18:00")
+      .slice(0, 5)
+      .split(":")
+      .map(Number);
+
+    let currentMinutes = openHour * 60 + openMinute;
+    const closingMinutes = closeHour * 60 + closeMinute;
+
+    while (currentMinutes < closingMinutes) {
+      const hour = Math.floor(currentMinutes / 60);
+      const minute = currentMinutes % 60;
+      const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+
+      if (currentMinutes + duration <= closingMinutes && !bookedTimes.has(time)) {
+        slots.push(time);
+      }
+
+      currentMinutes += duration;
+    }
+
+    return slots;
+  };
+
+  const refreshAvailableSlots = async (doctorId: string, date: string) => {
+    setAppointmentTime("");
+    setAvailableSlots([]);
+
+    if (!doctorId || !date) return;
+
+    setLoadingSlots(true);
+    try {
+      const slots = await loadAvailableSlots(doctorId, date);
+      setAvailableSlots(slots);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  const createAppointment = async () => {
+    if (!selectedCustomer || !appointmentDoctor || !appointmentService || !appointmentDate || !appointmentTime) {
+      alert("Please fill Doctor, Service, Date and Time.");
+      return;
+    }
+
+    setSavingAppointment(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert("Please login again.");
+        return;
+      }
+
+      const clinicId = await getClinicId(user.id);
+
+      const { data: existingAppointment } = await supabase
+        .from("appointments")
+        .select("id")
+        .eq("clinic_id", clinicId)
+        .eq("doctor_id", appointmentDoctor)
+        .eq("appointment_date", appointmentDate)
+        .eq("appointment_time", appointmentTime)
+        .in("status", ["pending", "confirmed"])
+        .limit(1)
+        .maybeSingle();
+
+      if (existingAppointment) {
+        alert("This time slot is already booked. Please select another time.");
+        await refreshAvailableSlots(appointmentDoctor, appointmentDate);
+        return;
+      }
+
+      const { error } = await supabase.from("appointments").insert({
+        clinic_id: clinicId,
+        user_id: user.id,
+        contact_id: selectedCustomer.id,
+        doctor_id: appointmentDoctor,
+        service_id: appointmentService,
+        appointment_date: appointmentDate,
+        appointment_time: appointmentTime,
+        patient_name: appointmentPatientName.trim() || selectedCustomer.name || "",
+        gender: appointmentGender || null,
+        age: appointmentAge ? Number(appointmentAge) : null,
+        status: "pending",
+      });
+
+      if (error) {
+        console.error("Create appointment error:", error);
+        alert("Failed to create appointment.");
+        return;
+      }
+
+      setAppointmentDoctor("");
+      setAppointmentService("");
+      setAppointmentDate("");
+      setAppointmentTime("");
+      setAppointmentPatientName("");
+      setAppointmentGender("");
+      setAppointmentAge("");
+      setAppointmentOpen(false);
+
+      await loadData();
+    } finally {
+      setSavingAppointment(false);
+    }
+  };
+
   const cancelAppointment = async (appointmentId: string) => {
     const { error } = await supabase
       .from("appointments")
@@ -227,7 +439,7 @@ const rescheduleAppointment = async (
                     .toUpperCase()}
                 </div>
 
-                <div>
+                <div className="flex-1">
                   <h1 className="text-2xl font-bold">
                     {selectedCustomer.name || "Unnamed Customer"}
                   </h1>
@@ -236,6 +448,17 @@ const rescheduleAppointment = async (
                     Customer ID: {selectedCustomer.id}
                   </p>
                 </div>
+
+                <button
+                  onClick={() => {
+                    setAppointmentPatientName(selectedCustomer.name || "");
+                    setAppointmentOpen(true);
+                    loadAppointmentOptions();
+                  }}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  + New Appointment
+                </button>
               </div>
             </div>
 
@@ -452,6 +675,12 @@ const rescheduleAppointment = async (
           <div>
             <h1 className="text-2xl font-bold">
               Customer Management
+              <button
+                onClick={() => setAddCustomerOpen(true)}
+                className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                + Add Customer
+              </button>
             </h1>
 
             <p className="mt-1 text-sm text-slate-500">
@@ -589,6 +818,154 @@ const rescheduleAppointment = async (
           )}
         </div>
       </div>
+
+      {appointmentOpen && selectedCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-[#0a1628]">New Appointment</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  For Customer
+                </p>
+              </div>
+              <button
+                onClick={() => setAppointmentOpen(false)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <select
+                value={appointmentDoctor}
+                onChange={(e) => {
+                  const doctorId = e.target.value;
+                  setAppointmentDoctor(doctorId);
+                  refreshAvailableSlots(doctorId, appointmentDate);
+                }}
+                className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
+              >
+                <option value="">Select Doctor</option>
+                {doctors.map((doctor) => (
+                  <option key={doctor.id} value={doctor.id}>
+                    {doctor.doctor_name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={appointmentService}
+                onChange={(e) => setAppointmentService(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
+              >
+                <option value="">Select Service</option>
+                {services.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.service_name}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                type="date"
+                value={appointmentDate}
+                onChange={(e) => {
+                  const date = e.target.value;
+                  setAppointmentDate(date);
+                  refreshAvailableSlots(appointmentDoctor, date);
+                }}
+                className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
+              />
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#0a1628]">
+                  Available Time
+                </label>
+
+                {!appointmentDoctor || !appointmentDate ? (
+                  <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
+                    Select Doctor and Date first.
+                  </p>
+                ) : loadingSlots ? (
+                  <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
+                    Loading available slots...
+                  </p>
+                ) : availableSlots.length === 0 ? (
+                  <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                    No available slots for this date.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {availableSlots.map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => setAppointmentTime(slot)}
+                        className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+                          appointmentTime === slot
+                            ? "border-blue-600 bg-blue-600 text-white"
+                            : "border-slate-200 bg-white text-[#0a1628] hover:border-blue-400"
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <input
+                type="text"
+                value={appointmentPatientName}
+                onChange={(e) => setAppointmentPatientName(e.target.value)}
+                placeholder="Patient Name"
+                className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={appointmentGender}
+                  onChange={(e) => setAppointmentGender(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
+                >
+                  <option value="">Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+
+                <input
+                  type="number"
+                  min="0"
+                  value={appointmentAge}
+                  onChange={(e) => setAppointmentAge(e.target.value)}
+                  placeholder="Age"
+                  className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
+                />
+              </div>
+
+              <button
+                onClick={createAppointment}
+                disabled={savingAppointment}
+                className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {savingAppointment ? "Creating..." : "Create Appointment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ContactForm
+        open={addCustomerOpen}
+        onOpenChange={setAddCustomerOpen}
+        onSaved={() => {
+          setAddCustomerOpen(false);
+          loadData();
+        }}
+      />
     </div>
   );
 }
