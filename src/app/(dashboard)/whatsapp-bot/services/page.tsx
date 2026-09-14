@@ -927,40 +927,7 @@ export default function ServicesPage() {
                           className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                         />
                       </div>
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          ⭐ Featured Service
-                        </label>
-                        <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              name="is_featured"
-                              checked={formData.is_featured}
-                              onChange={(e) => setFormData(prev => ({ ...prev, is_featured: e.target.checked }))}
-                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-gray-700">Yes</span>
-                          </label>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          🔒 Status
-                        </label>
-                        <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              name="is_active"
-                              checked={formData.is_active}
-                              onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                            />
-                            <span className="text-sm text-gray-700">Active</span>
-                          </label>
-                        </div>
-                      </div>
+
                     </div>
 
                     <div className="flex gap-3 pt-4">
