@@ -185,33 +185,7 @@ export function SettingsOverview({
                 : ''
             }`,
     },
-    {
-      section: 'templates',
-      loading: countsLoading,
-      subtitle:
-        counts?.templates == null
-          ? t('manageTemplates')
-          : `${t('templatesCount', { count: counts.templates })}${
-              counts.templatesPending
-                ? ` · ${t('pendingReview', { count: counts.templatesPending })}`
-                : ''
-            }`,
-    },
-    {
-      section: 'deals',
-      loading: false,
-      subtitle: `${defaultCurrency} — ${currencyLabel}`,
-    },
-    {
-      section: 'fields',
-      loading: countsLoading,
-      subtitle:
-        counts?.tags == null && counts?.customFields == null
-          ? t('tagsAndFields')
-          : `${t('tagsCount', { count: counts?.tags ?? 0 })} · ${t('fieldsCount', {
-              count: counts?.customFields ?? 0,
-            })}`,
-    },
+
     {
       section: 'appearance',
       loading: false,
