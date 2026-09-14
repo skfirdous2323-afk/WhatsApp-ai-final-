@@ -119,7 +119,6 @@ export default function ServicesPage() {
 
       const clinicId = await getClinicId(user.id);
 
-      // Check if services feature is enabled
       let isEnabled = true;
       try {
         const { data: clinic } = await supabase
@@ -300,31 +299,6 @@ export default function ServicesPage() {
     });
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        showMessage('error', 'Image size should be less than 2MB');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-
-      setFormData(prev => ({ ...prev, image_file: file }));
-    }
-  };
-
-  const removeImage = () => {
-    setImagePreview(null);
-    setFormData(prev => ({ ...prev, image_url: null, image_file: null }));
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 5000);
@@ -357,22 +331,6 @@ export default function ServicesPage() {
 
       const clinicId = await getClinicId(user.id);
 
-      let imageUrl = formData.image_url;
-      if (formData.image_file) {
-        const fileExt = formData.image_file.name.split('.').pop();
-        const fileName = `service-${Date.now()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from('service-images')
-          .upload(fileName, formData.image_file);
-
-        if (!uploadError) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('service-images')
-            .getPublicUrl(fileName);
-          imageUrl = publicUrl;
-        }
-      }
-
       const serviceData = {
         clinic_id: clinicId,
         user_id: user.id,
@@ -382,11 +340,7 @@ export default function ServicesPage() {
         duration_minutes: parseInt(formData.duration_minutes) || 30,
         category: formData.category,
         assigned_doctors: formData.assigned_doctors || [],
-        image_url: imageUrl,
-        is_featured: formData.is_featured,
-        whatsapp_reply: formData.whatsapp_reply,
-        preparation_instructions: formData.preparation_instructions,
-        is_active: formData.is_active,
+        is_active: true,
       };
 
       let error;
@@ -430,14 +384,14 @@ export default function ServicesPage() {
       duration_minutes: service.duration_minutes?.toString() || "30",
       category: service.category || "",
       assigned_doctors: service.assigned_doctors || [],
-      image_url: service.image_url || null,
+      image_url: null,
       image_file: null,
-      is_featured: service.is_featured || false,
-      whatsapp_reply: service.whatsapp_reply || "",
-      preparation_instructions: service.preparation_instructions || "",
-      is_active: service.is_active !== undefined ? service.is_active : true,
+      is_featured: false,
+      whatsapp_reply: "",
+      preparation_instructions: "",
+      is_active: true,
     });
-    setImagePreview(service.image_url);
+    setImagePreview(null);
     setEditingId(service.id || null);
     document.getElementById('service-form')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -503,10 +457,6 @@ export default function ServicesPage() {
           duration_minutes: parseInt(service.duration_minutes) || 30,
           category: service.category || "",
           assigned_doctors: service.assigned_doctors || [],
-          image_url: service.image_url || null,
-          is_featured: service.is_featured || false,
-          whatsapp_reply: service.whatsapp_reply || "",
-          preparation_instructions: service.preparation_instructions || "",
           is_active: true,
         }]);
 
@@ -520,14 +470,13 @@ export default function ServicesPage() {
   };
 
   const exportCSV = () => {
-    const headers = ['Name', 'Price', 'Duration', 'Category', 'Status', 'Featured', 'Description'];
+    const headers = ['Name', 'Price', 'Duration', 'Category', 'Status', 'Description'];
     const rows = filteredServices.map(s => [
       s.service_name,
       s.price,
       s.duration_minutes,
       s.category,
       s.is_active ? 'Active' : 'Inactive',
-      s.is_featured ? 'Yes' : 'No',
       s.description || ""
     ]);
 
@@ -577,7 +526,6 @@ export default function ServicesPage() {
             <p className="text-sm text-gray-500">Step 3 of 6 – Services</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
-            {/* Global On/Off Switch */}
             <div className="flex items-center gap-2 bg-white px-3 py-1.5 md:px-4 md:py-2 rounded-full shadow-md border border-gray-200">
               <span className="text-xs md:text-sm font-medium text-gray-600">Services</span>
               <button
@@ -865,69 +813,6 @@ export default function ServicesPage() {
                           )}
                         </div>
                       </div>
-                      <div className="md:col-span-2">
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          🖼️ Service Image/Icon
-                        </label>
-                        <div className="flex items-center gap-4">
-                          {imagePreview ? (
-                            <>
-                              <img
-                                src={imagePreview}
-                                alt="Service preview"
-                                className="h-16 w-16 md:h-20 md:w-20 rounded-lg object-cover border border-gray-200"
-                              />
-                              <button
-                                type="button"
-                                onClick={removeImage}
-                                className="text-sm text-red-600 hover:text-red-800 font-medium"
-                              >
-                                Remove
-                              </button>
-                            </>
-                          ) : (
-                            <div className="flex-1">
-                              <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageChange}
-                                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm text-gray-900 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
-                              />
-                              <p className="mt-1 text-xs text-gray-500">
-                                Recommended: Square image, max 2MB
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          📱 WhatsApp Quick Reply Text
-                        </label>
-                        <textarea
-                          name="whatsapp_reply"
-                          rows={2}
-                          value={formData.whatsapp_reply}
-                          onChange={handleInputChange}
-                          placeholder="Your appointment for {service} has been confirmed..."
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          📄 Preparation Instructions
-                        </label>
-                        <textarea
-                          name="preparation_instructions"
-                          rows={2}
-                          value={formData.preparation_instructions}
-                          onChange={handleInputChange}
-                          placeholder="Please arrive 15 minutes before appointment..."
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                        />
-                      </div>
-
                     </div>
 
                     <div className="flex gap-3 pt-4">
@@ -994,11 +879,6 @@ export default function ServicesPage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <h3 className="font-semibold text-gray-900 truncate text-sm md:text-base">{service.service_name}</h3>
-                                {service.is_featured && (
-                                  <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
-                                    ⭐
-                                  </span>
-                                )}
                               </div>
                               <div className="mt-1 space-y-1">
                                 <p className="text-sm text-gray-600">₹{service.price}</p>
@@ -1039,7 +919,6 @@ export default function ServicesPage() {
                             <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
                             <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
                             <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-                            <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                             <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                           </tr>
                         </thead>
@@ -1047,28 +926,10 @@ export default function ServicesPage() {
                           {filteredServices.map((service) => (
                             <tr key={service.id} className="hover:bg-gray-50">
                               <td className="px-2 py-1.5 md:px-3 md:py-2">
-                                <div className="flex items-center gap-2">
-                                  {service.image_url && (
-                                    <img
-                                      src={service.image_url}
-                                      alt={service.service_name}
-                                      className="h-6 w-6 md:h-8 md:w-8 rounded object-cover"
-                                    />
-                                  )}
-                                  <span className="text-xs md:text-sm font-medium text-gray-900 truncate max-w-[80px] md:max-w-none">{service.service_name}</span>
-                                </div>
+                                <span className="text-xs md:text-sm font-medium text-gray-900 truncate max-w-[80px] md:max-w-none">{service.service_name}</span>
                               </td>
                               <td className="px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm text-gray-600">₹{service.price}</td>
                               <td className="px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm text-gray-600">{service.duration_minutes} min</td>
-                              <td className="px-2 py-1.5 md:px-3 md:py-2">
-                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                                  service.is_active
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {service.is_active ? 'Active' : 'Inactive'}
-                                </span>
-                              </td>
                               <td className="px-2 py-1.5 md:px-3 md:py-2">
                                 <div className="flex flex-col md:flex-row gap-1 md:gap-2">
                                   <button
