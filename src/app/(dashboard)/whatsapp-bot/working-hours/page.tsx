@@ -40,7 +40,7 @@ export default function WorkingHoursPage() {
 
   const [appointmentSettings, setAppointmentSettings] = useState({
     slot_duration: "30",
-    max_booking_days: "30",
+    max_booking_days: "7",
     allow_online_booking: true,
     auto_confirm_booking: true
   });
@@ -183,7 +183,7 @@ export default function WorkingHoursPage() {
       if (!settingsError && settingsData) {
         setAppointmentSettings({
           slot_duration: settingsData.slot_duration?.toString() || "30",
-          max_booking_days: settingsData.max_booking_days?.toString() || "30",
+          max_booking_days: settingsData.max_booking_days?.toString() || "7",
           allow_online_booking: settingsData.allow_online_booking !== false,
           auto_confirm_booking: settingsData.auto_confirm_booking !== false
         });
@@ -322,7 +322,7 @@ export default function WorkingHoursPage() {
           clinic_id: clinicId,
           user_id: user.id,
           slot_duration: parseInt(appointmentSettings.slot_duration) || 30,
-          max_booking_days: parseInt(appointmentSettings.max_booking_days) || 30,
+          max_booking_days: parseInt(appointmentSettings.max_booking_days) || 7,
           allow_online_booking: appointmentSettings.allow_online_booking,
           auto_confirm_booking: appointmentSettings.auto_confirm_booking
         }, {
@@ -557,14 +557,19 @@ export default function WorkingHoursPage() {
                     </div>
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-gray-700">Max Booking Days in Advance</label>
-                      <input
-                        type="number"
+                      <select
                         value={appointmentSettings.max_booking_days}
                         onChange={(e) => handleAppointmentSettingChange('max_booking_days', e.target.value)}
-                        min="1"
-                        max="90"
                         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                      />
+                      >
+                        <option value="1">1 day</option>
+                        <option value="2">2 days</option>
+                        <option value="3">3 days</option>
+                        <option value="4">4 days</option>
+                        <option value="5">5 days</option>
+                        <option value="6">6 days</option>
+                        <option value="7">7 days</option>
+                      </select>
                     </div>
                   </div>
                 </div>
