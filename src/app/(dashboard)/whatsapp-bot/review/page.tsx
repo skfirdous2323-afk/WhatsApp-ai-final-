@@ -187,74 +187,6 @@ export default function ReviewPage() {
     return Math.round((completed / total) * 100);
   };
 
-  const handlePublish = async () => {
-    if (validationErrors.length > 0) {
-      setMessage({
-        type: 'error',
-        text: `Cannot publish: ${validationErrors.join(', ')}`
-      });
-      return;
-    }
-
-    setPublishing(true);
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        setMessage({ type: 'error', text: 'Please login first' });
-        return;
-      }
-
-      const clinicIdValue = await getClinicId(user.id);
-
-      const { error } = await supabase
-        .from('clinics')
-        .update({
-          bot_status: 'published',
-          published_at: new Date().toISOString()
-        })
-        .eq('id', clinicIdValue);
-
-      if (error) throw error;
-
-      setIsPublished(true);
-      setMessage({ type: 'success', text: '🎉 WhatsApp Bot published successfully!' });
-      setSummary(prev => ({ ...prev, botStatus: "Published" }));
-    } catch (error) {
-      console.error('Error publishing:', error);
-      setMessage({ type: 'error', text: 'Failed to publish bot' });
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  const handleSaveDraft = async () => {
-    setPublishing(true);
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        setMessage({ type: 'error', text: 'Please login first' });
-        return;
-      }
-
-      const clinicIdValue = await getClinicId(user.id);
-
-      const { error } = await supabase
-        .from('clinics')
-        .update({
-          bot_status: 'draft'
-        })
-        .eq('id', clinicIdValue);
-
-      if (error) throw error;
-      setMessage({ type: 'success', text: '📝 Draft saved successfully!' });
-    } catch (error) {
-      console.error('Error saving draft:', error);
-      setMessage({ type: 'error', text: 'Failed to save draft' });
-    } finally {
-      setPublishing(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -387,34 +319,6 @@ export default function ReviewPage() {
             </ul>
           </div>
         )}
-
-        {/* Publish Section */}
-        <div className="mt-8 rounded-xl bg-white p-6 shadow-xl border border-gray-100">
-          <h2 className="mb-6 text-xl font-semibold text-gray-900">🚀 Publish Section</h2>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={handlePublish}
-              disabled={publishing || validationErrors.length > 0 || isPublished}
-              className={`flex-1 min-w-[150px] rounded-lg px-6 py-3 font-semibold text-white transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
-                isPublished
-                  ? 'bg-green-600 cursor-default'
-                  : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'
-              }`}
-            >
-              {publishing ? 'Publishing...' : isPublished ? '✅ Published' : '🚀 Publish WhatsApp Bot'}
-            </button>
-            <button
-              onClick={handleSaveDraft}
-              disabled={publishing}
-              className="flex-1 min-w-[150px] rounded-lg border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              💾 Save as Draft
-            </button>
-          </div>
-          <div className="mt-4 rounded-lg bg-blue-50 p-3">
-            <p className="text-xs text-blue-800">💡 Last updated: {summary.lastUpdated}</p>
-          </div>
-        </div>
 
         {/* Navigation */}
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
