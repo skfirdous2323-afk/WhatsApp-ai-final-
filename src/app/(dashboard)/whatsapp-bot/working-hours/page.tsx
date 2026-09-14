@@ -68,7 +68,6 @@ export default function WorkingHoursPage() {
     return clinic.id;
   };
 
-  // Toggle working hours section on/off
   const handleToggleWorkingHours = async () => {
     setSaving(true);
     try {
@@ -79,10 +78,8 @@ export default function WorkingHoursPage() {
       }
 
       const clinicIdValue = await getClinicId(user.id);
-
       const newStatus = !isEnabled;
 
-      // Check if column exists, if not add it
       let isColumnExists = true;
       try {
         const { data: clinic } = await supabase
@@ -90,7 +87,7 @@ export default function WorkingHoursPage() {
           .select("working_hours_enabled")
           .eq("id", clinicIdValue)
           .maybeSingle();
-        
+
         if (!clinic) {
           isColumnExists = false;
         }
@@ -99,8 +96,6 @@ export default function WorkingHoursPage() {
       }
 
       if (!isColumnExists) {
-        // Add column first using raw SQL (if you have RPC function)
-        // Or use a simpler approach - just update without the column
         setIsEnabled(newStatus);
         showMessage('success', `Working hours section ${newStatus ? 'enabled' : 'disabled'} successfully`);
         return;
@@ -143,7 +138,6 @@ export default function WorkingHoursPage() {
       const clinicIdValue = await getClinicId(user.id);
       setClinicId(clinicIdValue);
 
-      // Check if working hours feature is enabled
       try {
         const { data: clinic } = await supabase
           .from("clinics")
@@ -159,7 +153,6 @@ export default function WorkingHoursPage() {
         setIsEnabled(true);
       }
 
-      // Load working hours from clinic_working_hours
       const { data: hoursData, error: hoursError } = await supabase
         .from('clinic_working_hours')
         .select('*')
@@ -181,7 +174,6 @@ export default function WorkingHoursPage() {
         setSchedule(updatedSchedule);
       }
 
-      // Load appointment settings from clinic_appointment_settings
       const { data: settingsData, error: settingsError } = await supabase
         .from('clinic_appointment_settings')
         .select('*')
@@ -298,7 +290,6 @@ export default function WorkingHoursPage() {
         return;
       }
 
-      // Validate all times before saving
       for (const day of schedule) {
         if (day.isOpen) {
           if (!validateTime(day.openTime, day.closeTime)) {
@@ -308,7 +299,6 @@ export default function WorkingHoursPage() {
         }
       }
 
-      // Save working hours to clinic_working_hours
       for (const day of schedule) {
         const { error } = await supabase
           .from('clinic_working_hours')
@@ -326,7 +316,6 @@ export default function WorkingHoursPage() {
         if (error) throw error;
       }
 
-      // Save appointment settings to clinic_appointment_settings
       const { error: settingsError } = await supabase
         .from('clinic_appointment_settings')
         .upsert({
@@ -377,7 +366,6 @@ export default function WorkingHoursPage() {
             <p className="text-sm text-gray-500">Step 4 of 6 – Working Hours & Settings</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
-            {/* Global On/Off Switch */}
             <div className="flex items-center gap-2 bg-white px-3 py-1.5 md:px-4 md:py-2 rounded-full shadow-md border border-gray-200">
               <span className="text-xs md:text-sm font-medium text-gray-600">Hours</span>
               <button
@@ -549,9 +537,8 @@ export default function WorkingHoursPage() {
                 </div>
               </div>
 
-              {/* Right Column - Settings & Preview */}
+              {/* Right Column - Appointment Settings */}
               <div className="lg:col-span-1">
-                {/* Appointment Settings */}
                 <div className="rounded-xl bg-white p-4 md:p-6 shadow-xl border border-gray-100">
                   <h2 className="mb-4 md:mb-6 text-lg md:text-xl font-semibold text-gray-900">⚙️ Appointment Settings</h2>
                   <div className="space-y-3 md:space-y-4">
@@ -578,52 +565,7 @@ export default function WorkingHoursPage() {
                         max="90"
                         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                       />
-                      <p className="mt-1 text-xs text-gray-500">How many days in advance patients can book</p>
                     </div>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={appointmentSettings.allow_online_booking}
-                          onChange={(e) => handleAppointmentSettingChange('allow_online_booking', e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">Allow Online Booking</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={appointmentSettings.auto_confirm_booking}
-                          onChange={(e) => handleAppointmentSettingChange('auto_confirm_booking', e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">Auto-Confirm Booking</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Live Preview */}
-                <div className="mt-6 md:mt-8 rounded-xl bg-white p-4 md:p-6 shadow-xl border border-gray-100">
-                  <h2 className="mb-3 md:mb-4 text-lg md:text-xl font-semibold text-gray-900">📋 Live Preview</h2>
-                  <div className="space-y-2">
-                    {schedule.slice(0, 5).map((day) => (
-                      <div key={day.day} className="flex items-center justify-between border-b border-gray-100 pb-2">
-                        <span className="text-xs md:text-sm font-medium text-gray-700">{day.day}</span>
-                        {day.isOpen ? (
-                          <span className="text-xs md:text-sm text-green-600">
-                            🟢 {formatTime(day.openTime)} – {formatTime(day.closeTime)}
-                          </span>
-                        ) : (
-                          <span className="text-xs md:text-sm text-red-600">🔴 Closed</span>
-                        )}
-                      </div>
-                    ))}
-                    {schedule.length > 5 && (
-                      <div className="text-center text-xs md:text-sm text-gray-500">
-                        +{schedule.length - 5} more days
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -653,7 +595,7 @@ export default function WorkingHoursPage() {
             </Link>
             <Link
               href="/whatsapp-bot/review"
-              className="rounded-lg bg-gradient-to-r from-green-600 to-green-700 px-4 py-2 md:px-6 md:dy-2.5 text-sm md:text-base font-semibold text-white hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg"
+              className="rounded-lg bg-gradient-to-r from-green-600 to-green-700 px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-semibold text-white hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg"
             >
               Next → Review & Publish
             </Link>
