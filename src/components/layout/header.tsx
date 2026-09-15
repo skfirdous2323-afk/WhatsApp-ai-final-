@@ -51,8 +51,8 @@ export function Header({ onOpenSidebar }: HeaderProps) {
   const titleKey = getPageTitleKey(pathname);
 
   const initial =
-    profile?.full_name?.charAt(0)?.toUpperCase() ??
-    profile?.email?.charAt(0)?.toUpperCase() ??
+    profile?.full_name?.trim()?.charAt(0)?.toUpperCase() ||
+    profile?.email?.charAt(0)?.toUpperCase() ||
     "U";
 
   return (
