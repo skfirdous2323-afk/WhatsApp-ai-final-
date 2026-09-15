@@ -48,7 +48,7 @@ export function ProfileForm() {
   // Seed form state once the profile loads.
   useEffect(() => {
     if (!profile) return;
-    setFullName(profile.full_name ?? '');
+    setFullName(profile.full_name?.trim() || profile.email?.split('@')[0] || '');
     setEmail(profile.email ?? '');
   }, [profile]);
 
