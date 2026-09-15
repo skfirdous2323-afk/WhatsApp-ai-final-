@@ -24,6 +24,7 @@ import {
 interface Profile {
   id: string;
   full_name: string | null;
+  user_code: string | null;
   email: string;
   avatar_url: string | null;
   role: string | null;
@@ -138,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "id, full_name, email, avatar_url, role, beta_features, account_id, account_role",
+          "id, full_name, email, avatar_url, role, beta_features, account_id, account_role, user_code",
         )
         .eq("user_id", userId)
         .maybeSingle();
@@ -201,6 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setProfile({
           id: data.id,
+          user_code: data.user_code ?? null,
           full_name: data.full_name,
           email: data.email,
           avatar_url: data.avatar_url,

@@ -226,39 +226,7 @@ export function ProfileForm() {
               </AvatarFallback>
             </Avatar>
 
-            <div className="flex flex-wrap gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                className="hidden"
-                onChange={onPickFile}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={saving}
-              >
-                <Upload className="size-4" />
-                {currentAvatar ? t('changePhoto') : t('uploadPhoto')}
-              </Button>
-              {currentAvatar && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={onRemoveAvatar}
-                  disabled={saving}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <Trash2 className="size-4" />
-                  {t('remove')}
-                </Button>
-              )}
-              <p className="w-full text-xs text-muted-foreground">
-                {t('photoHint')}
-              </p>
-            </div>
+
           </div>
 
           {/* Name */}
@@ -323,7 +291,7 @@ export function ProfileForm() {
               <div className="sm:col-span-2">
                 <dt className="text-muted-foreground">{t('userId')}</dt>
                 <dd className="mt-0.5 break-all font-mono text-xs text-muted-foreground">
-                  {user?.id ?? '—'}
+                  {profile?.user_code ?? '—'}
                 </dd>
               </div>
             </dl>
