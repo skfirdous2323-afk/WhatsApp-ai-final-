@@ -666,7 +666,7 @@ DECLARE
   v_full_name TEXT;
   v_account_id UUID;
 BEGIN
-  v_full_name := COALESCE(NEW.raw_user_meta_data->>'full_name', '');
+  v_full_name := COALESCE(NULLIF(NEW.raw_user_meta_data->>'full_name', ''), split_part(NEW.email, '@', 1), '');
 
   INSERT INTO public.accounts (name, owner_user_id)
   VALUES (COALESCE(NULLIF(v_full_name, ''), NEW.email, 'My account'), NEW.id)
