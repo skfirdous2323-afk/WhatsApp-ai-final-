@@ -952,7 +952,7 @@ Please confirm your booking:`;
           { id: "reschedule_booking", title: "🔄 Reschedule" },
           { id: "cancel_booking", title: "❌ Cancel" },
         ],
-        footerText: "ZIVEXO CRM",
+        footerText: "ZIVEXO",
       });
 
       return true;

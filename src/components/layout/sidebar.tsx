@@ -206,7 +206,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
 />
 
 <span className="text-sm font-semibold text-foreground">
-  ZIVEXO CRM
+  ZIVEXO
 </span>
 
 

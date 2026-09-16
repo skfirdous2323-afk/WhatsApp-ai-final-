@@ -136,7 +136,7 @@ export function InviteMemberDialog({
         // — the dialog requires admin+ which requires a loaded
         // profile — but stay safe).
 
-accountName: account?.name ?? 'our ZIVEXO CRM workspace'
+accountName: account?.name ?? 'our ZIVEXO workspace'
 
 
       });

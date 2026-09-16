@@ -252,6 +252,6 @@ export async function sendMainMenu({
       },
     ],
     footerText:
-      `🏥 ${clinicName} • ZIVEXO CRM`,
+      `🏥 ${clinicName} • ZIVEXO`,
   });
 }

@@ -24,8 +24,8 @@ export const metadata: Metadata = {
 
 
 title: {
-  default: "ZIVEXO CRM",
-  template: "%s — ZIVEXO CRM",
+  default: "ZIVEXO",
+  template: "%s — ZIVEXO",
 },
 
 
