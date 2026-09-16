@@ -22,22 +22,15 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#7c3aed", // primary (Hostinger-aligned purple)
-          borderRadius: 6,
+          background: "#ffffff",
         }}
       >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
+        <img
+          src="https://zivexo.space/branding/zivexo-logo.png"
+          width="32"
+          height="32"
+          style={{ objectFit: "contain" }}
+        />
       </div>
     ),
     { ...size },
