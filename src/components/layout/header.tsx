@@ -56,7 +56,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
     "U";
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-4 lg:px-6">
+    <header className="relative flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-4 lg:px-6">
       <div className="flex min-w-0 items-center gap-2">
         {/* Hamburger — mobile only. 44×44 hit target per Apple HIG. */}
         <button
@@ -67,7 +67,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         >
           <Menu className="h-5 w-5" />
         </button>
-        <Link href="/dashboard" aria-label="ZIVEXO Dashboard" className="flex items-center">
+        <Link href="/dashboard" aria-label="ZIVEXO Dashboard" className="absolute left-1/2 -translate-x-1/2 flex items-center">
           <img
             src="/branding/zivexo-logo.png"
             alt="ZIVEXO"
