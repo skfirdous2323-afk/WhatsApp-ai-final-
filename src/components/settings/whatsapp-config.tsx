@@ -60,6 +60,7 @@ export function WhatsAppConfig() {
   const [pin, setPin] = useState('');
   const [tokenEdited, setTokenEdited] = useState(false);
   const [isEmbeddedSignupLoading, setIsEmbeddedSignupLoading] = useState(false);
+const [showManualConnect, setShowManualConnect] = useState(false);
 
   const isRegistered = Boolean(config?.registered_at);
   const lastRegistrationError = config?.last_registration_error ?? null;
@@ -629,8 +630,57 @@ alert('[META FULL RESPONSE]\n\n' + JSON.stringify(response, null, 2));
               </Alert>
             )}
 
-            {/* API Credentials */}
+            {/* Meta Embedded Signup */}
+            <Card className="border-emerald-500/30">
+              <CardHeader>
+                <CardTitle className="text-foreground">Connect WhatsApp with Meta</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Connect your WhatsApp Business account securely using Meta Embedded Signup.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  onClick={handleEmbeddedSignup}
+                  disabled={isEmbeddedSignupLoading}
+                  className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+                >
+                  {isEmbeddedSignupLoading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin mr-2" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="size-4 mr-2" />
+                      Connect WhatsApp with Meta
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Manual Connect */}
             <Card>
+              <CardHeader>
+                <CardTitle className="text-foreground">Manual Connect</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Use API credentials and webhook settings to connect WhatsApp manually.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowManualConnect((v) => !v)}
+                  className="w-full"
+                >
+                  {showManualConnect ? 'Hide Manual Connection' : 'Connect Manually'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* API Credentials */}
+            <Card className={showManualConnect ? "" : "hidden"}>
               <CardHeader>
                 <CardTitle className="text-foreground">API Credentials</CardTitle>
                 <CardDescription className="text-muted-foreground">
@@ -730,7 +780,7 @@ alert('[META FULL RESPONSE]\n\n' + JSON.stringify(response, null, 2));
             </Card>
 
             {/* Webhook URL */}
-            <Card>
+            <Card className={showManualConnect ? "" : "hidden"}>
               <CardHeader>
                 <CardTitle className="text-foreground">Webhook Configuration</CardTitle>
                 <CardDescription className="text-muted-foreground">
@@ -759,24 +809,7 @@ alert('[META FULL RESPONSE]\n\n' + JSON.stringify(response, null, 2));
               </CardContent>
             </Card>
 
-            {/* Connect WhatsApp Button */}
-            <Button
-              onClick={handleEmbeddedSignup}
-              disabled={isEmbeddedSignupLoading}
-              className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all"
-            >
-              {isEmbeddedSignupLoading ? (
-                <>
-                  <Loader2 className="size-4 animate-spin mr-2" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <Zap className="size-4 mr-2" />
-                  Connect WhatsApp with Meta
-                </>
-              )}
-            </Button>
+
 
 
           </div>
