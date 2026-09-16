@@ -102,6 +102,7 @@ const navItems: NavItem[] = [
 { href: "/whatsapp-bot", labelKey: "whatsappBot", icon: Bot },
 
 { href: "/customer-management", labelKey: "customerManagement", icon: UsersRound },
+  { href: "/settings?tab=whatsapp", labelKey: "whatsappConnection", icon: MessageSquare },
 
 
 ];
