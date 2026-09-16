@@ -631,31 +631,58 @@ alert('[META FULL RESPONSE]\n\n' + JSON.stringify(response, null, 2));
             )}
 
             {/* Meta Embedded Signup */}
-            <Card className="border-emerald-500/30">
-              <CardHeader>
-                <CardTitle className="text-foreground">Connect WhatsApp with Meta</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Connect your WhatsApp Business account securely using Meta Embedded Signup.
-                </CardDescription>
+            <Card className="overflow-hidden border-border bg-gradient-to-br from-card via-card to-emerald-500/5 shadow-sm">
+              <CardHeader className="pb-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#1877F2] shadow-sm">
+                    <svg viewBox="0 0 24 24" className="size-7 fill-white" aria-hidden="true">
+                      <path d="M14 8h3V4h-3c-3.31 0-5 1.69-5 5v2H6v4h3v5h4v-5h3l1-4h-4V9c0-.66.34-1 1-1Z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-lg text-foreground">
+                      Connect WhatsApp with Meta
+                    </CardTitle>
+                    <CardDescription className="mt-1 text-muted-foreground">
+                      Securely connect your WhatsApp Business account through Meta.
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <div className="rounded-lg border border-border bg-muted/40 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <CheckCircle2 className="size-4 text-emerald-500" />
+                    Secure Meta connection
+                  </div>
+                  <p className="mt-1 pl-6 text-xs text-muted-foreground">
+                    Your WhatsApp credentials are connected directly through Meta.
+                  </p>
+                </div>
+
                 <Button
                   onClick={handleEmbeddedSignup}
                   disabled={isEmbeddedSignupLoading}
-                  className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+                  className="h-11 w-full bg-[#1877F2] text-white shadow-sm transition-all hover:bg-[#166FE5] hover:shadow-md"
                 >
                   {isEmbeddedSignupLoading ? (
                     <>
-                      <Loader2 className="size-4 animate-spin mr-2" />
-                      Connecting...
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Connecting to Meta...
                     </>
                   ) : (
                     <>
-                      <Zap className="size-4 mr-2" />
-                      Connect WhatsApp with Meta
+                      <svg viewBox="0 0 24 24" className="mr-2 size-5 fill-white" aria-hidden="true">
+                        <path d="M14 8h3V4h-3c-3.31 0-5 1.69-5 5v2H6v4h3v5h4v-5h3l1-4h-4V9c0-.66.34-1 1-1Z" />
+                      </svg>
+                      Continue with Meta
                     </>
                   )}
                 </Button>
+
+                <p className="text-center text-[11px] text-muted-foreground">
+                  Powered by Meta Embedded Signup
+                </p>
               </CardContent>
             </Card>
 
