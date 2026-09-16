@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { LogOut, Menu, Settings as SettingsIcon, User } from "lucide-react";
+import { LogOut, Menu, MoreVertical, Settings as SettingsIcon, User } from "lucide-react";
 import {
   Avatar,
   AvatarFallback,
@@ -67,9 +67,13 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         >
           <Menu className="h-5 w-5" />
         </button>
-        <h1 className="truncate text-base font-semibold text-foreground sm:text-lg">
-          {t(titleKey as string)}
-        </h1>
+        <Link href="/dashboard" aria-label="ZIVEXO Dashboard" className="flex items-center">
+          <img
+            src="/branding/zivexo-logo.png"
+            alt="ZIVEXO"
+            className="h-8 w-auto object-contain"
+          />
+        </Link>
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2">
@@ -93,6 +97,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
           <span className="hidden text-sm font-medium text-foreground sm:inline">
             {profile?.full_name ?? t("defaultUser")}
           </span>
+          <MoreVertical className="size-4 text-muted-foreground" />
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"
