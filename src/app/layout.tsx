@@ -35,7 +35,7 @@ description: "Professional WhatsApp CRM by ZIVEXO.",
     follow: false,
   },
   icons: {
-    icon: [{ url: "/icon" }],
+    icon: [{ url: "/branding/zivexo-logo.png" }],
   },
   formatDetection: {
     email: false,
