@@ -28,6 +28,7 @@ export async function sendMainMenu({
       logo_url,
       clinic_logo,
       menu_labels,
+      menu_descriptions,
       book_enabled,
       doctors_enabled,
       services_enabled,
@@ -53,6 +54,7 @@ export async function sendMainMenu({
     clinic?.logo_url || clinic?.clinic_logo || null;
 
   const menuLabels = clinic?.menu_labels || {};
+  const menuDescriptions = clinic?.menu_descriptions || {};
 
   // Feature settings
   const bookEnabled =
@@ -179,7 +181,8 @@ export async function sendMainMenu({
     rows.push({
       id: "book",
       title: bookLabel,
-      description: "Book a new appointment",
+      description:
+        menuDescriptions.book || "Book a new appointment",
     });
   }
 
@@ -188,7 +191,8 @@ export async function sendMainMenu({
     rows.push({
       id: "doctors",
       title: doctorsLabel,
-      description: "View all doctors",
+      description:
+        menuDescriptions.doctors || "View all doctors",
     });
   }
 
@@ -197,7 +201,8 @@ export async function sendMainMenu({
     rows.push({
       id: "services",
       title: servicesLabel,
-      description: "Our treatments",
+      description:
+        menuDescriptions.services || "Our treatments",
     });
   }
 
@@ -206,7 +211,8 @@ export async function sendMainMenu({
     rows.push({
       id: "hours",
       title: hoursLabel,
-      description: "Clinic timing",
+      description:
+        menuDescriptions.hours || "Clinic timing",
     });
   }
 
@@ -215,7 +221,8 @@ export async function sendMainMenu({
     rows.push({
       id: "faq",
       title: faqLabel,
-      description: "Frequently asked questions",
+      description:
+        menuDescriptions.faq || "Frequently asked questions",
     });
   }
 
@@ -224,7 +231,8 @@ export async function sendMainMenu({
     rows.push({
       id: "contact",
       title: contactLabel,
-      description: "Contact clinic",
+      description:
+        menuDescriptions.contact || "Contact clinic",
     });
   }
 
@@ -233,7 +241,8 @@ export async function sendMainMenu({
     rows.push({
       id: "location",
       title: locationLabel,
-      description: "Clinic address",
+      description:
+        menuDescriptions.location || "Clinic address",
     });
   }
 
