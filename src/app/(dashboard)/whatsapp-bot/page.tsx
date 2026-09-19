@@ -41,6 +41,16 @@ export default function WhatsAppBotPage() {
     location: "📍 Location",
   });
 
+  const [menuDescriptions, setMenuDescriptions] = useState({
+    book: "Book an appointment with our doctors",
+    doctors: "View our available doctors",
+    services: "Explore our available services",
+    hours: "Check our working hours",
+    faq: "Find answers to common questions",
+    contact: "Contact us for assistance",
+    location: "Find our clinic location",
+  });
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -231,6 +241,7 @@ export default function WhatsAppBotPage() {
         contact_enabled: contactEnabled,
         location_enabled: locationEnabled,
         menu_labels: menuLabels,
+        menu_descriptions: menuDescriptions,
       };
 
       let error;
@@ -456,144 +467,60 @@ export default function WhatsAppBotPage() {
               </div>
             </div>
 
-            {/* Right Column - Settings */}
-            <div className="lg:col-span-1">
-              <div className="rounded-lg bg-gradient-to-br from-gray-50 to-blue-50 p-6 border border-gray-200">
-                <h3 className="mb-4 text-lg font-semibold text-gray-900">
-                  ⚙️ Settings
-                </h3>
 
-                <div className="space-y-4">
-                  {/* Language */}
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                      🌐 Language
-                    </label>
-                    <select
-                      value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                    >
-                      <option>English</option>
-                      <option>Hindi</option>
-                      <option>Bengali</option>
-                      <option>Spanish</option>
-                      <option>French</option>
-                      <option>German</option>
-                      <option>Arabic</option>
-                      <option>Urdu</option>
-                    </select>
+          </div>
+
+          {/* WhatsApp Menu Customization */}
+          <div className="mt-8 rounded-xl border border-gray-200 bg-gray-50 p-6">
+            <div className="mb-5">
+              <h3 className="text-lg font-semibold text-gray-900">WhatsApp Menu Customization</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Customize the menu names and descriptions shown to patients on WhatsApp.
+              </p>
+            </div>
+
+            <div className="space-y-5">
+              {[
+                { key: "book", label: "Book Appointment" },
+                { key: "doctors", label: "Doctors" },
+                { key: "services", label: "Services" },
+                { key: "hours", label: "Working Hours" },
+                { key: "faq", label: "FAQ" },
+                { key: "contact", label: "Contact" },
+                { key: "location", label: "Location" },
+              ].map((item) => (
+                <div key={item.key} className="rounded-lg border border-gray-200 bg-white p-4">
+                  <p className="mb-3 text-sm font-semibold text-gray-800">{item.label}</p>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <input
+                      type="text"
+                      value={menuLabels[item.key as keyof typeof menuLabels]}
+                      onChange={(e) =>
+                        setMenuLabels((prev) => ({
+                          ...prev,
+                          [item.key]: e.target.value,
+                        }))
+                      }
+                      placeholder="Menu name"
+                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    />
+
+                    <input
+                      type="text"
+                      value={menuDescriptions[item.key as keyof typeof menuDescriptions]}
+                      onChange={(e) =>
+                        setMenuDescriptions((prev) => ({
+                          ...prev,
+                          [item.key]: e.target.value,
+                        }))
+                      }
+                      placeholder="Menu description"
+                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    />
                   </div>
-
-                  {/* Timezone */}
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                      🕒 Time Zone
-                    </label>
-                    <select
-                      value={timezone}
-                      onChange={(e) => setTimezone(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                    >
-                      <option>Asia/Kolkata</option>
-                      <option>Asia/Dhaka</option>
-                      <option>Asia/Dubai</option>
-                      <option>Asia/Singapore</option>
-                      <option>America/New_York</option>
-                      <option>America/Los_Angeles</option>
-                      <option>Europe/London</option>
-                      <option>Europe/Paris</option>
-                      <option>Australia/Sydney</option>
-                    </select>
-                  </div>
-
-                  {/* WhatsApp Menu Labels */}
-                  <div className="pt-4 border-t border-gray-200">
-                    <h4 className="mb-3 text-sm font-semibold text-gray-800">
-                      ✏️ WhatsApp Menu Labels
-                    </h4>
-
-                    <div className="space-y-3">
-                      {[
-                        ["book", "📅 Book Appointment"],
-                        ["doctors", "👨‍⚕️ Doctors"],
-                        ["services", "🦷 Services"],
-                        ["hours", "🕒 Working Hours"],
-                        ["faq", "❓ FAQ"],
-                        ["contact", "📞 Contact"],
-                        ["location", "📍 Location"],
-                      ].map(([key, defaultLabel]) => (
-                        <div key={key}>
-                          <label className="mb-1 block text-xs font-medium text-gray-600">
-                            {defaultLabel}
-                          </label>
-
-                          <input
-                            type="text"
-                            value={menuLabels[key as keyof typeof menuLabels]}
-                            onChange={(e) =>
-                              setMenuLabels((prev) => ({
-                                ...prev,
-                                [key]: e.target.value,
-                              }))
-                            }
-                            placeholder={defaultLabel}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                          />
-                        </div>
-                      ))}
-                    </div>
-
-                    <p className="mt-3 text-xs text-gray-500">
-                      💡 These names will appear in your WhatsApp menu.
-                    </p>
-                  </div>
-
-                  {/* WhatsApp Menu Controls */}
-                  <div className="pt-4 border-t border-gray-200">
-                    <h4 className="mb-3 text-sm font-semibold text-gray-800">
-                      📱 WhatsApp Menu Controls
-                    </h4>
-
-                    <div className="space-y-2">
-                      {[
-                        ["📅 Book Appointment", bookEnabled, setBookEnabled],
-                        ["👨‍⚕️ Doctors", doctorsEnabled, setDoctorsEnabled],
-                        ["🦷 Services", servicesEnabled, setServicesEnabled],
-                        ["🕒 Working Hours", workingHoursEnabled, setWorkingHoursEnabled],
-                        ["❓ FAQ", faqEnabled, setFaqEnabled],
-                        ["📞 Contact", contactEnabled, setContactEnabled],
-                        ["📍 Location", locationEnabled, setLocationEnabled],
-                      ].map(([label, enabled, setter]) => (
-                        <label
-                          key={label as string}
-                          className="flex items-center justify-between rounded-lg bg-white p-3 border border-gray-200"
-                        >
-                          <span className="text-sm text-gray-700">
-                            {label as string}
-                          </span>
-
-                          <input
-                            type="checkbox"
-                            checked={enabled as boolean}
-                            onChange={(e) =>
-                              (setter as React.Dispatch<React.SetStateAction<boolean>>)(
-                                e.target.checked
-                              )
-                            }
-                            className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                        </label>
-                      ))}
-                    </div>
-
-                    <p className="mt-3 text-xs text-gray-500">
-                      💡 Turn menu options ON/OFF for your WhatsApp bot.
-                    </p>
-                  </div>
-
                 </div>
-              </div>
+              ))}
             </div>
           </div>
 
