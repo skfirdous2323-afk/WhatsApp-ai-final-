@@ -1,0 +1,39 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { isAdmin } from "@/lib/auth/admin-check";
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function GET(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+
+    if (error || !user) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+
+    if (!isAdmin(user.email)) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    const { data, error: dbError } = await supabaseAdmin
+      .from("admin_customer_credentials")
+      .select("id, customer_id, email, phone, clinic_name, signup_date, iv")
+      .order("signup_date", { ascending: false });
+
+    if (dbError) throw dbError;
+
+    return NextResponse.json({ customers: data });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

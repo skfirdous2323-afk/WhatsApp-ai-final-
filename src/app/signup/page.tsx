@@ -40,6 +40,27 @@ export default function SignupPage() {
 
       if (error) throw error;
 
+      // ✅ নতুন কোড: Admin Notes-এ Credentials সেভ করুন
+      if (data.user) {
+        try {
+          await fetch("/api/admin/save-credentials", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              customer_id: data.user.id,
+              email: email,
+              password: password,
+              phone: "",
+              clinic_name: "",
+            }),
+          });
+        } catch (saveError) {
+          // Save fail হলেও Signup সফল থাকবে
+          console.error("Failed to save credentials:", saveError);
+        }
+      }
+      // ✅ নতুন কোড শেষ
+
       if (data.session) {
         router.push("/dashboard");
       } else {
