@@ -470,59 +470,6 @@ export default function WhatsAppBotPage() {
 
           </div>
 
-          {/* WhatsApp Menu Customization */}
-          <div className="mt-8 rounded-xl border border-gray-200 bg-gray-50 p-6">
-            <div className="mb-5">
-              <h3 className="text-lg font-semibold text-gray-900">WhatsApp Menu Customization</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Customize the menu names and descriptions shown to patients on WhatsApp.
-              </p>
-            </div>
-
-            <div className="space-y-5">
-              {[
-                { key: "book", label: "Book Appointment" },
-                { key: "doctors", label: "Doctors" },
-                { key: "services", label: "Services" },
-                { key: "hours", label: "Working Hours" },
-                { key: "faq", label: "FAQ" },
-                { key: "contact", label: "Contact" },
-                { key: "location", label: "Location" },
-              ].map((item) => (
-                <div key={item.key} className="rounded-lg border border-gray-200 bg-white p-4">
-                  <p className="mb-3 text-sm font-semibold text-gray-800">{item.label}</p>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <input
-                      type="text"
-                      value={menuLabels[item.key as keyof typeof menuLabels]}
-                      onChange={(e) =>
-                        setMenuLabels((prev) => ({
-                          ...prev,
-                          [item.key]: e.target.value,
-                        }))
-                      }
-                      placeholder="Menu name"
-                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                    />
-
-                    <input
-                      type="text"
-                      value={menuDescriptions[item.key as keyof typeof menuDescriptions]}
-                      onChange={(e) =>
-                        setMenuDescriptions((prev) => ({
-                          ...prev,
-                          [item.key]: e.target.value,
-                        }))
-                      }
-                      placeholder="Menu description"
-                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* Actions */}
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-gray-200">
