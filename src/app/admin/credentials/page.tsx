@@ -39,17 +39,32 @@ export default function CredentialsPage() {
   };
 
   const loadCustomers = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError || !session) {
+      console.error("No session:", sessionError);
       router.push("/login");
       return;
     }
 
     const res = await fetch("/api/admin/get-credentials", {
+      method: "GET",
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        "Authorization": `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
       },
     });
+
+    if (res.status === 401) {
+      router.push("/login");
+      return;
+    }
+
+    if (res.status === 403) {
+      setAccessDenied(true);
+      setLoading(false);
+      return;
+    }
 
     const data = await res.json();
     setCustomers(data.customers || []);
@@ -65,11 +80,16 @@ export default function CredentialsPage() {
     }
 
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!session) {
+      router.push("/login");
+      return;
+    }
 
     const res = await fetch(`/api/admin/reveal-password/${id}`, {
+      method: "GET",
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        "Authorization": `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
       },
     });
 
