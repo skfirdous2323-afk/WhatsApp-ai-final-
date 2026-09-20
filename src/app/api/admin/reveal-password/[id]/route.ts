@@ -3,15 +3,15 @@ import { createClient } from "@supabase/supabase-js";
 import { decryptPassword } from "@/lib/security/encryption";
 import { isAdmin } from "@/lib/auth/admin-check";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
