@@ -103,6 +103,7 @@ const navItems: NavItem[] = [
 
 { href: "/customer-management", labelKey: "customerManagement", icon: UsersRound },
   { href: "/settings?tab=whatsapp", labelKey: "whatsappConnection", icon: MessageSquare },
+  { href: "/pricing", labelKey: "pricing", icon: Crown },
 
 
 ];
