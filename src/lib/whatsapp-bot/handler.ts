@@ -188,6 +188,24 @@ async function getAvailableBookingDates(
     ])
   );
 
+  // Load doctor-specific working days
+  let doctorAvailableDays: string[] | null = null;
+
+  if (doctorId) {
+    const { data: doctor } = await db
+      .from("clinic_doctors")
+      .select("available_days")
+      .eq("id", doctorId)
+      .eq("clinic_id", clinicId)
+      .maybeSingle();
+
+    if (doctor?.available_days?.length) {
+      doctorAvailableDays = doctor.available_days.map((day: string) =>
+        day.toLowerCase()
+      );
+    }
+  }
+
   const dates = [];
   const today = new Date();
 
@@ -202,6 +220,14 @@ async function getAvailableBookingDates(
 
     // Skip if clinic is closed on this day
     if (!workingMap.get(weekday.toLowerCase())) {
+      continue;
+    }
+
+    // Skip if this doctor does not work on this day
+    if (
+      doctorAvailableDays &&
+      !doctorAvailableDays.includes(weekday.toLowerCase())
+    ) {
       continue;
     }
 

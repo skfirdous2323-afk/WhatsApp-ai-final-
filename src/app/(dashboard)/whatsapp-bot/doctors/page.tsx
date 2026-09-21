@@ -13,6 +13,9 @@ interface Doctor {
   qualification: string;
   experience: string;
   fees: string;
+  availableDays: string[];
+  startTime: string;
+  endTime: string;
 }
 
 export default function DoctorsPage() {
@@ -25,7 +28,10 @@ export default function DoctorsPage() {
     specialization: "",
     qualification: "",
     experience: "",
-    fees: ""
+    fees: "",
+    availableDays: [] as string[],
+    startTime: "09:00",
+    endTime: "18:00"
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -95,7 +101,10 @@ export default function DoctorsPage() {
         specialization: doc.specialization,
         qualification: doc.qualification,
         experience: doc.experience || "",
-        fees: doc.consultation_fee || ""
+        fees: doc.consultation_fee || "",
+        availableDays: doc.available_days || [],
+        startTime: doc.start_time || "09:00",
+        endTime: doc.end_time || "18:00"
       })) || [];
 
       setDoctors(mappedDoctors);
@@ -161,6 +170,11 @@ export default function DoctorsPage() {
       return;
     }
 
+    if (formData.availableDays.length === 0) {
+      showMessage('error', 'Please select at least one doctor availability day');
+      return;
+    }
+
     setIsSaving(true);
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -178,7 +192,10 @@ export default function DoctorsPage() {
             specialization: formData.specialization,
             qualification: formData.qualification,
             experience: formData.experience,
-            consultation_fee: formData.fees
+            consultation_fee: formData.fees,
+            available_days: formData.availableDays,
+            start_time: formData.startTime,
+            end_time: formData.endTime
           })
           .eq('id', editingId)
           .eq('clinic_id', clinicId);
@@ -195,7 +212,10 @@ export default function DoctorsPage() {
             specialization: formData.specialization,
             qualification: formData.qualification,
             experience: formData.experience || null,
-            consultation_fee: formData.fees || null
+            consultation_fee: formData.fees || null,
+            available_days: formData.availableDays,
+            start_time: formData.startTime,
+            end_time: formData.endTime
           }]);
 
         if (error) throw error;
@@ -223,7 +243,10 @@ export default function DoctorsPage() {
       specialization: doctor.specialization,
       qualification: doctor.qualification,
       experience: doctor.experience || "",
-      fees: doctor.fees || ""
+      fees: doctor.fees || "",
+      availableDays: doctor.availableDays || [],
+      startTime: doctor.startTime || "09:00",
+      endTime: doctor.endTime || "18:00"
     });
     setEditingId(doctor.id || null);
     document.getElementById('doctor-form')?.scrollIntoView({ behavior: 'smooth' });
@@ -269,7 +292,10 @@ export default function DoctorsPage() {
       specialization: "",
       qualification: "",
       experience: "",
-      fees: ""
+      fees: "",
+      availableDays: [],
+      startTime: "09:00",
+      endTime: "18:00"
     });
     setEditingId(null);
   };
@@ -446,6 +472,57 @@ export default function DoctorsPage() {
                       placeholder="500"
                       className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                     />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Doctor Available Days *
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
+                        <label key={day} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 cursor-pointer hover:bg-gray-50">
+                          <input
+                            type="checkbox"
+                            checked={formData.availableDays.includes(day)}
+                            onChange={(e) => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                availableDays: e.target.checked
+                                  ? [...prev.availableDays, day]
+                                  : prev.availableDays.filter((d) => d !== day),
+                              }));
+                            }}
+                            className="h-4 w-4"
+                          />
+                          <span className="text-sm text-gray-700">{day}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                        Start Time
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.startTime}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, startTime: e.target.value }))}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                        End Time
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.endTime}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, endTime: e.target.value }))}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900"
+                      />
+                    </div>
                   </div>
 
                   <div className="flex gap-3 pt-2">
