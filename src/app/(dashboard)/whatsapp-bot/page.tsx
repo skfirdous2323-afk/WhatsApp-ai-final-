@@ -1,4 +1,4 @@
-"use client";
+l"use client";
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
@@ -291,330 +291,406 @@ export default function WhatsAppBotPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
-      <div className="mx-auto max-w-7xl">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      <div className="mx-auto max-w-7xl p-4 md:p-6 lg:p-8">
+
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                WhatsApp Bot Setup
-              </h1>
-              <p className="mt-1 text-gray-600">
-                Step 1 of 6 – Clinic Information
-              </p>
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+                Step 1 of 6
+              </span>
             </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/whatsapp-bot/doctors"
-                className={`rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-2.5 font-semibold text-white hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl ${
-                  loading ? 'opacity-50 pointer-events-none' : ''
-                }`}
-              >
-                Next → Doctors
-              </Link>
-            </div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
+              Clinic Information
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Set up your clinic details and customize your WhatsApp bot menu
+            </p>
           </div>
+          <Link
+            href="/whatsapp-bot/doctors"
+            className={`group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow-xl hover:shadow-blue-500/40 ${
+              loading ? 'opacity-50 pointer-events-none' : ''
+            }`}
+          >
+            Next: Doctors
+            <svg className="h-4 w-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
         </div>
 
         {/* Message Alert */}
         {message && (
-          <div className={`mb-6 rounded-lg p-4 ${
+          <div className={`mb-6 rounded-xl p-4 shadow-sm ${
             message.type === 'success'
-              ? 'bg-green-50 border border-green-200'
+              ? 'bg-emerald-50 border border-emerald-200'
               : 'bg-red-50 border border-red-200'
           }`}>
-            <p className={`${
-              message.type === 'success' ? 'text-green-800' : 'text-red-800'
+            <p className={`text-sm font-medium ${
+              message.type === 'success' ? 'text-emerald-800' : 'text-red-800'
             }`}>
               {message.text}
             </p>
           </div>
         )}
 
-        <div className="rounded-xl bg-white p-8 shadow-xl border border-gray-100">
-          <div className="grid gap-8 lg:grid-cols-3">
-            {/* Left Column - Form */}
-            <div className="lg:col-span-2">
-              <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-3">
+
+          {/* Left Column - Form */}
+          <div className="lg:col-span-2">
+            <div className="overflow-hidden rounded-2xl bg-white shadow-xl shadow-gray-200/50 border border-gray-100">
+              <div className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100">
+                    <span className="text-xl">🏥</span>
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900">Clinic Details</h2>
+                    <p className="text-xs text-gray-500">Basic information about your clinic</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6">
                 {/* Business Category */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    Select Your Business Category
+                <div className="mb-5">
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    Business Category
                   </label>
                   <select
                     value="Healthcare"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900"
                     disabled
                   >
                     <option value="Healthcare">🏥 Healthcare / Clinic</option>
                   </select>
                 </div>
 
-                {/* Clinic Name */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    Clinic Name *
+                {/* Logo */}
+                <div className="mb-6">
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                    Clinic Logo
                   </label>
-                  <input
-                    type="text"
-                    value={clinicName}
-                    onChange={(e) => setClinicName(e.target.value)}
-                    placeholder="Enter clinic name"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
+                  <div className="flex items-center gap-5">
+                    <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl border-2 border-dashed border-gray-300 bg-gradient-to-br from-gray-50 to-gray-100">
+                      {logoPreview ? (
+                        <img
+                          src={logoPreview}
+                          alt="Logo preview"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <svg className="h-7 w-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoChange}
+                        className="hidden"
+                        id="logo-upload"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <label
+                          htmlFor="logo-upload"
+                          className="cursor-pointer rounded-lg bg-gray-900 px-4 py-2 text-xs font-semibold text-white hover:bg-gray-800 transition"
+                        >
+                          Upload Logo
+                        </label>
+                        {logoPreview && (
+                          <button
+                            onClick={removeLogo}
+                            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">PNG or JPG, max 2MB</p>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Clinic Type */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    Clinic Type
-                  </label>
-                  <select
-                    value={clinicType}
-                    onChange={(e) => setClinicType(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  >
-                    <option>Dental</option>
-                    <option>General</option>
-                    <option>Eye</option>
-                    <option>Skin</option>
-                    <option>ENT</option>
-                    <option>Orthopedic</option>
-                    <option>Cardiology</option>
-                    <option>Neurology</option>
-                    <option>Pediatrics</option>
-                    <option>Gynecology</option>
-                    <option>Other</option>
-                  </select>
-                </div>
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Clinic Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={clinicName}
+                      onChange={(e) => setClinicName(e.target.value)}
+                      placeholder="Sunrise Health Clinic"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
+                    />
+                  </div>
 
-                {/* WhatsApp Number */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    WhatsApp Number *
-                  </label>
-                  <input
-                    type="text"
-                    value={whatsappNumber}
-                    onChange={(e) => setWhatsappNumber(e.target.value)}
-                    placeholder="+91XXXXXXXXXX"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
-                </div>
-
-                {/* Phone Number */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    Phone Number
-                  </label>
-                  <input
-                    type="text"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    placeholder="+91XXXXXXXXXX"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="clinic@email.com"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
-                </div>
-
-                {/* Website */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    Website
-                  </label>
-                  <input
-                    type="url"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    placeholder="https://yourclinic.com"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
-                </div>
-
-                {/* Address */}
-                <div className="md:col-span-2">
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    Address *
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Clinic Address"
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
-                </div>
-
-                {/* Google Maps */}
-                <div className="md:col-span-2">
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    Google Maps Link
-                  </label>
-                  <input
-                    type="text"
-                    value={googleMaps}
-                    onChange={(e) => setGoogleMaps(e.target.value)}
-                    placeholder="https://maps.google.com/..."
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  />
-                </div>
-              </div>
-            </div>
-
-
-          </div>
-
-
-          {/* WhatsApp Menu Customization */}
-          <div className="mt-8 rounded-xl border border-gray-200 bg-gray-50 p-6">
-            <div className="mb-5">
-              <h2 className="text-xl font-bold text-gray-900">
-                📋 WhatsApp Menu Customization
-              </h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Customize the menu names, descriptions, and visibility shown to patients on WhatsApp.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {[
-                ["book", "Book Appointment", bookEnabled, setBookEnabled],
-                ["doctors", "Doctors", doctorsEnabled, setDoctorsEnabled],
-                ["services", "Services", servicesEnabled, setServicesEnabled],
-                ["hours", "Working Hours", workingHoursEnabled, setWorkingHoursEnabled],
-                ["faq", "FAQ", faqEnabled, setFaqEnabled],
-                ["contact", "Contact", contactEnabled, setContactEnabled],
-                ["location", "Location", locationEnabled, setLocationEnabled],
-              ].map(([key, defaultName, enabled, setEnabled]) => (
-                <div key={key as string} className="rounded-lg border border-gray-200 bg-white p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <span className="font-semibold text-gray-800">
-                      {defaultName as string}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => (setEnabled as React.Dispatch<React.SetStateAction<boolean>>)(!(enabled as boolean))}
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        enabled
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Clinic Type
+                    </label>
+                    <select
+                      value={clinicType}
+                      onChange={(e) => setClinicType(e.target.value)}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
                     >
-                      {enabled ? "ON" : "OFF"}
-                    </button>
+                      <option>Dental</option>
+                      <option>General</option>
+                      <option>Eye</option>
+                      <option>Skin</option>
+                      <option>ENT</option>
+                      <option>Orthopedic</option>
+                      <option>Cardiology</option>
+                      <option>Neurology</option>
+                      <option>Pediatrics</option>
+                      <option>Gynecology</option>
+                      <option>Other</option>
+                    </select>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      WhatsApp Number <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
-                      value={menuLabels[key as keyof typeof menuLabels]}
-                      onChange={(e) =>
-                        setMenuLabels((prev) => ({
-                          ...prev,
-                          [key as string]: e.target.value,
-                        }))
-                      }
-                      placeholder={defaultName as string}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900"
+                      value={whatsappNumber}
+                      onChange={(e) => setWhatsappNumber(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
                     />
+                  </div>
 
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Phone Number
+                    </label>
                     <input
                       type="text"
-                      value={menuDescriptions[key as keyof typeof menuDescriptions]}
-                      onChange={(e) =>
-                        setMenuDescriptions((prev) => ({
-                          ...prev,
-                          [key as string]: e.target.value,
-                        }))
-                      }
-                      placeholder="Menu description"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="clinic@email.com"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Website
+                    </label>
+                    <input
+                      type="url"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
+                      placeholder="https://yourclinic.com"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Address <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Clinic Address"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Google Maps Link
+                    </label>
+                    <input
+                      type="text"
+                      value={googleMaps}
+                      onChange={(e) => setGoogleMaps(e.target.value)}
+                      placeholder="https://maps.google.com/..."
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
                     />
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-gray-200">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-500">Step 1 of 6</span>
-              <div className="flex gap-1">
-                <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-                <div className="h-2 w-2 rounded-full bg-gray-300"></div>
-                <div className="h-2 w-2 rounded-full bg-gray-300"></div>
-                <div className="h-2 w-2 rounded-full bg-gray-300"></div>
-                <div className="h-2 w-2 rounded-full bg-gray-300"></div>
-                <div className="h-2 w-2 rounded-full bg-gray-300"></div>
               </div>
             </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={saveClinic}
-                disabled={loading}
-                className="rounded-lg bg-gradient-to-r from-green-600 to-green-700 px-6 py-2.5 font-semibold text-white hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <span className="flex items-center">
-                    <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Saving...
-                  </span>
-                ) : (
-                  "💾 Save Clinic"
-                )}
-              </button>
-
-              <Link
-                href="/whatsapp-bot/doctors"
-                className={`rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-2.5 font-semibold text-white hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg ${
-                  loading ? 'opacity-50 pointer-events-none' : ''
-                }`}
-              >
-                Next → Doctors
-              </Link>
-            </div>
           </div>
 
-          {/* ✅ Policy Links - Footer */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <div className="flex flex-wrap justify-center gap-3 text-sm">
-              <Link href="/privacy-policy" className="text-gray-500 hover:text-blue-600 transition-colors">
-                🔒 Privacy Policy
-              </Link>
-              <span className="text-gray-300">|</span>
-              <Link href="/terms" className="text-gray-500 hover:text-blue-600 transition-colors">
-                📋 Terms & Conditions
-              </Link>
-              <span className="text-gray-300">|</span>
-              <Link href="/refund-policy" className="text-gray-500 hover:text-blue-600 transition-colors">
-                💰 Refund Policy
-              </Link>
-            </div>
-            <p className="text-center text-xs text-gray-400 mt-2">
-              By using our services, you agree to our policies.
-            </p>
-          </div>
+          {/* Right Column - Menu Customization */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-6 overflow-hidden rounded-2xl bg-white shadow-xl shadow-gray-200/50 border border-gray-100">
+              <div className="border-b border-gray-100 bg-gradient-to-r from-purple-50 to-white px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100">
+                    <span className="text-base">📋</span>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">Menu Customization</h3>
+                    <p className="text-xs text-gray-500">Toggle & rename items</p>
+                  </div>
+                </div>
+              </div>
 
+              <div className="max-h-[70vh] overflow-y-auto p-4 space-y-3">
+                {[
+                  ["book", "Book Appointment", bookEnabled, setBookEnabled],
+                  ["doctors", "Doctors", doctorsEnabled, setDoctorsEnabled],
+                  ["services", "Services", servicesEnabled, setServicesEnabled],
+                  ["hours", "Working Hours", workingHoursEnabled, setWorkingHoursEnabled],
+                  ["faq", "FAQ", faqEnabled, setFaqEnabled],
+                  ["contact", "Contact", contactEnabled, setContactEnabled],
+                  ["location", "Location", locationEnabled, setLocationEnabled],
+                ].map(([key, defaultName, enabled, setEnabled]) => (
+                  <div
+                    key={key as string}
+                    className={`rounded-xl border-2 p-3 transition-all ${
+                      enabled
+                        ? "border-blue-100 bg-blue-50/30"
+                        : "border-gray-100 bg-gray-50/50 opacity-70"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-xs font-bold text-gray-800">
+                        {defaultName as string}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => (setEnabled as React.Dispatch<React.SetStateAction<boolean>>)(!(enabled as boolean))}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                          enabled ? "bg-green-500" : "bg-gray-300"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            enabled ? "translate-x-4" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={menuLabels[key as keyof typeof menuLabels]}
+                        onChange={(e) =>
+                          setMenuLabels((prev) => ({
+                            ...prev,
+                            [key as string]: e.target.value,
+                          }))
+                        }
+                        placeholder={defaultName as string}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                      />
+
+                      <input
+                        type="text"
+                        value={menuDescriptions[key as keyof typeof menuDescriptions]}
+                        onChange={(e) =>
+                          setMenuDescriptions((prev) => ({
+                            ...prev,
+                            [key as string]: e.target.value,
+                          }))
+                        }
+                        placeholder="Menu description"
+                        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Actions */}
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-white p-4 shadow-lg border border-gray-100">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-gray-500">Step 1 of 6</span>
+            <div className="flex gap-1">
+              <div className="h-1.5 w-6 rounded-full bg-blue-600"></div>
+              <div className="h-1.5 w-1.5 rounded-full bg-gray-300"></div>
+              <div className="h-1.5 w-1.5 rounded-full bg-gray-300"></div>
+              <div className="h-1.5 w-1.5 rounded-full bg-gray-300"></div>
+              <div className="h-1.5 w-1.5 rounded-full bg-gray-300"></div>
+              <div className="h-1.5 w-1.5 rounded-full bg-gray-300"></div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={saveClinic}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all hover:from-emerald-700 hover:to-emerald-800 hover:shadow-xl hover:shadow-emerald-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <span>💾</span>
+                  Save Clinic
+                </>
+              )}
+            </button>
+
+            <Link
+              href="/whatsapp-bot/doctors"
+              className={`inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow-xl hover:shadow-blue-500/40 ${
+                loading ? 'opacity-50 pointer-events-none' : ''
+              }`}
+            >
+              Next: Doctors
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-6 flex flex-wrap justify-center gap-3 text-xs">
+          <Link href="/privacy-policy" className="text-gray-400 hover:text-gray-600 transition-colors">
+            🔒 Privacy Policy
+          </Link>
+          <span className="text-gray-300">·</span>
+          <Link href="/terms" className="text-gray-400 hover:text-gray-600 transition-colors">
+            📋 Terms & Conditions
+          </Link>
+          <span className="text-gray-300">·</span>
+          <Link href="/refund-policy" className="text-gray-400 hover:text-gray-600 transition-colors">
+            💰 Refund Policy
+          </Link>
+        </div>
+
       </div>
     </div>
   );
