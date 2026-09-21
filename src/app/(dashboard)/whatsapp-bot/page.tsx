@@ -113,7 +113,8 @@ export default function WhatsAppBotPage() {
           location_enabled,
           logo_url,
           clinic_logo,
-          menu_labels
+          menu_labels,
+          menu_descriptions
         `)
         .eq("user_id", user.id)
         .maybeSingle();
@@ -148,6 +149,13 @@ export default function WhatsAppBotPage() {
         setMenuLabels(prev => ({
           ...prev,
           ...clinic.menu_labels,
+        }));
+      }
+
+      if (clinic.menu_descriptions) {
+        setMenuDescriptions(prev => ({
+          ...prev,
+          ...clinic.menu_descriptions,
         }));
       }
 
