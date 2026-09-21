@@ -214,7 +214,6 @@ export default function ServicesPage() {
       }
 
       const clinicId = await getClinicId(user.id);
-
       const newStatus = !isEnabled;
 
       const { error } = await supabase
@@ -359,7 +358,6 @@ export default function ServicesPage() {
       }
 
       if (error) throw error;
-
       showMessage('success', editingId ? 'Service updated successfully!' : 'Service added successfully!');
       resetForm();
       await loadServices();
@@ -517,56 +515,83 @@ export default function ServicesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 md:p-6">
-      <div className="mx-auto max-w-7xl">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      <div className="mx-auto max-w-7xl p-4 md:p-6 lg:p-8">
+
         {/* Header */}
-        <div className="mb-6 md:mb-8 flex flex-wrap items-center justify-between gap-3 md:gap-4">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">WhatsApp Bot Setup</h1>
-            <p className="text-sm text-gray-500">Step 3 of 6 – Services</p>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+                Step 3 of 6
+              </span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
+              Services Management
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Manage your clinic services and treatment options
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 md:gap-3">
-            <div className="flex items-center gap-2 bg-white px-3 py-1.5 md:px-4 md:py-2 rounded-full shadow-md border border-gray-200">
-              <span className="text-xs md:text-sm font-medium text-gray-600">Services</span>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3 rounded-full bg-white px-4 py-2 shadow-md border border-gray-200">
+              <span className="text-sm font-medium text-gray-600">Services</span>
               <button
                 onClick={handleToggleServices}
                 disabled={isSaving}
-                className={`relative inline-flex h-6 w-10 md:h-7 md:w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
                   isEnabled ? 'bg-green-500' : 'bg-gray-300'
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 md:h-5 md:w-5 transform rounded-full bg-white shadow-lg transition-transform ${
-                    isEnabled ? 'translate-x-5 md:translate-x-6' : 'translate-x-1'
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform ${
+                    isEnabled ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
               </button>
-              <span className={`text-xs md:text-sm font-semibold ${isEnabled ? 'text-green-600' : 'text-red-500'}`}>
+              <span className={`text-sm font-semibold ${isEnabled ? 'text-green-600' : 'text-red-500'}`}>
                 {isEnabled ? 'ON' : 'OFF'}
               </span>
             </div>
 
             <button
               onClick={exportCSV}
-              className="hidden sm:inline-flex rounded-lg border border-gray-300 bg-white px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              className="hidden sm:inline-flex rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
             >
               📤 Export CSV
             </button>
-            <span className="rounded-full bg-blue-100 px-3 py-1 md:px-4 md:py-2 text-xs md:text-sm font-medium text-blue-800 whitespace-nowrap">
+            <span className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-800">
               {services.length} Services
             </span>
+
+            <div className="flex gap-2">
+              <Link
+                href="/whatsapp-bot/doctors"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+              >
+                ← Previous
+              </Link>
+              <Link
+                href="/whatsapp-bot/faq"
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2.5 text-sm font-medium text-white hover:from-blue-700 hover:to-blue-800 transition shadow-md hover:shadow-lg"
+              >
+                Next → FAQ
+              </Link>
+            </div>
           </div>
         </div>
 
         {/* Message Alert */}
         {message && (
-          <div className={`mb-4 md:mb-6 rounded-lg p-3 md:p-4 ${
+          <div className={`mb-6 rounded-xl p-4 shadow-sm ${
             message.type === 'success'
-              ? 'bg-green-50 border border-green-200'
+              ? 'bg-emerald-50 border border-emerald-200'
               : 'bg-red-50 border border-red-200'
           }`}>
-            <p className={`text-sm md:text-base ${
-              message.type === 'success' ? 'text-green-800' : 'text-red-800'
+            <p className={`text-sm font-medium ${
+              message.type === 'success' ? 'text-emerald-800' : 'text-red-800'
             }`}>
               {message.text}
             </p>
@@ -575,72 +600,72 @@ export default function ServicesPage() {
 
         {/* Disabled State */}
         {!isEnabled ? (
-          <div className="rounded-2xl bg-white p-8 md:p-16 shadow-xl border border-gray-100 text-center">
+          <div className="rounded-2xl bg-white p-16 shadow-xl border border-gray-100 text-center">
             <div className="mx-auto max-w-md">
-              <div className="w-16 h-16 md:w-24 md:h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
-                <svg className="h-8 w-8 md:h-12 md:w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                <svg className="h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                 </svg>
               </div>
-              <h3 className="text-xl md:text-2xl font-bold text-gray-900">Services Section Disabled</h3>
-              <p className="mt-2 md:mt-3 text-sm md:text-base text-gray-500">Toggle the switch above to enable services management</p>
-              <div className="mt-4 md:mt-6 inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-gray-50 rounded-lg">
-                <span className="text-xs md:text-sm text-gray-500">💡 Tip:</span>
-                <span className="text-xs md:text-sm text-gray-600">Enable to add and manage services</span>
+              <h3 className="text-2xl font-bold text-gray-900">Services Section Disabled</h3>
+              <p className="mt-3 text-gray-500">Toggle the switch above to enable services management</p>
+              <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-500">💡 Tip:</span>
+                <span className="text-sm text-gray-600">Enable to add and manage services</span>
               </div>
             </div>
           </div>
         ) : (
           <>
             {/* Analytics Dashboard Cards */}
-            <div className="mb-6 md:mb-8 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-              <div className="rounded-xl bg-white p-4 md:p-6 shadow-lg border border-gray-100">
+            <div className="mb-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="rounded-2xl bg-white p-6 shadow-lg shadow-gray-200/50 border border-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs md:text-sm font-medium text-gray-500">Total Services</p>
-                    <p className="mt-1 md:mt-2 text-xl md:text-2xl font-bold text-gray-900">{analytics.total}</p>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Services</p>
+                    <p className="mt-2 text-2xl font-bold text-gray-900">{analytics.total}</p>
                   </div>
-                  <div className="rounded-full bg-blue-100 p-2 md:p-3">
-                    <svg className="h-5 w-5 md:h-6 md:w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="rounded-xl bg-blue-100 p-3">
+                    <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl bg-white p-4 md:p-6 shadow-lg border border-gray-100">
+              <div className="rounded-2xl bg-white p-6 shadow-lg shadow-gray-200/50 border border-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs md:text-sm font-medium text-gray-500">Active Services</p>
-                    <p className="mt-1 md:mt-2 text-xl md:text-2xl font-bold text-green-600">{analytics.active}</p>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Active</p>
+                    <p className="mt-2 text-2xl font-bold text-green-600">{analytics.active}</p>
                   </div>
-                  <div className="rounded-full bg-green-100 p-2 md:p-3">
-                    <svg className="h-5 w-5 md:h-6 md:w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="rounded-xl bg-green-100 p-3">
+                    <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl bg-white p-4 md:p-6 shadow-lg border border-gray-100">
+              <div className="rounded-2xl bg-white p-6 shadow-lg shadow-gray-200/50 border border-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs md:text-sm font-medium text-gray-500">Featured</p>
-                    <p className="mt-1 md:mt-2 text-xl md:text-2xl font-bold text-yellow-600">{analytics.featured}</p>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Featured</p>
+                    <p className="mt-2 text-2xl font-bold text-yellow-600">{analytics.featured}</p>
                   </div>
-                  <div className="rounded-full bg-yellow-100 p-2 md:p-3">
-                    <svg className="h-5 w-5 md:h-6 md:w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="rounded-xl bg-yellow-100 p-3">
+                    <svg className="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                     </svg>
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl bg-white p-4 md:p-6 shadow-lg border border-gray-100">
+              <div className="rounded-2xl bg-white p-6 shadow-lg shadow-gray-200/50 border border-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs md:text-sm font-medium text-gray-500">Avg. Price</p>
-                    <p className="mt-1 md:mt-2 text-xl md:text-2xl font-bold text-purple-600">₹{analytics.avgPrice.toFixed(0)}</p>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Avg. Price</p>
+                    <p className="mt-2 text-2xl font-bold text-purple-600">₹{analytics.avgPrice.toFixed(0)}</p>
                   </div>
-                  <div className="rounded-full bg-purple-100 p-2 md:p-3">
-                    <svg className="h-5 w-5 md:h-6 md:w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="rounded-xl bg-purple-100 p-3">
+                    <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v1m0 4.5V15m0-1v-1m0 4.5V19m0-1v-1M9 11.5c.542.79 1.442 1.5 3 1.5s2.458-.71 3-1.5" />
                     </svg>
                   </div>
@@ -649,20 +674,20 @@ export default function ServicesPage() {
             </div>
 
             {/* Filters and Search */}
-            <div className="mb-6 flex flex-wrap items-center gap-2 md:gap-3">
-              <div className="flex-1 min-w-[150px] md:min-w-[200px]">
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              <div className="flex-1 min-w-[200px]">
                 <input
                   type="text"
                   placeholder="🔍 Search services..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition"
                 />
               </div>
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition"
               >
                 <option value="">All Categories</option>
                 {categoryOptions.map(cat => (
@@ -672,16 +697,16 @@ export default function ServicesPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition"
               >
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
-              <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+              <div className="flex rounded-xl border border-gray-200 overflow-hidden bg-white">
                 <button
                   onClick={() => setViewMode("card")}
-                  className={`px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm font-medium transition-colors ${
+                  className={`px-3 py-2.5 text-sm font-medium transition ${
                     viewMode === "card"
                       ? "bg-blue-600 text-white"
                       : "bg-white text-gray-700 hover:bg-gray-50"
@@ -691,7 +716,7 @@ export default function ServicesPage() {
                 </button>
                 <button
                   onClick={() => setViewMode("table")}
-                  className={`px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm font-medium transition-colors ${
+                  className={`px-3 py-2.5 text-sm font-medium transition ${
                     viewMode === "table"
                       ? "bg-blue-600 text-white"
                       : "bg-white text-gray-700 hover:bg-gray-50"
@@ -703,261 +728,271 @@ export default function ServicesPage() {
             </div>
 
             {/* Main Content */}
-            <div className="grid gap-6 md:gap-8 lg:grid-cols-3">
+            <div className="grid gap-8 lg:grid-cols-3">
               {/* Form Section */}
               <div className="lg:col-span-2">
-                <div id="service-form" className="rounded-xl bg-white p-4 md:p-6 shadow-xl border border-gray-100">
-                  <div className="mb-4 md:mb-6">
-                    <h2 className="text-lg md:text-xl font-semibold text-gray-900">
-                      {editingId ? 'Edit Service' : 'Add New Service'}
-                    </h2>
-                    <p className="text-sm text-gray-500">
-                      {editingId ? 'Update service information' : 'Enter service details'}
-                    </p>
+                <div id="service-form" className="overflow-hidden rounded-2xl bg-white shadow-xl shadow-gray-200/50 border border-gray-100">
+                  <div className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100">
+                        <span className="text-xl">🩺</span>
+                      </div>
+                      <div>
+                        <h2 className="text-base font-bold text-gray-900">
+                          {editingId ? 'Edit Service' : 'Add New Service'}
+                        </h2>
+                        <p className="text-xs text-gray-500">
+                          {editingId ? 'Update service information' : 'Enter service details'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          Service Name *
-                        </label>
-                        <input
-                          type="text"
-                          name="service_name"
-                          value={formData.service_name}
-                          onChange={handleInputChange}
-                          placeholder="Dental Cleaning"
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          Price (₹) *
-                        </label>
-                        <input
-                          type="number"
-                          name="price"
-                          value={formData.price}
-                          onChange={handleInputChange}
-                          placeholder="500"
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          Duration (Minutes)
-                        </label>
-                        <select
-                          name="duration_minutes"
-                          value={formData.duration_minutes}
-                          onChange={handleInputChange}
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                        >
-                          {durationOptions.map(opt => (
-                            <option key={opt} value={opt}>{opt} min</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          Service Category
-                        </label>
-                        <select
-                          name="category"
-                          value={formData.category}
-                          onChange={handleInputChange}
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                        >
-                          <option value="">Select category</option>
-                          {categoryOptions.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          Description
-                        </label>
-                        <textarea
-                          name="description"
-                          rows={3}
-                          value={formData.description}
-                          onChange={handleInputChange}
-                          placeholder="Service description..."
-                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                          👨‍⚕️ Assigned Doctors
-                        </label>
-                        <div className="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50 min-h-[60px]">
-                          {doctors.length === 0 ? (
-                            <span className="text-sm text-gray-500">No doctors available. Add doctors first.</span>
-                          ) : (
-                            doctors.map(doctor => (
-                              <button
-                                key={doctor.id}
-                                type="button"
-                                onClick={() => handleDoctorSelect(doctor.id)}
-                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                                  formData.assigned_doctors.includes(doctor.id)
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                }`}
-                              >
-                                {doctor.name}
-                              </button>
-                            ))
-                          )}
+                  <div className="p-6">
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                            Service Name <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="service_name"
+                            value={formData.service_name}
+                            onChange={handleInputChange}
+                            placeholder="Dental Cleaning"
+                            className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                            Price (₹) <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            name="price"
+                            value={formData.price}
+                            onChange={handleInputChange}
+                            placeholder="500"
+                            className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                            Duration (Minutes)
+                          </label>
+                          <select
+                            name="duration_minutes"
+                            value={formData.duration_minutes}
+                            onChange={handleInputChange}
+                            className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
+                          >
+                            {durationOptions.map(opt => (
+                              <option key={opt} value={opt}>{opt} min</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                            Service Category
+                          </label>
+                          <select
+                            name="category"
+                            value={formData.category}
+                            onChange={handleInputChange}
+                            className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
+                          >
+                            <option value="">Select category</option>
+                            {categoryOptions.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                            Description
+                          </label>
+                          <textarea
+                            name="description"
+                            rows={3}
+                            value={formData.description}
+                            onChange={handleInputChange}
+                            placeholder="Service description..."
+                            className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 outline-none transition"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="mb-2 block text-sm font-semibold text-gray-700">
+                            👨‍⚕️ Assigned Doctors
+                          </label>
+                          <div className="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-xl bg-gray-50/50 min-h-[60px]">
+                            {doctors.length === 0 ? (
+                              <span className="text-sm text-gray-500">No doctors available. Add doctors first.</span>
+                            ) : (
+                              doctors.map(doctor => (
+                                <button
+                                  key={doctor.id}
+                                  type="button"
+                                  onClick={() => handleDoctorSelect(doctor.id)}
+                                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                                    formData.assigned_doctors.includes(doctor.id)
+                                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                      : 'bg-white text-gray-700 border border-gray-200 hover:border-blue-300'
+                                  }`}
+                                >
+                                  {doctor.name}
+                                </button>
+                              ))
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex gap-3 pt-4">
-                      <button
-                        type="submit"
-                        disabled={isSaving}
-                        className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2.5 md:px-6 md:py-2.5 text-sm md:text-base font-semibold text-white hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isSaving ? (
-                          <span className="flex items-center justify-center">
-                            <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            {editingId ? 'Updating...' : 'Adding...'}
-                          </span>
-                        ) : (
-                          editingId ? 'Update Service' : 'Add Service'
-                        )}
-                      </button>
-                      {editingId && (
+                      <div className="flex gap-3 pt-4">
                         <button
-                          type="button"
-                          onClick={resetForm}
-                          className="px-4 py-2.5 md:px-6 md:py-2.5 rounded-lg border border-gray-300 font-medium text-gray-700 hover:bg-gray-50 transition-colors text-sm md:text-base"
+                          type="submit"
+                          disabled={isSaving}
+                          className="flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow-xl hover:shadow-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Cancel
+                          {isSaving ? (
+                            <span className="flex items-center justify-center">
+                              <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              {editingId ? 'Updating...' : 'Adding...'}
+                            </span>
+                          ) : (
+                            editingId ? 'Update Service' : 'Add Service'
+                          )}
                         </button>
-                      )}
-                    </div>
-                  </form>
+                        {editingId && (
+                          <button
+                            type="button"
+                            onClick={resetForm}
+                            className="rounded-xl border border-gray-300 px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  </div>
                 </div>
               </div>
 
               {/* Services List Section */}
               <div className="lg:col-span-1">
-                <div className="rounded-xl bg-white p-4 md:p-6 shadow-xl border border-gray-100">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-gray-900">Service List</h2>
-                    <span className="text-sm text-gray-500">{filteredServices.length} shown</span>
+                <div className="overflow-hidden rounded-2xl bg-white shadow-xl shadow-gray-200/50 border border-gray-100">
+                  <div className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-5 py-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100">
+                          <span className="text-base">📋</span>
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-gray-900">Service List</h3>
+                          <p className="text-xs text-gray-500">{filteredServices.length} shown</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-                    </div>
-                  ) : filteredServices.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-sm text-gray-500">No services found</p>
-                      <p className="text-xs text-gray-400 mt-1">Try adjusting filters</p>
-                    </div>
-                  ) : viewMode === "card" ? (
-                    <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                      {filteredServices.map((service) => (
-                        <div
-                          key={service.id}
-                          className={`rounded-lg border p-4 transition-all ${
-                            service.is_active
-                              ? 'border-gray-200 hover:border-blue-300'
-                              : 'border-gray-200 opacity-60'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-semibold text-gray-900 truncate text-sm md:text-base">{service.service_name}</h3>
+                  <div className="p-4">
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+                      </div>
+                    ) : filteredServices.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-sm text-gray-500">No services found</p>
+                        <p className="text-xs text-gray-400 mt-1">Try adjusting filters</p>
+                      </div>
+                    ) : viewMode === "card" ? (
+                      <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                        {filteredServices.map((service) => (
+                          <div
+                            key={service.id}
+                            className={`rounded-xl border p-4 transition-all ${
+                              service.is_active
+                                ? 'border-gray-200 hover:border-blue-300 hover:shadow-sm'
+                                : 'border-gray-200 opacity-60'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-gray-900 truncate text-sm">{service.service_name}</h3>
+                                <div className="mt-2 flex items-center gap-3 text-xs">
+                                  <span className="font-semibold text-green-600">₹{service.price}</span>
+                                  {service.duration_minutes && (
+                                    <span className="text-gray-500">• {service.duration_minutes} min</span>
+                                  )}
+                                </div>
                               </div>
-                              <div className="mt-1 space-y-1">
-                                <p className="text-sm text-gray-600">₹{service.price}</p>
-                                {service.duration_minutes && (
-                                  <p className="text-xs text-gray-500">{service.duration_minutes} min</p>
-                                )}
+                              <div className="flex flex-col gap-1 ml-2 flex-shrink-0">
+                                <button
+                                  onClick={() => handleEdit(service)}
+                                  className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDuplicate(service)}
+                                  className="text-xs font-medium text-purple-600 hover:text-purple-800"
+                                >
+                                  Copy
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(service.id!)}
+                                  className="text-xs font-medium text-red-600 hover:text-red-800"
+                                >
+                                  Delete
+                                </button>
                               </div>
-                            </div>
-                            <div className="flex flex-col gap-1 ml-2">
-                              <button
-                                onClick={() => handleEdit(service)}
-                                className="text-xs font-medium text-blue-600 hover:text-blue-800"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDuplicate(service)}
-                                className="text-xs font-medium text-purple-600 hover:text-purple-800"
-                              >
-                                Duplicate
-                              </button>
-                              <button
-                                onClick={() => handleDelete(service.id!)}
-                                className="text-xs font-medium text-red-600 hover:text-red-800"
-                              >
-                                Delete
-                              </button>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50 sticky top-0">
-                          <tr>
-                            <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
-                            <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                            <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-                            <th className="px-2 py-1.5 md:px-3 md:py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {filteredServices.map((service) => (
-                            <tr key={service.id} className="hover:bg-gray-50">
-                              <td className="px-2 py-1.5 md:px-3 md:py-2">
-                                <span className="text-xs md:text-sm font-medium text-gray-900 truncate max-w-[80px] md:max-w-none">{service.service_name}</span>
-                              </td>
-                              <td className="px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm text-gray-600">₹{service.price}</td>
-                              <td className="px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm text-gray-600">{service.duration_minutes} min</td>
-                              <td className="px-2 py-1.5 md:px-3 md:py-2">
-                                <div className="flex flex-col md:flex-row gap-1 md:gap-2">
-                                  <button
-                                    onClick={() => handleEdit(service)}
-                                    className="text-xs font-medium text-blue-600 hover:text-blue-800"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDuplicate(service)}
-                                    className="text-xs font-medium text-purple-600 hover:text-purple-800"
-                                  >
-                                    Copy
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(service.id!)}
-                                    className="text-xs font-medium text-red-600 hover:text-red-800"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50 sticky top-0">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {filteredServices.map((service) => (
+                              <tr key={service.id} className="hover:bg-gray-50">
+                                <td className="px-3 py-2">
+                                  <span className="text-xs font-medium text-gray-900">{service.service_name}</span>
+                                </td>
+                                <td className="px-3 py-2 text-xs text-gray-600">₹{service.price}</td>
+                                <td className="px-3 py-2">
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => handleEdit(service)}
+                                      className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(service.id!)}
+                                      className="text-xs font-medium text-red-600 hover:text-red-800"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -965,33 +1000,34 @@ export default function ServicesPage() {
         )}
 
         {/* Navigation */}
-        <div className="mt-6 md:mt-8 flex flex-wrap items-center justify-between gap-3 md:gap-4">
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">Step 3 of 6</span>
+            <span className="text-xs font-semibold text-gray-500">Step 3 of 6</span>
             <div className="flex gap-1">
-              <div className="h-2 w-2 rounded-full bg-blue-600"></div>
-              <div className="h-2 w-2 rounded-full bg-blue-600"></div>
-              <div className="h-2 w-8 rounded-full bg-blue-600"></div>
-              <div className="h-2 w-2 rounded-full bg-gray-300"></div>
-              <div className="h-2 w-2 rounded-full bg-gray-300"></div>
-              <div className="h-2 w-2 rounded-full bg-gray-300"></div>
+              <div className="h-1.5 w-6 rounded-full bg-blue-600"></div>
+              <div className="h-1.5 w-6 rounded-full bg-blue-600"></div>
+              <div className="h-1.5 w-6 rounded-full bg-blue-600"></div>
+              <div className="h-1.5 w-1.5 rounded-full bg-gray-300"></div>
+              <div className="h-1.5 w-1.5 rounded-full bg-gray-300"></div>
+              <div className="h-1.5 w-1.5 rounded-full bg-gray-300"></div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/whatsapp-bot/doctors"
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
             >
               ← Previous
             </Link>
             <Link
               href="/whatsapp-bot/faq"
-              className="rounded-lg bg-gradient-to-r from-green-600 to-green-700 px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-semibold text-white hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow-xl hover:shadow-blue-500/40"
             >
               Next → FAQ
             </Link>
           </div>
         </div>
+
       </div>
     </div>
   );
