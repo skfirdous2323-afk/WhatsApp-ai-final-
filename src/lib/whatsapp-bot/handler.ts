@@ -64,12 +64,16 @@ function getNext7Days() {
  * Generate time slots based on slot duration
  * Default: 9:00 AM to 6:00 PM
  */
-function generateTimeSlots(slotDuration: number) {
+function generateTimeSlots(
+  slotDuration: number,
+  startTime = "09:00",
+  endTime = "18:00"
+) {
   const timeSlots = [];
-  let hour = 9;
-  let minute = 0;
+  let [hour, minute] = startTime.split(":").map(Number);
+  const [endHour, endMinute] = endTime.split(":").map(Number);
 
-  while (hour < 18 || (hour === 18 && minute === 0)) {
+  while (hour < endHour || (hour === endHour && minute <= endMinute)) {
     const hh = String(hour).padStart(2, "0");
     const mm = String(minute).padStart(2, "0");
 
@@ -102,8 +106,18 @@ async function getAvailableTimeSlots(
   slotDuration: number,
   page: number
 ) {
-  // Get all time slots
-  const allSlots = generateTimeSlots(slotDuration);
+  // Get this doctor's working hours
+  const { data: doctor } = await db
+    .from("clinic_doctors")
+    .select("start_time, end_time")
+    .eq("id", doctorId)
+    .maybeSingle();
+
+  const allSlots = generateTimeSlots(
+    slotDuration,
+    doctor?.start_time?.slice(0, 5) || "09:00",
+    doctor?.end_time?.slice(0, 5) || "18:00"
+  );
   const pageSize = 8;
   const start = page * pageSize;
   const end = start + pageSize;
