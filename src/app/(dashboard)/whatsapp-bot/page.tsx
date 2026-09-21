@@ -479,6 +479,77 @@ export default function WhatsAppBotPage() {
           </div>
 
 
+          {/* WhatsApp Menu Customization */}
+          <div className="mt-8 rounded-xl border border-gray-200 bg-gray-50 p-6">
+            <div className="mb-5">
+              <h2 className="text-xl font-bold text-gray-900">
+                📋 WhatsApp Menu Customization
+              </h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Customize the menu names, descriptions, and visibility shown to patients on WhatsApp.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {[
+                ["book", "Book Appointment", bookEnabled, setBookEnabled],
+                ["doctors", "Doctors", doctorsEnabled, setDoctorsEnabled],
+                ["services", "Services", servicesEnabled, setServicesEnabled],
+                ["hours", "Working Hours", workingHoursEnabled, setWorkingHoursEnabled],
+                ["faq", "FAQ", faqEnabled, setFaqEnabled],
+                ["contact", "Contact", contactEnabled, setContactEnabled],
+                ["location", "Location", locationEnabled, setLocationEnabled],
+              ].map(([key, defaultName, enabled, setEnabled]) => (
+                <div key={key as string} className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <span className="font-semibold text-gray-800">
+                      {defaultName as string}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => (setEnabled as React.Dispatch<React.SetStateAction<boolean>>)(!(enabled as boolean))}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        enabled
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      {enabled ? "ON" : "OFF"}
+                    </button>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <input
+                      type="text"
+                      value={menuLabels[key as keyof typeof menuLabels]}
+                      onChange={(e) =>
+                        setMenuLabels((prev) => ({
+                          ...prev,
+                          [key as string]: e.target.value,
+                        }))
+                      }
+                      placeholder={defaultName as string}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900"
+                    />
+
+                    <input
+                      type="text"
+                      value={menuDescriptions[key as keyof typeof menuDescriptions]}
+                      onChange={(e) =>
+                        setMenuDescriptions((prev) => ({
+                          ...prev,
+                          [key as string]: e.target.value,
+                        }))
+                      }
+                      placeholder="Menu description"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-gray-200">
             <div className="flex items-center gap-3">
