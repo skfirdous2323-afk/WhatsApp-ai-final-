@@ -65,6 +65,8 @@ export default function CustomerManagementPage() {
   const [appointmentPatientName, setAppointmentPatientName] = useState("");
   const [appointmentGender, setAppointmentGender] = useState("");
   const [appointmentAge, setAppointmentAge] = useState("");
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<"day" | "week" | "month">("month");
   const [savingAppointment, setSavingAppointment] = useState(false);
 
   const getClinicId = async (userId: string) => {
@@ -405,6 +407,149 @@ const rescheduleAppointment = async (
     }
   };
 
+  // ==================== APPOINTMENT CALENDAR ENGINE ====================
+
+  const formatCalendarDate = (date: Date) => {
+    return date.toLocaleDateString("en-CA");
+  };
+
+  const calendarMonthLabel = calendarDate.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const calendarWeekStart = new Date(calendarDate);
+  calendarWeekStart.setHours(0, 0, 0, 0);
+  calendarWeekStart.setDate(
+    calendarWeekStart.getDate() - calendarWeekStart.getDay()
+  );
+
+  const calendarWeekDays = Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(calendarWeekStart);
+    day.setDate(calendarWeekStart.getDate() + index);
+    return day;
+  });
+
+  const calendarMonthStart = new Date(
+    calendarDate.getFullYear(),
+    calendarDate.getMonth(),
+    1
+  );
+
+  const calendarMonthEnd = new Date(
+    calendarDate.getFullYear(),
+    calendarDate.getMonth() + 1,
+    0
+  );
+
+  const calendarGridStart = new Date(calendarMonthStart);
+  calendarGridStart.setDate(
+    calendarMonthStart.getDate() - calendarMonthStart.getDay()
+  );
+
+  const calendarGridEnd = new Date(calendarMonthEnd);
+  calendarGridEnd.setDate(
+    calendarMonthEnd.getDate() + (6 - calendarMonthEnd.getDay())
+  );
+
+  const calendarMonthDays: Date[] = [];
+  const monthCursor = new Date(calendarGridStart);
+
+  while (monthCursor <= calendarGridEnd) {
+    calendarMonthDays.push(new Date(monthCursor));
+    monthCursor.setDate(monthCursor.getDate() + 1);
+  }
+
+  const appointmentsForDate = (date: Date) => {
+    const dateKey = formatCalendarDate(date);
+
+    return appointments
+      .filter((appointment) => appointment.appointment_date === dateKey)
+      .sort((a, b) =>
+        a.appointment_time.localeCompare(b.appointment_time)
+      );
+  };
+
+  const getDoctorName = (doctorId?: string) => {
+    if (!doctorId) return "Unassigned";
+
+    return (
+      doctors.find((doctor) => doctor.id === doctorId)?.doctor_name ||
+      "Doctor"
+    );
+  };
+
+  const getServiceName = (serviceId?: string) => {
+    if (!serviceId) return "Consultation";
+
+    return (
+      services.find((service) => service.id === serviceId)?.service_name ||
+      "Service"
+    );
+  };
+
+  const getAppointmentStatusClass = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "confirmed":
+        return "border-green-200 bg-green-50 text-green-700";
+      case "completed":
+        return "border-blue-200 bg-blue-50 text-blue-700";
+      case "cancelled":
+      case "canceled":
+        return "border-red-200 bg-red-50 text-red-700";
+      case "no-show":
+        return "border-slate-200 bg-slate-100 text-slate-600";
+      default:
+        return "border-amber-200 bg-amber-50 text-amber-700";
+    }
+  };
+
+  const getAppointmentStatusLabel = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "confirmed":
+        return "Confirmed";
+      case "completed":
+        return "Completed";
+      case "cancelled":
+      case "canceled":
+        return "Cancelled";
+      case "no-show":
+        return "No-show";
+      default:
+        return "Pending";
+    }
+  };
+
+  const changeCalendarDate = (direction: number) => {
+    setCalendarDate((current) => {
+      const next = new Date(current);
+
+      if (calendarView === "day") {
+        next.setDate(next.getDate() + direction);
+      } else if (calendarView === "week") {
+        next.setDate(next.getDate() + direction * 7);
+      } else {
+        next.setMonth(next.getMonth() + direction);
+      }
+
+      return next;
+    });
+  };
+
+  const goToCalendarToday = () => {
+    setCalendarDate(new Date());
+  };
+
+  const isCalendarToday = (date: Date) => {
+    const today = new Date();
+
+    return (
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
+    );
+  };
+
   // Customer Details View
   if (selectedCustomer) {
     const customerAppointments = getCustomerAppointments(
@@ -715,6 +860,7 @@ const rescheduleAppointment = async (
             title="Pending"
             value={pendingAppointments}
             icon={<Clock className="h-5 w-5" />}
+
           />
 
           <StatCard
@@ -723,6 +869,370 @@ const rescheduleAppointment = async (
             icon={<XCircle className="h-5 w-5" />}
           />
         </div>
+
+
+        {/* ==================== PROFESSIONAL APPOINTMENT CALENDAR ==================== */}
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-slate-50/70 p-5 md:p-6">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+                    <CalendarDays className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">
+                      Appointment Calendar
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Manage clinic appointments, doctors and patient schedules.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={goToCalendarToday}
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Today
+                </button>
+
+                <div className="flex items-center rounded-lg border border-slate-200 bg-white p-1">
+                  <button
+                    type="button"
+                    onClick={() => changeCalendarDate(-1)}
+                    className="rounded-md px-3 py-2 text-lg font-medium text-slate-600 hover:bg-slate-100"
+                    aria-label="Previous"
+                  >
+                    ‹
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => changeCalendarDate(1)}
+                    className="rounded-md px-3 py-2 text-lg font-medium text-slate-600 hover:bg-slate-100"
+                    aria-label="Next"
+                  >
+                    ›
+                  </button>
+                </div>
+
+                <div className="flex rounded-lg border border-slate-200 bg-white p-1">
+                  {(["day", "week", "month"] as const).map((view) => (
+                    <button
+                      key={view}
+                      type="button"
+                      onClick={() => setCalendarView(view)}
+                      className={`rounded-md px-3 py-2 text-sm font-semibold capitalize transition ${
+                        calendarView === view
+                          ? "bg-blue-600 text-white"
+                          : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {view}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-lg font-bold text-slate-900">
+                {calendarView === "month"
+                  ? calendarMonthLabel
+                  : calendarView === "week"
+                    ? `${calendarWeekDays[0].toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })} - ${calendarWeekDays[6].toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}`
+                    : calendarDate.toLocaleDateString("en-US", {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+              </h3>
+
+              <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-slate-600">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                  Pending
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                  Confirmed
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                  Completed
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                  Cancelled
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {calendarView === "month" && (
+            <div className="overflow-x-auto">
+              <div className="min-w-[900px]">
+                <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                    (day) => (
+                      <div
+                        key={day}
+                        className="border-r border-slate-200 px-3 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500 last:border-r-0"
+                      >
+                        {day}
+                      </div>
+                    )
+                  )}
+                </div>
+
+                <div className="grid grid-cols-7">
+                  {calendarMonthDays.map((date) => {
+                    const dayAppointments = appointmentsForDate(date);
+                    const isCurrentMonth =
+                      date.getMonth() === calendarDate.getMonth();
+
+                    return (
+                      <div
+                        key={formatCalendarDate(date)}
+                        className={`min-h-[155px] border-b border-r border-slate-200 p-2 ${
+                          !isCurrentMonth ? "bg-slate-50/60" : "bg-white"
+                        }`}
+                      >
+                        <div className="mb-2 flex items-center justify-between">
+                          <span
+                            className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
+                              isCalendarToday(date)
+                                ? "bg-blue-600 text-white"
+                                : isCurrentMonth
+                                  ? "text-slate-700"
+                                  : "text-slate-400"
+                            }`}
+                          >
+                            {date.getDate()}
+                          </span>
+
+                          {dayAppointments.length > 0 && (
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+                              {dayAppointments.length}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          {dayAppointments.slice(0, 4).map((appointment) => (
+                            <button
+                              key={appointment.id}
+                              type="button"
+                              onClick={() => {
+                                const customer = customers.find(
+                                  (item) => item.id === appointment.contact_id
+                                );
+                                if (customer) setSelectedCustomer(customer);
+                              }}
+                              className={`w-full rounded-lg border p-2 text-left transition hover:shadow-sm ${getAppointmentStatusClass(
+                                appointment.status
+                              )}`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[11px] font-bold">
+                                  {appointment.appointment_time}
+                                </span>
+                                <span className="truncate text-[9px] font-semibold uppercase">
+                                  {getAppointmentStatusLabel(
+                                    appointment.status
+                                  )}
+                                </span>
+                              </div>
+                              <p className="mt-1 truncate text-xs font-bold">
+                                {appointment.patient_name || "Patient"}
+                              </p>
+                              <p className="truncate text-[10px] opacity-80">
+                                {getDoctorName(appointment.doctor_id)}
+                              </p>
+                            </button>
+                          ))}
+
+                          {dayAppointments.length > 4 && (
+                            <button
+                              type="button"
+                              className="w-full rounded-md px-2 py-1 text-left text-[11px] font-semibold text-blue-600 hover:bg-blue-50"
+                            >
+                              +{dayAppointments.length - 4} more appointments
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {calendarView === "week" && (
+            <div className="overflow-x-auto">
+              <div className="min-w-[900px]">
+                <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+                  {calendarWeekDays.map((date) => (
+                    <div
+                      key={formatCalendarDate(date)}
+                      className={`border-r border-slate-200 p-4 text-center last:border-r-0 ${
+                        isCalendarToday(date) ? "bg-blue-50" : ""
+                      }`}
+                    >
+                      <p className="text-xs font-semibold uppercase text-slate-500">
+                        {date.toLocaleDateString("en-US", {
+                          weekday: "short",
+                        })}
+                      </p>
+                      <p
+                        className={`mt-1 text-xl font-bold ${
+                          isCalendarToday(date)
+                            ? "text-blue-600"
+                            : "text-slate-800"
+                        }`}
+                      >
+                        {date.getDate()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-7">
+                  {calendarWeekDays.map((date) => {
+                    const dayAppointments = appointmentsForDate(date);
+
+                    return (
+                      <div
+                        key={formatCalendarDate(date)}
+                        className="min-h-[420px] border-r border-slate-200 p-3 last:border-r-0"
+                      >
+                        <div className="space-y-2">
+                          {dayAppointments.length === 0 ? (
+                            <p className="py-10 text-center text-xs text-slate-400">
+                              No appointments
+                            </p>
+                          ) : (
+                            dayAppointments.map((appointment) => (
+                              <button
+                                key={appointment.id}
+                                type="button"
+                                onClick={() => {
+                                  const customer = customers.find(
+                                    (item) =>
+                                      item.id === appointment.contact_id
+                                  );
+                                  if (customer) setSelectedCustomer(customer);
+                                }}
+                                className={`w-full rounded-xl border p-3 text-left ${getAppointmentStatusClass(
+                                  appointment.status
+                                )}`}
+                              >
+                                <p className="text-sm font-bold">
+                                  {appointment.appointment_time}
+                                </p>
+                                <p className="mt-1 truncate text-sm font-semibold">
+                                  {appointment.patient_name || "Patient"}
+                                </p>
+                                <p className="mt-1 truncate text-xs">
+                                  {getDoctorName(appointment.doctor_id)}
+                                </p>
+                                <p className="mt-1 truncate text-[11px] opacity-75">
+                                  {getServiceName(appointment.service_id)}
+                                </p>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {calendarView === "day" && (
+            <div className="p-5 md:p-6">
+              <div className="rounded-xl border border-slate-200">
+                <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                  <p className="font-semibold text-slate-900">
+                    {calendarDate.toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+
+                <div className="divide-y divide-slate-100">
+                  {appointmentsForDate(calendarDate).length === 0 ? (
+                    <div className="py-16 text-center text-sm text-slate-500">
+                      No appointments scheduled for this day.
+                    </div>
+                  ) : (
+                    appointmentsForDate(calendarDate).map((appointment) => (
+                      <button
+                        key={appointment.id}
+                        type="button"
+                        onClick={() => {
+                          const customer = customers.find(
+                            (item) => item.id === appointment.contact_id
+                          );
+                          if (customer) setSelectedCustomer(customer);
+                        }}
+                        className="flex w-full flex-col gap-4 p-5 text-left transition hover:bg-slate-50 md:flex-row md:items-center"
+                      >
+                        <div className="w-24 shrink-0">
+                          <p className="text-lg font-bold text-slate-900">
+                            {appointment.appointment_time}
+                          </p>
+                        </div>
+
+                        <div
+                          className={`flex-1 rounded-xl border p-4 ${getAppointmentStatusClass(
+                            appointment.status
+                          )}`}
+                        >
+                          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                            <div>
+                              <p className="font-bold">
+                                {appointment.patient_name || "Patient"}
+                              </p>
+                              <p className="mt-1 text-sm">
+                                {getDoctorName(appointment.doctor_id)} •{" "}
+                                {getServiceName(appointment.service_id)}
+                              </p>
+                            </div>
+
+                            <span className="w-fit rounded-full border bg-white/70 px-3 py-1 text-xs font-bold">
+                              {getAppointmentStatusLabel(
+                                appointment.status
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
 
         {/* Search */}
         <div className="rounded-xl border border-slate-200 bg-white p-4">
