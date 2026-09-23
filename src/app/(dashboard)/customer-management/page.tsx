@@ -99,7 +99,7 @@ export default function CustomerManagementPage() {
   const [updatingAppointmentStatus, setUpdatingAppointmentStatus] =
     useState(false);
 
-  // ==================== HELPERS (declared before use) ====================
+  // ==================== HELPERS ====================
 
   const formatCalendarDate = (date: Date) => date.toLocaleDateString("en-CA");
 
@@ -892,6 +892,337 @@ export default function CustomerManagementPage() {
     );
   };
 
+  // ==================== SHARED MODALS ====================
+  // Modals are declared BEFORE the early return so they can be rendered
+  // from BOTH the customer details view and the customer list view.
+
+  const appointmentModal =
+    appointmentOpen && selectedCustomer ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="mb-5 flex items-start justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                New Appointment
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                For {selectedCustomer.name || selectedCustomer.phone}
+              </p>
+            </div>
+            <button
+              onClick={() => setAppointmentOpen(false)}
+              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+              aria-label="Close"
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <select
+              value={appointmentDoctor}
+              onChange={(e) => {
+                const doctorId = e.target.value;
+                setAppointmentDoctor(doctorId);
+                refreshAvailableSlots(doctorId, appointmentDate);
+              }}
+              className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">Select Doctor</option>
+              {doctors.map((doctor) => (
+                <option key={doctor.id} value={doctor.id}>
+                  {doctor.doctor_name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={appointmentService}
+              onChange={(e) => setAppointmentService(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">Select Service</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.service_name}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="date"
+              value={appointmentDate}
+              onChange={(e) => {
+                const date = e.target.value;
+                setAppointmentDate(date);
+                setAppointmentTime("");
+
+                if (!appointmentDoctor || !date) {
+                  setAvailableSlots([]);
+                  return;
+                }
+
+                refreshAvailableSlots(appointmentDoctor, date);
+              }}
+              className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Available Time
+              </label>
+
+              {!appointmentDoctor || !appointmentDate ? (
+                <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
+                  Select Doctor and Date first.
+                </p>
+              ) : loadingSlots ? (
+                <p className="flex items-center gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading available slots...
+                </p>
+              ) : availableSlots.length === 0 ? (
+                <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                  No available slots for this date.
+                </p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {availableSlots.map((slot) => (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => setAppointmentTime(slot)}
+                      className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                        appointmentTime === slot
+                          ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                          : "border-slate-200 bg-white text-slate-900 hover:border-blue-400 hover:bg-blue-50"
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <input
+              type="text"
+              value={appointmentPatientName}
+              onChange={(e) => setAppointmentPatientName(e.target.value)}
+              placeholder="Patient Name"
+              className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <select
+                value={appointmentGender}
+                onChange={(e) => setAppointmentGender(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="">Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+
+              <input
+                type="number"
+                min="0"
+                value={appointmentAge}
+                onChange={(e) => setAppointmentAge(e.target.value)}
+                placeholder="Age"
+                className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <button
+              onClick={createAppointment}
+              disabled={savingAppointment}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {savingAppointment && (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              )}
+              {savingAppointment ? "Creating..." : "Create Appointment"}
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
+  const appointmentDetailsModal = selectedAppointment ? (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50/40 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
+              Appointment Details
+            </p>
+            <h2 className="mt-1 text-xl font-bold text-slate-900">
+              {selectedAppointment.patient_name || "Patient"}
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSelectedAppointment(null)}
+            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200"
+            aria-label="Close appointment details"
+          >
+            <XCircle className="h-6 w-6" />
+          </button>
+        </div>
+
+        <div className="grid gap-4 p-6 sm:grid-cols-2">
+          {(() => {
+            const customer = customers.find(
+              (item) => item.id === selectedAppointment.contact_id
+            );
+            const phone = customer?.phone || "";
+
+            return (
+              <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-4 sm:col-span-2">
+                {phone && (
+                  <>
+                    <a
+                      href={`tel:${phone}`}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                    >
+                      <Phone className="h-4 w-4" />
+                      Call Patient
+                    </a>
+                    <a
+                      href={`https://wa.me/${phone.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-green-600"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      WhatsApp
+                    </a>
+                  </>
+                )}
+
+                {customer && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAppointment(null);
+                      setSelectedCustomer(customer);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <User className="h-4 w-4" />
+                    Patient Profile
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
+          <DetailBox
+            label="Date"
+            value={selectedAppointment.appointment_date}
+          />
+          <DetailBox
+            label="Time"
+            value={selectedAppointment.appointment_time}
+          />
+          <DetailBox
+            label="Doctor"
+            value={getDoctorName(selectedAppointment.doctor_id)}
+          />
+          <DetailBox
+            label="Service"
+            value={getServiceName(selectedAppointment.service_id)}
+          />
+
+          <div className="rounded-xl border border-slate-200 p-4">
+            <p className="text-xs font-semibold uppercase text-slate-400">
+              Patient
+            </p>
+            <p className="mt-1 font-semibold text-slate-900">
+              {selectedAppointment.patient_name || "Not available"}
+            </p>
+            {(() => {
+              const customer = customers.find(
+                (item) => item.id === selectedAppointment.contact_id
+              );
+
+              return (
+                <div className="mt-2 space-y-1 text-xs text-slate-500">
+                  <p>📞 {customer?.phone || "Phone not available"}</p>
+                  <p>✉️ {customer?.email || "Email not available"}</p>
+                  <p className="break-all font-mono text-[10px]">
+                    ID: {selectedAppointment.contact_id}
+                  </p>
+                </div>
+              );
+            })()}
+          </div>
+
+          <DetailBox
+            label="Patient Details"
+            value={`${selectedAppointment.gender || "Gender not set"}${
+              selectedAppointment.age !== undefined &&
+              selectedAppointment.age !== null
+                ? ` • ${selectedAppointment.age} years`
+                : ""
+            }`}
+          />
+        </div>
+
+        <div className="border-t border-slate-200 px-6 py-5">
+          <p className="mb-3 text-sm font-semibold text-slate-700">
+            Update Appointment Status
+          </p>
+
+          <div className="mb-5 flex flex-wrap gap-2">
+            {(
+              [
+                "pending",
+                "confirmed",
+                "completed",
+                "no-show",
+                "cancelled",
+              ] as const
+            ).map((status) => (
+              <button
+                key={status}
+                type="button"
+                disabled={updatingAppointmentStatus}
+                onClick={() =>
+                  updateAppointmentStatus(selectedAppointment.id, status)
+                }
+                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold capitalize transition ${
+                  selectedAppointment.status === status
+                    ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                } disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {updatingAppointmentStatus &&
+                  selectedAppointment.status !== status && (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  )}
+                {status}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setSelectedAppointment(null)}
+              className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   // ==================== CUSTOMER DETAILS VIEW ====================
 
   if (selectedCustomer) {
@@ -1141,6 +1472,9 @@ export default function CustomerManagementPage() {
             )}
           </div>
         </div>
+
+        {appointmentModal}
+        {appointmentDetailsModal}
       </div>
     );
   }
@@ -1290,8 +1624,7 @@ export default function CustomerManagementPage() {
                   label: "Today",
                   value: appointments.filter(
                     (a) =>
-                      a.appointment_date ===
-                      formatCalendarDate(new Date())
+                      a.appointment_date === formatCalendarDate(new Date())
                   ).length,
                   className: "border-blue-200 bg-blue-50 text-blue-700",
                 },
@@ -1471,7 +1804,9 @@ export default function CustomerManagementPage() {
                             <button
                               key={appointment.id}
                               type="button"
-                              onClick={() => setSelectedAppointment(appointment)}
+                              onClick={() =>
+                                setSelectedAppointment(appointment)
+                              }
                               className={`w-full rounded-lg border p-2 text-left transition hover:shadow-sm ${getAppointmentStatusClass(
                                 appointment.status
                               )}`}
@@ -1742,338 +2077,8 @@ export default function CustomerManagementPage() {
         </div>
       </div>
 
-      {/* ==================== NEW APPOINTMENT MODAL ==================== */}
-      {appointmentOpen && selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mb-5 flex items-start justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">
-                  New Appointment
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  For {selectedCustomer.name || selectedCustomer.phone}
-                </p>
-              </div>
-              <button
-                onClick={() => setAppointmentOpen(false)}
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
-                aria-label="Close"
-              >
-                <XCircle className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <select
-                value={appointmentDoctor}
-                onChange={(e) => {
-                  const doctorId = e.target.value;
-                  setAppointmentDoctor(doctorId);
-                  refreshAvailableSlots(doctorId, appointmentDate);
-                }}
-                className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="">Select Doctor</option>
-                {doctors.map((doctor) => (
-                  <option key={doctor.id} value={doctor.id}>
-                    {doctor.doctor_name}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={appointmentService}
-                onChange={(e) => setAppointmentService(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="">Select Service</option>
-                {services.map((service) => (
-                  <option key={service.id} value={service.id}>
-                    {service.service_name}
-                  </option>
-                ))}
-              </select>
-
-              <input
-                type="date"
-                value={appointmentDate}
-                onChange={(e) => {
-                  const date = e.target.value;
-                  setAppointmentDate(date);
-                  setAppointmentTime("");
-
-                  if (!appointmentDoctor || !date) {
-                    setAvailableSlots([]);
-                    return;
-                  }
-
-                  refreshAvailableSlots(appointmentDoctor, date);
-                }}
-                className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Available Time
-                </label>
-
-                {!appointmentDoctor || !appointmentDate ? (
-                  <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
-                    Select Doctor and Date first.
-                  </p>
-                ) : loadingSlots ? (
-                  <p className="flex items-center gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading available slots...
-                  </p>
-                ) : availableSlots.length === 0 ? (
-                  <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
-                    No available slots for this date.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-3 gap-2">
-                    {availableSlots.map((slot) => (
-                      <button
-                        key={slot}
-                        type="button"
-                        onClick={() => setAppointmentTime(slot)}
-                        className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                          appointmentTime === slot
-                            ? "border-blue-600 bg-blue-600 text-white shadow-sm"
-                            : "border-slate-200 bg-white text-slate-900 hover:border-blue-400 hover:bg-blue-50"
-                        }`}
-                      >
-                        {slot}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <input
-                type="text"
-                value={appointmentPatientName}
-                onChange={(e) => setAppointmentPatientName(e.target.value)}
-                placeholder="Patient Name"
-                className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-
-              <div className="grid grid-cols-2 gap-3">
-                <select
-                  value={appointmentGender}
-                  onChange={(e) => setAppointmentGender(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">Gender</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-
-                <input
-                  type="number"
-                  min="0"
-                  value={appointmentAge}
-                  onChange={(e) => setAppointmentAge(e.target.value)}
-                  placeholder="Age"
-                  className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              <button
-                onClick={createAppointment}
-                disabled={savingAppointment}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {savingAppointment && (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                )}
-                {savingAppointment ? "Creating..." : "Create Appointment"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== APPOINTMENT DETAILS MODAL ==================== */}
-      {selectedAppointment && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50/40 px-6 py-5">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
-                  Appointment Details
-                </p>
-                <h2 className="mt-1 text-xl font-bold text-slate-900">
-                  {selectedAppointment.patient_name || "Patient"}
-                </h2>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedAppointment(null)}
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200"
-                aria-label="Close appointment details"
-              >
-                <XCircle className="h-6 w-6" />
-              </button>
-            </div>
-
-            <div className="grid gap-4 p-6 sm:grid-cols-2">
-              {(() => {
-                const customer = customers.find(
-                  (item) => item.id === selectedAppointment.contact_id
-                );
-                const phone = customer?.phone || "";
-
-                return (
-                  <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-4 sm:col-span-2">
-                    {phone && (
-                      <>
-                        <a
-                          href={`tel:${phone}`}
-                          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-                        >
-                          <Phone className="h-4 w-4" />
-                          Call Patient
-                        </a>
-                        <a
-                          href={`https://wa.me/${phone.replace(
-                            /[^0-9]/g,
-                            ""
-                          )}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-green-600"
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                          WhatsApp
-                        </a>
-                      </>
-                    )}
-
-                    {customer && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedAppointment(null);
-                          setSelectedCustomer(customer);
-                        }}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                      >
-                        <User className="h-4 w-4" />
-                        Patient Profile
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
-
-              <DetailBox
-                label="Date"
-                value={selectedAppointment.appointment_date}
-              />
-              <DetailBox
-                label="Time"
-                value={selectedAppointment.appointment_time}
-              />
-              <DetailBox
-                label="Doctor"
-                value={getDoctorName(selectedAppointment.doctor_id)}
-              />
-              <DetailBox
-                label="Service"
-                value={getServiceName(selectedAppointment.service_id)}
-              />
-
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-400">
-                  Patient
-                </p>
-                <p className="mt-1 font-semibold text-slate-900">
-                  {selectedAppointment.patient_name || "Not available"}
-                </p>
-                {(() => {
-                  const customer = customers.find(
-                    (item) => item.id === selectedAppointment.contact_id
-                  );
-
-                  return (
-                    <div className="mt-2 space-y-1 text-xs text-slate-500">
-                      <p>📞 {customer?.phone || "Phone not available"}</p>
-                      <p>✉️ {customer?.email || "Email not available"}</p>
-                      <p className="break-all font-mono text-[10px]">
-                        ID: {selectedAppointment.contact_id}
-                      </p>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              <DetailBox
-                label="Patient Details"
-                value={`${
-                  selectedAppointment.gender || "Gender not set"
-                }${
-                  selectedAppointment.age !== undefined &&
-                  selectedAppointment.age !== null
-                    ? ` • ${selectedAppointment.age} years`
-                    : ""
-                }`}
-              />
-            </div>
-
-            <div className="border-t border-slate-200 px-6 py-5">
-              <p className="mb-3 text-sm font-semibold text-slate-700">
-                Update Appointment Status
-              </p>
-
-              <div className="mb-5 flex flex-wrap gap-2">
-                {(
-                  [
-                    "pending",
-                    "confirmed",
-                    "completed",
-                    "no-show",
-                    "cancelled",
-                  ] as const
-                ).map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    disabled={updatingAppointmentStatus}
-                    onClick={() =>
-                      updateAppointmentStatus(selectedAppointment.id, status)
-                    }
-                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold capitalize transition ${
-                      selectedAppointment.status === status
-                        ? "border-blue-600 bg-blue-600 text-white shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                    } disabled:cursor-not-allowed disabled:opacity-50`}
-                  >
-                    {updatingAppointmentStatus &&
-                      selectedAppointment.status !== status && (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      )}
-                    {status}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setSelectedAppointment(null)}
-                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {appointmentModal}
+      {appointmentDetailsModal}
 
       <ContactForm
         open={addCustomerOpen}
@@ -2139,7 +2144,9 @@ function StatCard({
           <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
         </div>
         <div
-          className={`rounded-lg p-2 ${variantClasses[variant] || variantClasses.blue}`}
+          className={`rounded-lg p-2 ${
+            variantClasses[variant] || variantClasses.blue
+          }`}
         >
           {icon}
         </div>
