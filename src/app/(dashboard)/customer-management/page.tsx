@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ContactForm } from "@/components/contacts/contact-form";
 import {
@@ -22,7 +22,23 @@ import {
   ChevronRight,
   Filter,
   Stethoscope,
+  Tag,
+  Download,
+  Printer,
+  FileText,
+  Activity,
+  TrendingUp,
+  IndianRupee,
+  CheckSquare,
+  Square,
+  Bell,
+  Keyboard,
+  Edit3,
+  Trash2,
+  Paperclip,
 } from "lucide-react";
+
+// ==================== TYPES ====================
 
 type Customer = {
   id: string;
@@ -44,6 +60,7 @@ type Appointment = {
   status: string;
   doctor_id?: string;
   service_id?: string;
+  amount?: number;
 };
 
 type Note = {
@@ -59,6 +76,34 @@ type Service = {
   duration_minutes?: number;
   assigned_doctors?: string[];
 };
+
+type MessageItem = {
+  id: string;
+  content_text?: string;
+  message_type?: string;
+  direction?: string;
+  created_at: string;
+  status?: string;
+};
+
+type DocumentItem = {
+  id: string;
+  file_name: string;
+  file_url?: string;
+  file_type?: string;
+  created_at: string;
+};
+
+type CustomerTab =
+  | "overview"
+  | "appointments"
+  | "notes"
+  | "messages"
+  | "documents";
+
+type SortOption = "recent" | "name" | "appointments";
+
+// ==================== MAIN COMPONENT ====================
 
 export default function CustomerManagementPage() {
   const supabase = useMemo(() => createClient(), []);
@@ -98,6 +143,32 @@ export default function CustomerManagementPage() {
     useState<Appointment | null>(null);
   const [updatingAppointmentStatus, setUpdatingAppointmentStatus] =
     useState(false);
+
+  // ==================== NEW STATE ====================
+
+  const [customerTab, setCustomerTab] = useState<CustomerTab>("overview");
+  const [customerMessages, setCustomerMessages] = useState<MessageItem[]>([]);
+  const [customerDocuments, setCustomerDocuments] = useState<DocumentItem[]>(
+    []
+  );
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [tags, setTags] = useState<Record<string, string[]>>({});
+  const [tagInput, setTagInput] = useState("");
+
+  // Advanced filters
+  const [listStatusFilter, setListStatusFilter] = useState("");
+  const [listTagFilter, setListTagFilter] = useState("");
+  const [listSort, setListSort] = useState<SortOption>("recent");
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkWorking, setBulkWorking] = useState(false);
+
+  // Keyboard shortcuts help
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  const searchRef = useRef<HTMLInputElement | null>(null);
 
   // ==================== HELPERS ====================
 
@@ -165,6 +236,41 @@ export default function CustomerManagementPage() {
     }
 
     return clinic.id;
+  };
+
+  // ==================== TAG MANAGEMENT (localStorage based) ====================
+
+  useEffect(() => {
+    try {
+      const raw = typeof window !== "undefined"
+        ? window.localStorage.getItem("cm_customer_tags")
+        : null;
+      if (raw) setTags(JSON.parse(raw));
+    } catch (e) {
+      console.error("Tag load error", e);
+    }
+  }, []);
+
+  const persistTags = (next: Record<string, string[]>) => {
+    setTags(next);
+    try {
+      window.localStorage.setItem("cm_customer_tags", JSON.stringify(next));
+    } catch (e) {
+      console.error("Tag save error", e);
+    }
+  };
+
+  const addTagToCustomer = (customerId: string, tag: string) => {
+    const trimmed = tag.trim();
+    if (!trimmed) return;
+    const current = tags[customerId] || [];
+    if (current.includes(trimmed)) return;
+    persistTags({ ...tags, [customerId]: [...current, trimmed] });
+  };
+
+  const removeTagFromCustomer = (customerId: string, tag: string) => {
+    const current = tags[customerId] || [];
+    persistTags({ ...tags, [customerId]: current.filter((t) => t !== tag) });
   };
 
   // ==================== DATA LOADERS ====================
@@ -246,6 +352,46 @@ export default function CustomerManagementPage() {
     }
   };
 
+  // Graceful fallback — these tables may not exist in all installs
+  const loadCustomerMessages = async (contactId: string) => {
+    setLoadingMessages(true);
+    try {
+      const { data, error } = await supabase
+        .from("whatsapp_messages")
+        .select(
+          "id, content_text, message_type, direction, created_at, status"
+        )
+        .eq("contact_id", contactId)
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (!error) setCustomerMessages((data || []) as MessageItem[]);
+      else setCustomerMessages([]);
+    } catch {
+      setCustomerMessages([]);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
+  const loadCustomerDocuments = async (contactId: string) => {
+    setLoadingDocuments(true);
+    try {
+      const { data, error } = await supabase
+        .from("contact_documents")
+        .select("id, file_name, file_url, file_type, created_at")
+        .eq("contact_id", contactId)
+        .order("created_at", { ascending: false });
+
+      if (!error) setCustomerDocuments((data || []) as DocumentItem[]);
+      else setCustomerDocuments([]);
+    } catch {
+      setCustomerDocuments([]);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -253,25 +399,133 @@ export default function CustomerManagementPage() {
   useEffect(() => {
     if (selectedCustomer) {
       loadCustomerNotes(selectedCustomer.id);
+      loadCustomerMessages(selectedCustomer.id);
+      loadCustomerDocuments(selectedCustomer.id);
+      setCustomerTab("overview");
     } else {
       setCustomerNotes([]);
+      setCustomerMessages([]);
+      setCustomerDocuments([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomer?.id]);
+
+  // ==================== KEYBOARD SHORTCUTS ====================
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const inInput =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+
+      // Esc closes modals / detail view
+      if (e.key === "Escape") {
+        if (appointmentOpen) setAppointmentOpen(false);
+        else if (selectedAppointment) setSelectedAppointment(null);
+        else if (shortcutsOpen) setShortcutsOpen(false);
+        else if (selectedCustomer) setSelectedCustomer(null);
+        return;
+      }
+
+      if (inInput) return;
+
+      if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === "n" || e.key === "N") {
+        if (selectedCustomer) {
+          setAppointmentOpen(true);
+          loadAppointmentOptions();
+        }
+      } else if (e.key === "?") {
+        setShortcutsOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    appointmentOpen,
+    selectedAppointment,
+    shortcutsOpen,
+    selectedCustomer,
+  ]);
 
   // ==================== DERIVED DATA ====================
 
   const filteredCustomers = useMemo(() => {
     const term = search.toLowerCase().trim();
-    if (!term) return customers;
 
-    return customers.filter(
-      (customer) =>
-        customer.name?.toLowerCase().includes(term) ||
-        customer.phone?.toLowerCase().includes(term) ||
-        customer.email?.toLowerCase().includes(term)
-    );
-  }, [customers, search]);
+    let list = customers;
+
+    if (term) {
+      list = list.filter(
+        (customer) =>
+          customer.name?.toLowerCase().includes(term) ||
+          customer.phone?.toLowerCase().includes(term) ||
+          customer.email?.toLowerCase().includes(term)
+      );
+    }
+
+    if (listTagFilter) {
+      list = list.filter((c) => (tags[c.id] || []).includes(listTagFilter));
+    }
+
+    if (listStatusFilter) {
+      list = list.filter((c) => {
+        const customerAppts = appointments.filter(
+          (a) => a.contact_id === c.id
+        );
+        if (listStatusFilter === "has_upcoming") {
+          const today = formatCalendarDate(new Date());
+          return customerAppts.some(
+            (a) =>
+              a.appointment_date >= today &&
+              (a.status === "pending" || a.status === "confirmed")
+          );
+        }
+        if (listStatusFilter === "no_appointments") {
+          return customerAppts.length === 0;
+        }
+        return customerAppts.some(
+          (a) => a.status.toLowerCase() === listStatusFilter
+        );
+      });
+    }
+
+    // Sorting
+    if (listSort === "name") {
+      list = [...list].sort((a, b) =>
+        (a.name || a.phone || "").localeCompare(b.name || b.phone || "")
+      );
+    } else if (listSort === "appointments") {
+      list = [...list].sort((a, b) => {
+        const ac = appointments.filter((x) => x.contact_id === a.id).length;
+        const bc = appointments.filter((x) => x.contact_id === b.id).length;
+        return bc - ac;
+      });
+    }
+
+    return list;
+  }, [
+    customers,
+    search,
+    tags,
+    listTagFilter,
+    listStatusFilter,
+    listSort,
+    appointments,
+  ]);
+
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    Object.values(tags).forEach((arr) => arr.forEach((t) => set.add(t)));
+    return Array.from(set).sort();
+  }, [tags]);
 
   const getCustomerAppointments = (customerId: string) =>
     appointments.filter((appointment) => appointment.contact_id === customerId);
@@ -284,6 +538,35 @@ export default function CustomerManagementPage() {
     (appointment) =>
       appointment.status === "cancelled" || appointment.status === "canceled"
   ).length;
+
+  const getUpcomingAppointment = (customerId: string) => {
+    const today = formatCalendarDate(new Date());
+    return appointments
+      .filter(
+        (a) =>
+          a.contact_id === customerId &&
+          a.appointment_date >= today &&
+          (a.status === "pending" || a.status === "confirmed")
+      )
+      .sort((a, b) =>
+        `${a.appointment_date}${a.appointment_time}`.localeCompare(
+          `${b.appointment_date}${b.appointment_time}`
+        )
+      )[0];
+  };
+
+  const getLifetimeStats = (customerId: string) => {
+    const list = getCustomerAppointments(customerId);
+    const completed = list.filter((a) => a.status === "completed");
+    const total = completed.reduce((sum, a) => sum + (a.amount || 0), 0);
+    const lastVisit = completed[0]?.appointment_date || null;
+    return {
+      totalVisits: completed.length,
+      totalRevenue: total,
+      lastVisit,
+      totalAppointments: list.length,
+    };
+  };
 
   // ==================== ACTIONS ====================
 
@@ -774,6 +1057,161 @@ export default function CustomerManagementPage() {
     await loadData();
   };
 
+  // ==================== BULK + EXPORT ACTIONS ====================
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredCustomers.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredCustomers.map((c) => c.id)));
+    }
+  };
+
+  const exportCustomersCSV = (onlySelected = false) => {
+    const source = onlySelected
+      ? customers.filter((c) => selectedIds.has(c.id))
+      : filteredCustomers;
+
+    const rows = [
+      [
+        "Name",
+        "Phone",
+        "Email",
+        "Company",
+        "Tags",
+        "Total Appointments",
+        "Created At",
+      ],
+      ...source.map((c) => [
+        c.name || "",
+        c.phone || "",
+        c.email || "",
+        c.company || "",
+        (tags[c.id] || []).join(" | "),
+        String(getCustomerAppointments(c.id).length),
+        c.created_at,
+      ]),
+    ];
+
+    const csv = rows
+      .map((row) =>
+        row
+          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+          .join(",")
+      )
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `customers-${formatCalendarDate(new Date())}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const bulkSendWhatsApp = async () => {
+    if (selectedIds.size === 0) return;
+    const message = window.prompt(
+      `Send WhatsApp message to ${selectedIds.size} customer(s):`
+    );
+    if (!message?.trim()) return;
+
+    setBulkWorking(true);
+    let sent = 0;
+    let failed = 0;
+
+    for (const id of Array.from(selectedIds)) {
+      try {
+        const res = await fetch("/api/whatsapp/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contact_id: id,
+            message_type: "text",
+            content_text: message,
+          }),
+        });
+        if (res.ok) sent++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+    }
+
+    setBulkWorking(false);
+    setSelectedIds(new Set());
+    alert(`Sent: ${sent}, Failed: ${failed}`);
+  };
+
+  const bulkAddTag = () => {
+    if (selectedIds.size === 0) return;
+    const tag = window.prompt("Enter tag to add to selected customers:");
+    if (!tag?.trim()) return;
+    const next = { ...tags };
+    Array.from(selectedIds).forEach((id) => {
+      const existing = next[id] || [];
+      if (!existing.includes(tag.trim())) {
+        next[id] = [...existing, tag.trim()];
+      }
+    });
+    persistTags(next);
+    setSelectedIds(new Set());
+  };
+
+  const printReceipt = (appointment: Appointment) => {
+    const customer = customers.find((c) => c.id === appointment.contact_id);
+    const html = `
+      <html>
+        <head>
+          <title>Appointment Receipt</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 40px; color:#111; }
+            h1 { font-size: 22px; margin-bottom: 4px; }
+            .muted { color:#666; font-size: 12px; }
+            .box { border:1px solid #ddd; border-radius:8px; padding:16px; margin-top:16px; }
+            table { width:100%; border-collapse:collapse; margin-top:16px; }
+            td { padding:8px 0; border-bottom:1px solid #eee; font-size:14px; }
+            td:first-child { color:#666; width: 160px; }
+          </style>
+        </head>
+        <body>
+          <h1>Appointment Receipt</h1>
+          <p class="muted">Generated ${new Date().toLocaleString()}</p>
+          <div class="box">
+            <table>
+              <tr><td>Patient</td><td>${appointment.patient_name || customer?.name || "-"}</td></tr>
+              <tr><td>Phone</td><td>${customer?.phone || "-"}</td></tr>
+              <tr><td>Email</td><td>${customer?.email || "-"}</td></tr>
+              <tr><td>Doctor</td><td>${getDoctorName(appointment.doctor_id)}</td></tr>
+              <tr><td>Service</td><td>${getServiceName(appointment.service_id)}</td></tr>
+              <tr><td>Date</td><td>${appointment.appointment_date}</td></tr>
+              <tr><td>Time</td><td>${appointment.appointment_time}</td></tr>
+              <tr><td>Status</td><td>${appointment.status}</td></tr>
+              ${appointment.amount ? `<tr><td>Amount</td><td>₹${appointment.amount}</td></tr>` : ""}
+            </table>
+          </div>
+          <p class="muted" style="margin-top:24px;">Thank you for visiting our clinic.</p>
+        </body>
+      </html>
+    `;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 300);
+  };
+
   // ==================== CALENDAR ENGINE ====================
 
   const calendarMonthLabel = calendarDate.toLocaleDateString("en-US", {
@@ -893,8 +1331,6 @@ export default function CustomerManagementPage() {
   };
 
   // ==================== SHARED MODALS ====================
-  // Modals are declared BEFORE the early return so they can be rendered
-  // from BOTH the customer details view and the customer list view.
 
   const appointmentModal =
     appointmentOpen && selectedCustomer ? (
@@ -1063,14 +1499,25 @@ export default function CustomerManagementPage() {
             </h2>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setSelectedAppointment(null)}
-            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200"
-            aria-label="Close appointment details"
-          >
-            <XCircle className="h-6 w-6" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => printReceipt(selectedAppointment)}
+              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200"
+              aria-label="Print receipt"
+              title="Print receipt"
+            >
+              <Printer className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedAppointment(null)}
+              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200"
+              aria-label="Close appointment details"
+            >
+              <XCircle className="h-6 w-6" />
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-4 p-6 sm:grid-cols-2">
@@ -1212,6 +1659,14 @@ export default function CustomerManagementPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
+              onClick={() => printReceipt(selectedAppointment)}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              <Printer className="h-4 w-4" />
+              Print Receipt
+            </button>
+            <button
+              type="button"
               onClick={() => setSelectedAppointment(null)}
               className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
             >
@@ -1227,22 +1682,66 @@ export default function CustomerManagementPage() {
 
   if (selectedCustomer) {
     const customerAppointments = getCustomerAppointments(selectedCustomer.id);
+    const upcoming = getUpcomingAppointment(selectedCustomer.id);
+    const stats = getLifetimeStats(selectedCustomer.id);
+    const customerTagList = tags[selectedCustomer.id] || [];
 
     return (
       <div className="min-h-screen bg-slate-50 p-4 text-slate-900 md:p-6 lg:p-8">
-        <div className="mx-auto max-w-5xl space-y-6">
-          <button
-            onClick={() => setSelectedCustomer(null)}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Customers
-          </button>
+        <div className="mx-auto max-w-6xl space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              onClick={() => setSelectedCustomer(null)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Customers
+            </button>
 
-          {/* Profile */}
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <Keyboard className="h-3.5 w-3.5" />
+              Press{" "}
+              <kbd className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono text-[10px]">
+                N
+              </kbd>{" "}
+              for new appointment ·{" "}
+              <kbd className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono text-[10px]">
+                Esc
+              </kbd>{" "}
+              to go back
+            </div>
+          </div>
+
+          {/* Upcoming banner */}
+          {upcoming && (
+            <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm">
+                  <Bell className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                    Upcoming Appointment
+                  </p>
+                  <p className="text-sm font-semibold text-emerald-900">
+                    {upcoming.appointment_date} at {upcoming.appointment_time}{" "}
+                    · {getDoctorName(upcoming.doctor_id)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedAppointment(upcoming)}
+                className="rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
+              >
+                View
+              </button>
+            </div>
+          )}
+
+          {/* Profile card */}
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-2xl font-bold text-white shadow-md">
                   {(selectedCustomer.name || selectedCustomer.phone || "?")
                     .charAt(0)
@@ -1254,9 +1753,84 @@ export default function CustomerManagementPage() {
                     {selectedCustomer.name || "Unnamed Customer"}
                   </h1>
                   <p className="mt-1 text-xs text-slate-500">
-                    ID: <span className="font-mono">{selectedCustomer.id}</span>
+                    ID:{" "}
+                    <span className="font-mono">{selectedCustomer.id}</span>
                   </p>
+
+                  {/* Tags */}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {customerTagList.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700"
+                      >
+                        <Tag className="h-3 w-3" />
+                        {tag}
+                        <button
+                          onClick={() =>
+                            removeTagFromCustomer(selectedCustomer.id, tag)
+                          }
+                          className="ml-1 rounded-full text-blue-400 transition hover:text-blue-700"
+                          aria-label={`Remove tag ${tag}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    <div className="inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 bg-white px-2 py-1">
+                      <input
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && tagInput.trim()) {
+                            addTagToCustomer(selectedCustomer.id, tagInput);
+                            setTagInput("");
+                          }
+                        }}
+                        placeholder="Add tag"
+                        className="w-20 bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
+                      />
+                      <button
+                        onClick={() => {
+                          if (tagInput.trim()) {
+                            addTagToCustomer(selectedCustomer.id, tagInput);
+                            setTagInput("");
+                          }
+                        }}
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
                 </div>
+              </div>
+
+              {/* Quick Actions Bar */}
+              <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4">
+                {selectedCustomer.phone && (
+                  <>
+                    <a
+                      href={`tel:${selectedCustomer.phone}`}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                    >
+                      <Phone className="h-4 w-4" />
+                      Call
+                    </a>
+                    <a
+                      href={`https://wa.me/${selectedCustomer.phone.replace(
+                        /[^0-9]/g,
+                        ""
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-green-600"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      WhatsApp
+                    </a>
+                  </>
+                )}
 
                 <button
                   onClick={() => {
@@ -1264,10 +1838,44 @@ export default function CustomerManagementPage() {
                     setAppointmentOpen(true);
                     loadAppointmentOptions();
                   }}
-                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
                 >
                   <Plus className="h-4 w-4" />
-                  New Appointment
+                  Book Appointment
+                </button>
+
+                <button
+                  onClick={() => {
+                    setCustomerTab("notes");
+                    setTimeout(
+                      () =>
+                        document
+                          .getElementById("new-note-input")
+                          ?.focus(),
+                      100
+                    );
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                >
+                  <Edit3 className="h-4 w-4" />
+                  Add Note
+                </button>
+
+                <button
+                  onClick={() => printReceipt({
+                    ...customerAppointments[0],
+                    id: customerAppointments[0]?.id || "",
+                    contact_id: selectedCustomer.id,
+                    patient_name: selectedCustomer.name || "",
+                    appointment_date: "",
+                    appointment_time: "",
+                    status: "",
+                  })}
+                  disabled={customerAppointments.length === 0}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Printer className="h-4 w-4" />
+                  Print
                 </button>
               </div>
             </div>
@@ -1291,185 +1899,245 @@ export default function CustomerManagementPage() {
             </div>
           </div>
 
-          {/* Summary */}
-          <div className="grid gap-4 sm:grid-cols-2">
+          {/* Lifetime stats */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title="Total Appointments"
-              value={customerAppointments.length}
+              value={stats.totalAppointments}
               icon={<CalendarDays className="h-5 w-5" />}
               variant="blue"
             />
             <StatCard
-              title="Active Appointments"
+              title="Completed Visits"
+              value={stats.totalVisits}
+              icon={<TrendingUp className="h-5 w-5" />}
+              variant="indigo"
+            />
+            <StatCard
+              title="Lifetime Revenue"
+              value={stats.totalRevenue}
+              icon={<IndianRupee className="h-5 w-5" />}
+              variant="amber"
+              prefix="₹"
+            />
+            <StatCard
+              title="Active"
               value={
                 customerAppointments.filter(
                   (a) => a.status === "pending" || a.status === "confirmed"
                 ).length
               }
               icon={<Clock className="h-5 w-5" />}
-              variant="amber"
+              variant="red"
             />
           </div>
 
-          {/* Notes */}
+          {/* Tabs */}
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 p-5">
-              <h2 className="text-lg font-semibold text-slate-900">
-                Customer Notes
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Internal notes about this customer
-              </p>
-            </div>
-
-            <div className="p-5">
-              <textarea
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Write a note about this customer..."
-                rows={3}
-                className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
-              />
-
-              <button
-                onClick={addCustomerNote}
-                disabled={savingNote || !newNote.trim()}
-                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {savingNote && <Loader2 className="h-4 w-4 animate-spin" />}
-                {savingNote ? "Saving..." : "Add Note"}
-              </button>
-
-              <div className="mt-5 space-y-3">
-                {customerNotes.length === 0 ? (
-                  <p className="text-sm text-slate-400">No notes yet.</p>
-                ) : (
-                  customerNotes.map((note) => (
-                    <div
-                      key={note.id}
-                      className="rounded-xl border border-slate-100 bg-slate-50 p-4"
-                    >
-                      <p className="text-sm text-slate-700">{note.note_text}</p>
-                      <p className="mt-2 text-xs text-slate-400">
-                        {new Date(note.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Appointment History */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 p-5">
-              <h2 className="text-lg font-semibold text-slate-900">
-                Appointment History
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                All appointments for this customer
-              </p>
-            </div>
-
-            {customerAppointments.length === 0 ? (
-              <div className="py-16 text-center">
-                <CalendarDays className="mx-auto h-10 w-10 text-slate-300" />
-                <p className="mt-3 text-sm font-medium text-slate-600">
-                  No appointments yet
-                </p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Appointment history will appear here.
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {customerAppointments.map((appointment) => (
-                  <div
-                    key={appointment.id}
-                    className="p-5 transition hover:bg-slate-50"
+            <div className="border-b border-slate-200 bg-slate-50/70">
+              <div className="flex overflow-x-auto">
+                {(
+                  [
+                    {
+                      id: "overview",
+                      label: "Overview",
+                      icon: <Activity className="h-4 w-4" />,
+                    },
+                    {
+                      id: "appointments",
+                      label: `Appointments (${customerAppointments.length})`,
+                      icon: <CalendarDays className="h-4 w-4" />,
+                    },
+                    {
+                      id: "notes",
+                      label: `Notes (${customerNotes.length})`,
+                      icon: <FileText className="h-4 w-4" />,
+                    },
+                    {
+                      id: "messages",
+                      label: `Messages (${customerMessages.length})`,
+                      icon: <MessageCircle className="h-4 w-4" />,
+                    },
+                    {
+                      id: "documents",
+                      label: `Documents (${customerDocuments.length})`,
+                      icon: <Paperclip className="h-4 w-4" />,
+                    },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setCustomerTab(tab.id)}
+                    className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-5 py-3.5 text-sm font-semibold transition ${
+                      customerTab === tab.id
+                        ? "border-blue-600 bg-white text-blue-600"
+                        : "border-transparent text-slate-500 hover:bg-white/70 hover:text-slate-700"
+                    }`}
                   >
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-blue-600" />
-                          <span className="font-semibold text-slate-900">
-                            {appointment.patient_name ||
-                              selectedCustomer.name ||
-                              "Patient"}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-wrap gap-3 text-sm text-slate-500">
-                          <span className="inline-flex items-center gap-1">
-                            <CalendarDays className="h-3.5 w-3.5" />
-                            {appointment.appointment_date}
-                          </span>
-                          <span className="inline-flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
-                            {appointment.appointment_time}
-                          </span>
-                          {appointment.gender && (
-                            <span>⚥ {appointment.gender}</span>
-                          )}
-                          {appointment.age && (
-                            <span>🎂 Age: {appointment.age}</span>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 text-xs">
-                          <span className="rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-600">
-                            <Stethoscope className="mr-1 inline h-3 w-3" />
-                            {getDoctorName(appointment.doctor_id)}
-                          </span>
-                          <span className="rounded-md bg-blue-50 px-2 py-1 font-medium text-blue-600">
-                            {getServiceName(appointment.service_id)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <StatusBadge status={appointment.status} />
-
-                        {(appointment.status === "pending" ||
-                          appointment.status === "confirmed") && (
-                          <>
-                            <button
-                              onClick={() => {
-                                const newDate = window.prompt(
-                                  "Enter new date (YYYY-MM-DD):"
-                                );
-                                if (!newDate) return;
-                                const newTime = window.prompt(
-                                  "Enter new time (HH:MM):"
-                                );
-                                if (!newTime) return;
-                                rescheduleAppointment(
-                                  appointment.id,
-                                  newDate,
-                                  newTime
-                                );
-                              }}
-                              className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
-                            >
-                              Reschedule
-                            </button>
-
-                            <button
-                              onClick={() =>
-                                cancelAppointment(appointment.id)
-                              }
-                              className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                    {tab.icon}
+                    {tab.label}
+                  </button>
                 ))}
               </div>
-            )}
+            </div>
+
+            <div className="p-5 md:p-6">
+              {customerTab === "overview" && (
+                <ActivityTimeline
+                  customer={selectedCustomer}
+                  appointments={customerAppointments}
+                  notes={customerNotes}
+                  messages={customerMessages}
+                  onSelectAppointment={setSelectedAppointment}
+                />
+              )}
+
+              {customerTab === "appointments" && (
+                <AppointmentsTab
+                  appointments={customerAppointments}
+                  customerName={selectedCustomer.name || ""}
+                  getDoctorName={getDoctorName}
+                  getServiceName={getServiceName}
+                  onSelect={setSelectedAppointment}
+                  onCancel={cancelAppointment}
+                  onReschedule={rescheduleAppointment}
+                />
+              )}
+
+              {customerTab === "notes" && (
+                <div>
+                  <textarea
+                    id="new-note-input"
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="Write a note about this customer..."
+                    rows={3}
+                    className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                  />
+
+                  <button
+                    onClick={addCustomerNote}
+                    disabled={savingNote || !newNote.trim()}
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingNote && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {savingNote ? "Saving..." : "Add Note"}
+                  </button>
+
+                  <div className="mt-5 space-y-3">
+                    {customerNotes.length === 0 ? (
+                      <p className="text-sm text-slate-400">No notes yet.</p>
+                    ) : (
+                      customerNotes.map((note) => (
+                        <div
+                          key={note.id}
+                          className="rounded-xl border border-slate-100 bg-slate-50 p-4"
+                        >
+                          <p className="text-sm text-slate-700">
+                            {note.note_text}
+                          </p>
+                          <p className="mt-2 text-xs text-slate-400">
+                            {new Date(note.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {customerTab === "messages" && (
+                <div>
+                  {loadingMessages ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                    </div>
+                  ) : customerMessages.length === 0 ? (
+                    <EmptyState
+                      icon={<MessageCircle className="h-10 w-10" />}
+                      title="No messages yet"
+                      description="WhatsApp conversations with this customer will appear here."
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {customerMessages.map((msg) => {
+                        const outbound =
+                          (msg.direction || "").toLowerCase() === "outbound";
+                        return (
+                          <div
+                            key={msg.id}
+                            className={`flex ${
+                              outbound ? "justify-end" : "justify-start"
+                            }`}
+                          >
+                            <div
+                              className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+                                outbound
+                                  ? "bg-blue-600 text-white"
+                                  : "border border-slate-200 bg-white text-slate-800"
+                              }`}
+                            >
+                              <p className="whitespace-pre-wrap">
+                                {msg.content_text || "(empty)"}
+                              </p>
+                              <p
+                                className={`mt-1 text-[10px] ${
+                                  outbound
+                                    ? "text-blue-100"
+                                    : "text-slate-400"
+                                }`}
+                              >
+                                {new Date(msg.created_at).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {customerTab === "documents" && (
+                <div>
+                  {loadingDocuments ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                    </div>
+                  ) : customerDocuments.length === 0 ? (
+                    <EmptyState
+                      icon={<Paperclip className="h-10 w-10" />}
+                      title="No documents"
+                      description="Upload prescriptions, reports or files for this customer."
+                    />
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {customerDocuments.map((doc) => (
+                        <a
+                          key={doc.id}
+                          href={doc.file_url || "#"}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:shadow-sm"
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                            <FileText className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-900">
+                              {doc.file_name}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {new Date(doc.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1491,11 +2159,28 @@ export default function CustomerManagementPage() {
               Customer Management
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Manage customers and their appointments from one place.
+              Manage customers, appointments and communication in one place.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShortcutsOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              title="Keyboard shortcuts"
+            >
+              <Keyboard className="h-4 w-4" />
+              Shortcuts
+            </button>
+
+            <button
+              onClick={() => exportCustomersCSV(false)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </button>
+
             <button
               onClick={() => setAddCustomerOpen(true)}
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
@@ -1506,10 +2191,9 @@ export default function CustomerManagementPage() {
 
             <button
               onClick={loadData}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               <RefreshCw className="h-4 w-4" />
-              Refresh
             </button>
           </div>
         </div>
@@ -1989,27 +2673,127 @@ export default function CustomerManagementPage() {
           )}
         </section>
 
-        {/* Search */}
+        {/* Search + Advanced filters */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="relative max-w-xl">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search customer by name, phone or email..."
-              className="w-full rounded-lg border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
+          <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                ref={searchRef}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search customer by name, phone or email...  ( / )"
+                className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <select
+              value={listStatusFilter}
+              onChange={(e) => setListStatusFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-blue-500"
+            >
+              <option value="">Any status</option>
+              <option value="has_upcoming">Has upcoming</option>
+              <option value="no_appointments">No appointments</option>
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+
+            <select
+              value={listTagFilter}
+              onChange={(e) => setListTagFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-blue-500"
+            >
+              <option value="">Any tag</option>
+              {allTags.map((tag) => (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={listSort}
+              onChange={(e) => setListSort(e.target.value as SortOption)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-blue-500"
+            >
+              <option value="recent">Sort: Recent</option>
+              <option value="name">Sort: Name (A-Z)</option>
+              <option value="appointments">Sort: Most appointments</option>
+            </select>
           </div>
         </div>
 
+        {/* Bulk actions */}
+        {selectedIds.size > 0 && (
+          <div className="sticky top-3 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 shadow-md">
+            <p className="text-sm font-semibold text-blue-900">
+              {selectedIds.size} selected
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={bulkSendWhatsApp}
+                disabled={bulkWorking}
+                className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-green-700 disabled:opacity-50"
+              >
+                {bulkWorking ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <MessageCircle className="h-3.5 w-3.5" />
+                )}
+                Send WhatsApp
+              </button>
+              <button
+                onClick={bulkAddTag}
+                disabled={bulkWorking}
+                className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                <Tag className="h-3.5 w-3.5" />
+                Add Tag
+              </button>
+              <button
+                onClick={() => exportCustomersCSV(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export Selected
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Customer List */}
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="font-semibold text-slate-900">Customers</h2>
-            <p className="text-sm text-slate-500">
-              {filteredCustomers.length} customer
-              {filteredCustomers.length === 1 ? "" : "s"} found
-            </p>
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={toggleSelectAll}
+                className="text-slate-500 transition hover:text-blue-600"
+                aria-label="Select all"
+              >
+                {selectedIds.size === filteredCustomers.length &&
+                filteredCustomers.length > 0 ? (
+                  <CheckSquare className="h-5 w-5 text-blue-600" />
+                ) : (
+                  <Square className="h-5 w-5" />
+                )}
+              </button>
+              <div>
+                <h2 className="font-semibold text-slate-900">Customers</h2>
+                <p className="text-sm text-slate-500">
+                  {filteredCustomers.length} customer
+                  {filteredCustomers.length === 1 ? "" : "s"} found
+                </p>
+              </div>
+            </div>
           </div>
 
           {loading ? (
@@ -2017,15 +2801,19 @@ export default function CustomerManagementPage() {
               <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
             </div>
           ) : filteredCustomers.length === 0 ? (
-            <div className="py-16 text-center text-sm text-slate-500">
-              No customers found.
-            </div>
+            <EmptyState
+              icon={<Users className="h-10 w-10" />}
+              title="No customers found"
+              description="Try adjusting your search or filters."
+            />
           ) : (
             <div className="divide-y divide-slate-100">
               {filteredCustomers.map((customer) => {
                 const customerAppointments = getCustomerAppointments(
                   customer.id
                 );
+                const customerTagList = tags[customer.id] || [];
+                const upcoming = getUpcomingAppointment(customer.id);
 
                 return (
                   <div
@@ -2034,6 +2822,18 @@ export default function CustomerManagementPage() {
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div className="flex min-w-0 items-center gap-3">
+                        <button
+                          onClick={() => toggleSelected(customer.id)}
+                          className="shrink-0 text-slate-400 transition hover:text-blue-600"
+                          aria-label="Select customer"
+                        >
+                          {selectedIds.has(customer.id) ? (
+                            <CheckSquare className="h-5 w-5 text-blue-600" />
+                          ) : (
+                            <Square className="h-5 w-5" />
+                          )}
+                        </button>
+
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 font-semibold text-white shadow-sm">
                           {(customer.name || customer.phone || "?")
                             .charAt(0)
@@ -2052,14 +2852,64 @@ export default function CustomerManagementPage() {
                               {customer.email}
                             </p>
                           )}
+
+                          {customerTagList.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {customerTagList.slice(0, 3).map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                              {customerTagList.length > 3 && (
+                                <span className="text-[10px] text-slate-400">
+                                  +{customerTagList.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {upcoming && (
+                            <p className="mt-1 text-[11px] font-semibold text-emerald-600">
+                              🟢 Upcoming: {upcoming.appointment_date}{" "}
+                              {upcoming.appointment_time}
+                            </p>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">
                           {customerAppointments.length} appointment
                           {customerAppointments.length === 1 ? "" : "s"}
                         </div>
+
+                        {customer.phone && (
+                          <a
+                            href={`tel:${customer.phone}`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-600 transition hover:bg-emerald-50"
+                            title="Call"
+                          >
+                            <Phone className="h-4 w-4" />
+                          </a>
+                        )}
+
+                        {customer.phone && (
+                          <a
+                            href={`https://wa.me/${customer.phone.replace(
+                              /[^0-9]/g,
+                              ""
+                            )}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-green-200 bg-white text-green-600 transition hover:bg-green-50"
+                            title="WhatsApp"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                          </a>
+                        )}
 
                         <button
                           onClick={() => setSelectedCustomer(customer)}
@@ -2079,6 +2929,56 @@ export default function CustomerManagementPage() {
 
       {appointmentModal}
       {appointmentDetailsModal}
+
+      {/* Keyboard Shortcuts Modal */}
+      {shortcutsOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setShortcutsOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">
+                Keyboard Shortcuts
+              </h2>
+              <button
+                onClick={() => setShortcutsOpen(false)}
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-3 text-sm">
+              {[
+                { keys: ["/"], label: "Focus search" },
+                { keys: ["N"], label: "New appointment (from customer)" },
+                { keys: ["Esc"], label: "Close modal / Go back" },
+                { keys: ["?"], label: "Show this dialog" },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between border-b border-slate-100 pb-2 last:border-0"
+                >
+                  <span className="text-slate-600">{item.label}</span>
+                  <div className="flex gap-1">
+                    {item.keys.map((k) => (
+                      <kbd
+                        key={k}
+                        className="rounded border border-slate-300 bg-slate-100 px-2 py-1 font-mono text-xs text-slate-700"
+                      >
+                        {k}
+                      </kbd>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <ContactForm
         open={addCustomerOpen}
@@ -2123,11 +3023,13 @@ function StatCard({
   value,
   icon,
   variant = "blue",
+  prefix = "",
 }: {
   title: string;
   value: number;
   icon: React.ReactNode;
   variant?: "blue" | "indigo" | "amber" | "red";
+  prefix?: string;
 }) {
   const variantClasses: Record<string, string> = {
     blue: "bg-blue-50 text-blue-600",
@@ -2141,7 +3043,10 @@ function StatCard({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-slate-500">{title}</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">
+            {prefix}
+            {value}
+          </p>
         </div>
         <div
           className={`rounded-lg p-2 ${
@@ -2199,5 +3104,263 @@ function StatusBadge({ status }: { status: string }) {
     >
       {label}
     </span>
+  );
+}
+
+function EmptyState({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="text-slate-300">{icon}</div>
+      <p className="mt-3 text-sm font-medium text-slate-600">{title}</p>
+      <p className="mt-1 max-w-xs text-xs text-slate-400">{description}</p>
+    </div>
+  );
+}
+
+function ActivityTimeline({
+  customer,
+  appointments,
+  notes,
+  messages,
+  onSelectAppointment,
+}: {
+  customer: Customer;
+  appointments: Appointment[];
+  notes: Note[];
+  messages: MessageItem[];
+  onSelectAppointment: (a: Appointment) => void;
+}) {
+  type Item = {
+    id: string;
+    date: string;
+    icon: React.ReactNode;
+    color: string;
+    title: string;
+    subtitle?: string;
+    onClick?: () => void;
+  };
+
+  const items: Item[] = [];
+
+  items.push({
+    id: `created-${customer.id}`,
+    date: customer.created_at,
+    icon: <User className="h-4 w-4" />,
+    color: "bg-blue-100 text-blue-600",
+    title: "Customer created",
+    subtitle: customer.name || customer.phone,
+  });
+
+  appointments.forEach((a) => {
+    items.push({
+      id: `appt-${a.id}`,
+      date: `${a.appointment_date}T${a.appointment_time || "00:00"}:00`,
+      icon: <CalendarDays className="h-4 w-4" />,
+      color:
+        a.status === "completed"
+          ? "bg-indigo-100 text-indigo-600"
+          : a.status === "cancelled"
+          ? "bg-red-100 text-red-600"
+          : "bg-emerald-100 text-emerald-600",
+      title: `Appointment ${a.status}`,
+      subtitle: `${a.appointment_date} ${a.appointment_time} · ${
+        a.patient_name || ""
+      }`,
+      onClick: () => onSelectAppointment(a),
+    });
+  });
+
+  notes.forEach((n) => {
+    items.push({
+      id: `note-${n.id}`,
+      date: n.created_at,
+      icon: <FileText className="h-4 w-4" />,
+      color: "bg-amber-100 text-amber-600",
+      title: "Note added",
+      subtitle:
+        n.note_text.length > 60
+          ? `${n.note_text.slice(0, 60)}...`
+          : n.note_text,
+    });
+  });
+
+  messages.slice(0, 10).forEach((m) => {
+    items.push({
+      id: `msg-${m.id}`,
+      date: m.created_at,
+      icon: <MessageCircle className="h-4 w-4" />,
+      color: "bg-green-100 text-green-600",
+      title: "WhatsApp message",
+      subtitle:
+        (m.content_text || "").length > 60
+          ? `${(m.content_text || "").slice(0, 60)}...`
+          : m.content_text || "(media)",
+    });
+  });
+
+  items.sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        icon={<Activity className="h-10 w-10" />}
+        title="No activity yet"
+        description="Once this customer has appointments or notes, the timeline will appear here."
+      />
+    );
+  }
+
+  return (
+    <div className="relative">
+      <div className="absolute left-[19px] top-3 bottom-3 w-px bg-slate-200" />
+      <div className="space-y-4">
+        {items.map((item) => (
+          <div key={item.id} className="relative flex gap-4">
+            <div
+              className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${item.color}`}
+            >
+              {item.icon}
+            </div>
+            <div
+              className={`flex-1 rounded-xl border border-slate-100 bg-white p-3 transition ${
+                item.onClick
+                  ? "cursor-pointer hover:border-blue-200 hover:shadow-sm"
+                  : ""
+              }`}
+              onClick={item.onClick}
+            >
+              <p className="text-sm font-semibold text-slate-900">
+                {item.title}
+              </p>
+              {item.subtitle && (
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {item.subtitle}
+                </p>
+              )}
+              <p className="mt-1 text-[10px] text-slate-400">
+                {new Date(item.date).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AppointmentsTab({
+  appointments,
+  customerName,
+  getDoctorName,
+  getServiceName,
+  onSelect,
+  onCancel,
+  onReschedule,
+}: {
+  appointments: Appointment[];
+  customerName: string;
+  getDoctorName: (id?: string) => string;
+  getServiceName: (id?: string) => string;
+  onSelect: (a: Appointment) => void;
+  onCancel: (id: string) => void;
+  onReschedule: (id: string, date: string, time: string) => void;
+}) {
+  if (appointments.length === 0) {
+    return (
+      <EmptyState
+        icon={<CalendarDays className="h-10 w-10" />}
+        title="No appointments yet"
+        description="Appointment history will appear here."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {appointments.map((appointment) => (
+        <div
+          key={appointment.id}
+          className="rounded-xl border border-slate-200 p-4 transition hover:border-blue-200 hover:shadow-sm"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <button
+              onClick={() => onSelect(appointment)}
+              className="flex-1 text-left"
+            >
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-blue-600" />
+                <span className="font-semibold text-slate-900">
+                  {appointment.patient_name || customerName || "Patient"}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-500">
+                <span className="inline-flex items-center gap-1">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  {appointment.appointment_date}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  {appointment.appointment_time}
+                </span>
+                {appointment.gender && <span>⚥ {appointment.gender}</span>}
+                {appointment.age && <span>🎂 {appointment.age}</span>}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-600">
+                  <Stethoscope className="mr-1 inline h-3 w-3" />
+                  {getDoctorName(appointment.doctor_id)}
+                </span>
+                <span className="rounded-md bg-blue-50 px-2 py-1 font-medium text-blue-600">
+                  {getServiceName(appointment.service_id)}
+                </span>
+              </div>
+            </button>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={appointment.status} />
+
+              {(appointment.status === "pending" ||
+                appointment.status === "confirmed") && (
+                <>
+                  <button
+                    onClick={() => {
+                      const newDate = window.prompt(
+                        "Enter new date (YYYY-MM-DD):"
+                      );
+                      if (!newDate) return;
+                      const newTime = window.prompt(
+                        "Enter new time (HH:MM):"
+                      );
+                      if (!newTime) return;
+                      onReschedule(appointment.id, newDate, newTime);
+                    }}
+                    className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
+                  >
+                    Reschedule
+                  </button>
+
+                  <button
+                    onClick={() => onCancel(appointment.id)}
+                    className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                  >
+                    Cancel
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
