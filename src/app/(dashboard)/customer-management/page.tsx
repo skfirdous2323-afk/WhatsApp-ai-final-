@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { engineSendText } from '@/lib/automations/meta-send'
 import { ContactForm } from "@/components/contacts/contact-form";
 import {
   Search,
@@ -68,6 +69,13 @@ export default function CustomerManagementPage() {
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [calendarView, setCalendarView] = useState<"day" | "week" | "month">("month");
   const [savingAppointment, setSavingAppointment] = useState(false);
+  const [calendarDoctorFilter, setCalendarDoctorFilter] = useState("");
+  const [calendarStatusFilter, setCalendarStatusFilter] = useState("");
+  const [appointmentSearch, setAppointmentSearch] = useState("");
+  const [selectedAppointment, setSelectedAppointment] =
+    useState<Appointment | null>(null);
+  const [updatingAppointmentStatus, setUpdatingAppointmentStatus] =
+    useState(false);
 
   const getClinicId = async (userId: string) => {
     const { data: clinic, error: clinicError } = await supabase
@@ -272,6 +280,23 @@ const rescheduleAppointment = async (
       return [];
     }
 
+    // Respect this doctor's own working days and hours
+    const { data: doctor } = await supabase
+      .from("clinic_doctors")
+      .select("available_days, start_time, end_time")
+      .eq("id", doctorId)
+      .maybeSingle();
+
+    if (doctor?.available_days?.length) {
+      const doctorDays = doctor.available_days.map((day: string) =>
+        day.toLowerCase()
+      );
+
+      if (!doctorDays.includes(weekday.toLowerCase())) {
+        return [];
+      }
+    }
+
     const { data: booked } = await supabase
       .from("appointments")
       .select("appointment_time")
@@ -284,14 +309,18 @@ const rescheduleAppointment = async (
     );
 
     const slots: string[] = [];
-    const [openHour, openMinute] = String(workingHour.open_time || "09:00")
-      .slice(0, 5)
-      .split(":")
-      .map(Number);
-    const [closeHour, closeMinute] = String(workingHour.close_time || "18:00")
-      .slice(0, 5)
-      .split(":")
-      .map(Number);
+
+    // Doctor hours override clinic hours when configured.
+    const doctorStart = String(
+      doctor?.start_time || workingHour.open_time || "09:00"
+    ).slice(0, 5);
+
+    const doctorEnd = String(
+      doctor?.end_time || workingHour.close_time || "18:00"
+    ).slice(0, 5);
+
+    const [openHour, openMinute] = doctorStart.split(":").map(Number);
+    const [closeHour, closeMinute] = doctorEnd.split(":").map(Number);
 
     let currentMinutes = openHour * 60 + openMinute;
     const closingMinutes = closeHour * 60 + closeMinute;
@@ -344,6 +373,19 @@ const rescheduleAppointment = async (
 
       const clinicId = await getClinicId(user.id);
 
+      // Validate that the selected doctor can provide the selected service.
+      const selectedService = services.find(
+        (service) => service.id === appointmentService
+      );
+
+      if (
+        selectedService?.assigned_doctors?.length &&
+        !selectedService.assigned_doctors.includes(appointmentDoctor)
+      ) {
+        alert("The selected doctor is not assigned to this service. Please select an assigned doctor.");
+        return;
+      }
+
       const { data: existingAppointment } = await supabase
         .from("appointments")
         .select("id")
@@ -361,7 +403,7 @@ const rescheduleAppointment = async (
         return;
       }
 
-      const { error } = await supabase.from("appointments").insert({
+      const { data: newAppointment, error } = await supabase.from("appointments").insert({
         clinic_id: clinicId,
         user_id: user.id,
         contact_id: selectedCustomer.id,
@@ -373,12 +415,71 @@ const rescheduleAppointment = async (
         gender: appointmentGender || null,
         age: appointmentAge ? Number(appointmentAge) : null,
         status: "pending",
-      });
+      }).select("id").single();
 
       if (error) {
         console.error("Create appointment error:", error);
         alert("Failed to create appointment.");
         return;
+      }
+
+      // Send WhatsApp appointment confirmation.
+      // The appointment is already saved, so a WhatsApp failure must not
+      // cancel or roll back the appointment.
+      try {
+        const doctorName = getDoctorName(appointmentDoctor);
+        const serviceName = getServiceName(appointmentService);
+        const patientName =
+          appointmentPatientName.trim() || selectedCustomer.name || "Patient";
+
+        const formattedDate = new Date(
+          `${appointmentDate}T00:00:00`
+        ).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        });
+
+        const confirmationMessage = [
+          `Hello ${patientName},`,
+          ``,
+          `Your appointment has been booked successfully.`,
+          ``,
+          `👨‍⚕️ Doctor: ${doctorName}`,
+          `🩺 Service: ${serviceName}`,
+          `📅 Date: ${formattedDate}`,
+          `🕐 Time: ${appointmentTime}`,
+          `📌 Status: Pending Confirmation`,
+          ``,
+          `Please contact the clinic if you need to reschedule or cancel.`,
+          ``,
+          `Thank you.`,
+        ].join("\n");
+
+        const whatsappResponse = await fetch("/api/whatsapp/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contact_id: selectedCustomer.id,
+            message_type: "text",
+            content_text: confirmationMessage,
+          }),
+        });
+
+        if (!whatsappResponse.ok) {
+          const whatsappError = await whatsappResponse.text();
+          console.error(
+            "Appointment WhatsApp confirmation failed:",
+            whatsappError
+          );
+        }
+      } catch (whatsappError) {
+        console.error(
+          "Appointment WhatsApp confirmation error:",
+          whatsappError
+        );
       }
 
       setAppointmentDoctor("");
@@ -396,15 +497,196 @@ const rescheduleAppointment = async (
     }
   };
 
+  const updateAppointmentStatus = async (
+    appointmentId: string,
+    status: "pending" | "confirmed" | "completed" | "cancelled" | "no-show"
+  ) => {
+    setUpdatingAppointmentStatus(true);
+
+    try {
+      const { error } = await supabase
+        .from("appointments")
+        .update({ status })
+        .eq("id", appointmentId);
+
+      if (error) {
+        console.error("Appointment status update error:", error);
+        alert("Failed to update appointment status.");
+        return;
+      }
+
+      setSelectedAppointment((current) =>
+        current?.id === appointmentId
+          ? { ...current, status }
+          : current
+      );
+
+      // Send a status-specific WhatsApp notification.
+      // Notification failure must never undo the appointment status update.
+      try {
+        const appointment = appointments.find(
+          (item) => item.id === appointmentId
+        );
+
+        if (appointment?.contact_id) {
+          const customer = customers.find(
+            (item) => item.id === appointment.contact_id
+          );
+
+          const doctorName = getDoctorName(appointment.doctor_id);
+          const serviceName = getServiceName(appointment.service_id);
+          const patientName =
+            appointment.patient_name ||
+            customer?.name ||
+            "Patient";
+
+          const statusMessages: Record<string, string> = {
+            pending:
+              "Your appointment is currently pending confirmation from the clinic.",
+            confirmed:
+              "Your appointment has been confirmed by the clinic.",
+            cancelled:
+              "Your appointment has been cancelled. Please contact the clinic if you need a new appointment.",
+            completed:
+              "Your appointment has been marked as completed. Thank you for visiting the clinic.",
+            "no-show":
+              "Our records show that the appointment was marked as no-show. Please contact the clinic if you would like to book another appointment.",
+          };
+
+          const formattedDate = new Date(
+            `${appointment.appointment_date}T00:00:00`
+          ).toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          });
+
+          const notification = [
+            `Hello ${patientName},`,
+            ``,
+            statusMessages[status],
+            ``,
+            `👨‍⚕️ Doctor: ${doctorName}`,
+            `🩺 Service: ${serviceName}`,
+            `📅 Date: ${formattedDate}`,
+            `🕐 Time: ${appointment.appointment_time}`,
+            ``,
+            `Thank you.`,
+          ].join("\n");
+
+          const whatsappResponse = await fetch("/api/whatsapp/send", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              contact_id: appointment.contact_id,
+              message_type: "text",
+              content_text: notification,
+            }),
+          });
+
+          if (!whatsappResponse.ok) {
+            console.error(
+              "Appointment status WhatsApp notification failed:",
+              await whatsappResponse.text()
+            );
+          }
+        }
+      } catch (whatsappError) {
+        console.error(
+          "Appointment status WhatsApp notification error:",
+          whatsappError
+        );
+      }
+
+      await loadData();
+    } finally {
+      setUpdatingAppointmentStatus(false);
+    }
+  };
+
   const cancelAppointment = async (appointmentId: string) => {
     const { error } = await supabase
       .from("appointments")
       .update({ status: "cancelled" })
       .eq("id", appointmentId);
 
-    if (!error) {
-      await loadData();
+    if (error) {
+      console.error("Cancel appointment error:", error);
+      alert("Failed to cancel appointment.");
+      return;
     }
+
+    // Notify the patient when an appointment is cancelled.
+    try {
+      const appointment = appointments.find(
+        (item) => item.id === appointmentId
+      );
+
+      if (appointment?.contact_id) {
+        const customer = customers.find(
+          (item) => item.id === appointment.contact_id
+        );
+
+        const patientName =
+          appointment.patient_name ||
+          customer?.name ||
+          "Patient";
+
+        const doctorName = getDoctorName(appointment.doctor_id);
+        const serviceName = getServiceName(appointment.service_id);
+
+        const formattedDate = new Date(
+          `${appointment.appointment_date}T00:00:00`
+        ).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        });
+
+        const notification = [
+          `Hello ${patientName},`,
+          ``,
+          `❌ Your appointment has been cancelled.`,
+          ``,
+          `👨‍⚕️ Doctor: ${doctorName}`,
+          `🩺 Service: ${serviceName}`,
+          `📅 Date: ${formattedDate}`,
+          `🕐 Time: ${appointment.appointment_time}`,
+          ``,
+          `Please contact the clinic if you need to book another appointment.`,
+          ``,
+          `Thank you.`,
+        ].join("\n");
+
+        const whatsappResponse = await fetch("/api/whatsapp/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contact_id: appointment.contact_id,
+            message_type: "text",
+            content_text: notification,
+          }),
+        });
+
+        if (!whatsappResponse.ok) {
+          console.error(
+            "Cancellation WhatsApp notification failed:",
+            await whatsappResponse.text()
+          );
+        }
+      }
+    } catch (whatsappError) {
+      console.error(
+        "Cancellation WhatsApp notification error:",
+        whatsappError
+      );
+    }
+
+    await loadData();
   };
 
   // ==================== APPOINTMENT CALENDAR ENGINE ====================
@@ -462,9 +744,45 @@ const rescheduleAppointment = async (
 
   const appointmentsForDate = (date: Date) => {
     const dateKey = formatCalendarDate(date);
+    const query = appointmentSearch.trim().toLowerCase();
 
     return appointments
       .filter((appointment) => appointment.appointment_date === dateKey)
+      .filter((appointment) => {
+        if (!query) return true;
+
+        const customer = customers.find(
+          (item) => item.id === appointment.contact_id
+        );
+
+        const doctorName = getDoctorName(appointment.doctor_id);
+        const serviceName = getServiceName(appointment.service_id);
+
+        return [
+          appointment.patient_name,
+          customer?.name,
+          customer?.phone,
+          customer?.email,
+          doctorName,
+          serviceName,
+          appointment.status,
+          appointment.appointment_time,
+        ]
+          .filter(Boolean)
+          .some((value) =>
+            String(value).toLowerCase().includes(query)
+          );
+      })
+      .filter(
+        (appointment) =>
+          !calendarDoctorFilter ||
+          appointment.doctor_id === calendarDoctorFilter
+      )
+      .filter(
+        (appointment) =>
+          !calendarStatusFilter ||
+          appointment.status.toLowerCase() === calendarStatusFilter
+      )
       .sort((a, b) =>
         a.appointment_time.localeCompare(b.appointment_time)
       );
@@ -939,6 +1257,96 @@ const rescheduleAppointment = async (
               </div>
             </div>
 
+            <div className="mt-5">
+              <input
+                type="search"
+                value={appointmentSearch}
+                onChange={(e) => setAppointmentSearch(e.target.value)}
+                placeholder="Search patient, phone, doctor, service, status or time..."
+                className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+              {[
+                {
+                  label: "Today",
+                  value: appointments.filter(
+                    (a) => a.appointment_date === formatCalendarDate(new Date())
+                  ).length,
+                  className: "border-blue-200 bg-blue-50 text-blue-700",
+                },
+                {
+                  label: "Pending",
+                  value: appointments.filter(
+                    (a) => a.status.toLowerCase() === "pending"
+                  ).length,
+                  className: "border-amber-200 bg-amber-50 text-amber-700",
+                },
+                {
+                  label: "Confirmed",
+                  value: appointments.filter(
+                    (a) => a.status.toLowerCase() === "confirmed"
+                  ).length,
+                  className: "border-green-200 bg-green-50 text-green-700",
+                },
+                {
+                  label: "Completed",
+                  value: appointments.filter(
+                    (a) => a.status.toLowerCase() === "completed"
+                  ).length,
+                  className: "border-indigo-200 bg-indigo-50 text-indigo-700",
+                },
+                {
+                  label: "Cancelled / No-show",
+                  value: appointments.filter((a) =>
+                    ["cancelled", "canceled", "no-show"].includes(
+                      a.status.toLowerCase()
+                    )
+                  ).length,
+                  className: "border-red-200 bg-red-50 text-red-700",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className={`rounded-xl border px-4 py-3 ${stat.className}`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide">
+                    {stat.label}
+                  </p>
+                  <p className="mt-1 text-2xl font-bold">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 grid gap-3 border-t border-slate-200 pt-4 md:grid-cols-2">
+              <select
+                value={calendarDoctorFilter}
+                onChange={(e) => setCalendarDoctorFilter(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-blue-500"
+              >
+                <option value="">All Doctors</option>
+                {doctors.map((doctor) => (
+                  <option key={doctor.id} value={doctor.id}>
+                    {doctor.doctor_name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={calendarStatusFilter}
+                onChange={(e) => setCalendarStatusFilter(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-blue-500"
+              >
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="completed">Completed</option>
+                <option value="no-show">No-show</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+
             <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="text-lg font-bold text-slate-900">
                 {calendarView === "month"
@@ -1039,7 +1447,7 @@ const rescheduleAppointment = async (
                                 const customer = customers.find(
                                   (item) => item.id === appointment.contact_id
                                 );
-                                if (customer) setSelectedCustomer(customer);
+                                setSelectedAppointment(appointment);
                               }}
                               className={`w-full rounded-lg border p-2 text-left transition hover:shadow-sm ${getAppointmentStatusClass(
                                 appointment.status
@@ -1134,7 +1542,7 @@ const rescheduleAppointment = async (
                                     (item) =>
                                       item.id === appointment.contact_id
                                   );
-                                  if (customer) setSelectedCustomer(customer);
+                                  setSelectedAppointment(appointment);
                                 }}
                                 className={`w-full rounded-xl border p-3 text-left ${getAppointmentStatusClass(
                                   appointment.status
@@ -1192,9 +1600,9 @@ const rescheduleAppointment = async (
                           const customer = customers.find(
                             (item) => item.id === appointment.contact_id
                           );
-                          if (customer) setSelectedCustomer(customer);
-                        }}
-                        className="flex w-full flex-col gap-4 p-5 text-left transition hover:bg-slate-50 md:flex-row md:items-center"
+                        setSelectedAppointment(appointment);
+                      }}
+                      className="flex w-full flex-col gap-4 p-5 text-left transition hover:bg-slate-50 md:flex-row md:items-center"
                       >
                         <div className="w-24 shrink-0">
                           <p className="text-lg font-bold text-slate-900">
@@ -1384,6 +1792,13 @@ const rescheduleAppointment = async (
                 onChange={(e) => {
                   const date = e.target.value;
                   setAppointmentDate(date);
+                  setAppointmentTime("");
+
+                  if (!appointmentDoctor || !date) {
+                    setAvailableSlots([]);
+                    return;
+                  }
+
                   refreshAvailableSlots(appointmentDoctor, date);
                 }}
                 className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
@@ -1463,6 +1878,190 @@ const rescheduleAppointment = async (
               >
                 {savingAppointment ? "Creating..." : "Create Appointment"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedAppointment && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                  Appointment Details
+                </p>
+                <h2 className="mt-1 text-xl font-bold text-slate-900">
+                  {selectedAppointment.patient_name || "Patient"}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedAppointment(null)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-200"
+                aria-label="Close appointment details"
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="grid gap-4 p-6 sm:grid-cols-2">
+          {(() => {
+            const customer = customers.find(
+              (item) => item.id === selectedAppointment.contact_id
+            );
+            const phone = customer?.phone || "";
+
+            return (
+              <div className="sm:col-span-2 flex flex-wrap gap-2 border-b border-slate-200 pb-4">
+                {phone && (
+                  <>
+                    <a
+                      href={`tel:${phone}`}
+                      className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                    >
+                      <Phone className="h-4 w-4" />
+                      Call Patient
+                    </a>
+                    <a
+                      href={`https://wa.me/${phone.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+                    >
+                      WhatsApp
+                    </a>
+                  </>
+                )}
+
+                {customer && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAppointment(null);
+                      setSelectedCustomer(customer);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <User className="h-4 w-4" />
+                    Patient Profile
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="text-xs font-semibold uppercase text-slate-400">
+                  Date
+                </p>
+                <p className="mt-1 font-semibold text-slate-900">
+                  {selectedAppointment.appointment_date}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="text-xs font-semibold uppercase text-slate-400">
+                  Time
+                </p>
+                <p className="mt-1 font-semibold text-slate-900">
+                  {selectedAppointment.appointment_time}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="text-xs font-semibold uppercase text-slate-400">
+                  Doctor
+                </p>
+                <p className="mt-1 font-semibold text-slate-900">
+                  {getDoctorName(selectedAppointment.doctor_id)}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="text-xs font-semibold uppercase text-slate-400">
+                  Service
+                </p>
+                <p className="mt-1 font-semibold text-slate-900">
+                  {getServiceName(selectedAppointment.service_id)}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="text-xs font-semibold uppercase text-slate-400">
+                  Patient
+                </p>
+                <p className="mt-1 font-semibold text-slate-900">
+                  {selectedAppointment.patient_name || "Not available"}
+                </p>
+                {(() => {
+                  const customer = customers.find(
+                    (item) => item.id === selectedAppointment.contact_id
+                  );
+
+                  return (
+                    <div className="mt-2 space-y-1 text-xs text-slate-500">
+                      <p>📞 {customer?.phone || "Phone not available"}</p>
+                      <p>✉️ {customer?.email || "Email not available"}</p>
+                      <p className="break-all">
+                        ID: {selectedAppointment.contact_id}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="text-xs font-semibold uppercase text-slate-400">
+                  Patient Details
+                </p>
+                <p className="mt-1 font-semibold text-slate-900">
+                  {selectedAppointment.gender || "Gender not set"}
+                  {selectedAppointment.age !== undefined &&
+                    selectedAppointment.age !== null
+                    ? ` • ${selectedAppointment.age} years`
+                    : ""}
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 px-6 py-5">
+              <p className="mb-3 text-sm font-semibold text-slate-700">
+                Appointment Status
+              </p>
+
+              <div className="mb-5 flex flex-wrap gap-2">
+                {(
+                  ["pending", "confirmed", "completed", "no-show", "cancelled"] as const
+                ).map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    disabled={updatingAppointmentStatus}
+                    onClick={() =>
+                      updateAppointmentStatus(selectedAppointment.id, status)
+                    }
+                    className={`rounded-lg border px-3 py-2 text-xs font-semibold capitalize transition ${
+                      selectedAppointment.status === status
+                        ? "border-blue-600 bg-blue-600 text-white"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setSelectedAppointment(null)}
+                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
