@@ -1217,12 +1217,10 @@ function PipelineDonutCard({
   loading: boolean;
   currency: string;
 }) {
-  const rawData = data as any;
-  const items: Array<{ label: string; value: number }> =
-    rawData?.items ||
-    rawData?.stages ||
-    rawData?.breakdown ||
-    (Array.isArray(rawData) ? rawData : []);
+  const items = (data?.items || []) as Array<{
+    label: string;
+    value: number;
+  }>;
   const COLORS = [
     "#3b82f6",
     "#8b5cf6",
@@ -1289,7 +1287,7 @@ function PipelineDonutCard({
                       boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
                       fontSize: 12,
                     }}
-                    formatter={((v: any) => formatCurrency(Number(v) || 0, currency)) as any}
+                    formatter={(v: number) => formatCurrency(v, currency)}
                   />
                 </PieChart>
               </ResponsiveContainer>
