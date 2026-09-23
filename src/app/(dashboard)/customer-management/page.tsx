@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { engineSendText } from '@/lib/automations/meta-send'
 import { ContactForm } from "@/components/contacts/contact-form";
 import {
   Search,
@@ -17,6 +16,12 @@ import {
   Building2,
   ArrowLeft,
   User,
+  MessageCircle,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Stethoscope,
 } from "lucide-react";
 
 type Customer = {
@@ -41,20 +46,35 @@ type Appointment = {
   service_id?: string;
 };
 
+type Note = {
+  id: string;
+  note_text: string;
+  created_at: string;
+};
+
+type Doctor = { id: string; doctor_name: string };
+type Service = {
+  id: string;
+  service_name: string;
+  duration_minutes?: number;
+  assigned_doctors?: string[];
+};
+
 export default function CustomerManagementPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [selectedCustomer, setSelectedCustomer] =
-    useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null
+  );
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [appointmentOpen, setAppointmentOpen] = useState(false);
-  const [doctors, setDoctors] = useState<{ id: string; doctor_name: string }[]>([]);
-  const [services, setServices] = useState<{ id: string; service_name: string; duration_minutes?: number; assigned_doctors?: string[] }[]>([]);
-  const [customerNotes, setCustomerNotes] = useState<{ id: string; note_text: string; created_at: string }[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [customerNotes, setCustomerNotes] = useState<Note[]>([]);
   const [newNote, setNewNote] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [appointmentDoctor, setAppointmentDoctor] = useState("");
@@ -67,7 +87,9 @@ export default function CustomerManagementPage() {
   const [appointmentGender, setAppointmentGender] = useState("");
   const [appointmentAge, setAppointmentAge] = useState("");
   const [calendarDate, setCalendarDate] = useState(new Date());
-  const [calendarView, setCalendarView] = useState<"day" | "week" | "month">("month");
+  const [calendarView, setCalendarView] = useState<"day" | "week" | "month">(
+    "month"
+  );
   const [savingAppointment, setSavingAppointment] = useState(false);
   const [calendarDoctorFilter, setCalendarDoctorFilter] = useState("");
   const [calendarStatusFilter, setCalendarStatusFilter] = useState("");
@@ -76,6 +98,58 @@ export default function CustomerManagementPage() {
     useState<Appointment | null>(null);
   const [updatingAppointmentStatus, setUpdatingAppointmentStatus] =
     useState(false);
+
+  // ==================== HELPERS (declared before use) ====================
+
+  const formatCalendarDate = (date: Date) => date.toLocaleDateString("en-CA");
+
+  const getDoctorName = (doctorId?: string) => {
+    if (!doctorId) return "Unassigned";
+    return (
+      doctors.find((doctor) => doctor.id === doctorId)?.doctor_name ||
+      "Doctor"
+    );
+  };
+
+  const getServiceName = (serviceId?: string) => {
+    if (!serviceId) return "Consultation";
+    return (
+      services.find((service) => service.id === serviceId)?.service_name ||
+      "Service"
+    );
+  };
+
+  const getAppointmentStatusClass = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "confirmed":
+        return "border-emerald-200 bg-emerald-50 text-emerald-700";
+      case "completed":
+        return "border-blue-200 bg-blue-50 text-blue-700";
+      case "cancelled":
+      case "canceled":
+        return "border-red-200 bg-red-50 text-red-700";
+      case "no-show":
+        return "border-slate-200 bg-slate-100 text-slate-600";
+      default:
+        return "border-amber-200 bg-amber-50 text-amber-700";
+    }
+  };
+
+  const getAppointmentStatusLabel = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "confirmed":
+        return "Confirmed";
+      case "completed":
+        return "Completed";
+      case "cancelled":
+      case "canceled":
+        return "Cancelled";
+      case "no-show":
+        return "No-show";
+      default:
+        return "Pending";
+    }
+  };
 
   const getClinicId = async (userId: string) => {
     const { data: clinic, error: clinicError } = await supabase
@@ -93,9 +167,14 @@ export default function CustomerManagementPage() {
     return clinic.id;
   };
 
+  // ==================== DATA LOADERS ====================
+
   const loadAppointmentOptions = async () => {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
       if (userError || !user) return;
 
@@ -110,14 +189,14 @@ export default function CustomerManagementPage() {
 
         supabase
           .from("clinic_services")
-          .select("id, service_name, duration_minutes")
+          .select("id, service_name, duration_minutes, assigned_doctors")
           .eq("clinic_id", clinicId)
           .eq("is_active", true)
           .order("created_at", { ascending: false }),
       ]);
 
-      setDoctors(doctorData || []);
-      setServices(serviceData || []);
+      setDoctors((doctorData || []) as Doctor[]);
+      setServices((serviceData || []) as Service[]);
     } catch (error) {
       console.error("Appointment options error:", error);
     }
@@ -126,8 +205,11 @@ export default function CustomerManagementPage() {
   const loadData = async () => {
     setLoading(true);
 
-    const [{ data: contacts }, { data: appointmentData }] =
-      await Promise.all([
+    try {
+      const [
+        { data: contacts, error: contactsError },
+        { data: appointmentData, error: appointmentsError },
+      ] = await Promise.all([
         supabase
           .from("contacts")
           .select("id, name, phone, email, company, created_at")
@@ -141,18 +223,46 @@ export default function CustomerManagementPage() {
           .order("appointment_date", { ascending: false }),
       ]);
 
-    setCustomers((contacts || []) as Customer[]);
-    setAppointments((appointmentData || []) as Appointment[]);
-    setLoading(false);
+      if (contactsError) console.error("Contacts load error:", contactsError);
+      if (appointmentsError)
+        console.error("Appointments load error:", appointmentsError);
+
+      setCustomers((contacts || []) as Customer[]);
+      setAppointments((appointmentData || []) as Appointment[]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadCustomerNotes = async (contactId: string) => {
+    const { data, error } = await supabase
+      .from("contact_notes")
+      .select("*")
+      .eq("contact_id", contactId)
+      .order("created_at", { ascending: false });
+
+    if (!error) {
+      setCustomerNotes((data || []) as Note[]);
+    }
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (selectedCustomer) {
+      loadCustomerNotes(selectedCustomer.id);
+    } else {
+      setCustomerNotes([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCustomer?.id]);
+
+  // ==================== DERIVED DATA ====================
 
   const filteredCustomers = useMemo(() => {
     const term = search.toLowerCase().trim();
-
     if (!term) return customers;
 
     return customers.filter(
@@ -164,60 +274,7 @@ export default function CustomerManagementPage() {
   }, [customers, search]);
 
   const getCustomerAppointments = (customerId: string) =>
-    appointments.filter(
-      (appointment) => appointment.contact_id === customerId
-    );
-
-  const loadCustomerNotes = async (contactId: string) => {
-    const { data, error } = await supabase
-      .from("contact_notes")
-      .select("*")
-      .eq("contact_id", contactId)
-      .order("created_at", { ascending: false });
-
-    if (!error) {
-      setCustomerNotes(data || []);
-    }
-  };
-
-  const addCustomerNote = async () => {
-    if (!selectedCustomer || !newNote.trim()) return;
-
-    setSavingNote(true);
-
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      setSavingNote(false);
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from("contacts")
-      .select("account_id")
-      .eq("id", selectedCustomer.id)
-      .single();
-
-    if (!profile?.account_id) {
-      setSavingNote(false);
-      return;
-    }
-
-    const { error } = await supabase.from("contact_notes").insert({
-      contact_id: selectedCustomer.id,
-      account_id: profile.account_id,
-      user_id: user.id,
-      note_text: newNote.trim(),
-    });
-
-    if (!error) {
-      setNewNote("");
-      await loadCustomerNotes(selectedCustomer.id);
-    }
-
-    setSavingNote(false);
-  };
-
+    appointments.filter((appointment) => appointment.contact_id === customerId);
 
   const pendingAppointments = appointments.filter(
     (appointment) => appointment.status === "pending"
@@ -225,33 +282,68 @@ export default function CustomerManagementPage() {
 
   const cancelledAppointments = appointments.filter(
     (appointment) =>
-      appointment.status === "cancelled" ||
-      appointment.status === "canceled"
+      appointment.status === "cancelled" || appointment.status === "canceled"
   ).length;
 
-const rescheduleAppointment = async (
-  appointmentId: string,
-  newDate: string,
-  newTime: string
-) => {
-  const { error } = await supabase
-    .from("appointments")
-    .update({
-      appointment_date: newDate,
-      appointment_time: newTime,
-    })
-    .eq("id", appointmentId);
+  // ==================== ACTIONS ====================
 
-  if (error) {
-    console.error("Reschedule error:", error);
-    return false;
-  }
+  const addCustomerNote = async () => {
+    if (!selectedCustomer || !newNote.trim()) return;
 
-  await loadData();
-  return true;
-};
+    setSavingNote(true);
 
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("contacts")
+        .select("account_id")
+        .eq("id", selectedCustomer.id)
+        .single();
+
+      if (!profile?.account_id) return;
+
+      const { error } = await supabase.from("contact_notes").insert({
+        contact_id: selectedCustomer.id,
+        account_id: profile.account_id,
+        user_id: user.id,
+        note_text: newNote.trim(),
+      });
+
+      if (!error) {
+        setNewNote("");
+        await loadCustomerNotes(selectedCustomer.id);
+      }
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const rescheduleAppointment = async (
+    appointmentId: string,
+    newDate: string,
+    newTime: string
+  ) => {
+    const { error } = await supabase
+      .from("appointments")
+      .update({
+        appointment_date: newDate,
+        appointment_time: newTime,
+      })
+      .eq("id", appointmentId);
+
+    if (error) {
+      console.error("Reschedule error:", error);
+      return false;
+    }
+
+    await loadData();
+    return true;
+  };
 
   const loadAvailableSlots = async (doctorId: string, date: string) => {
     if (!doctorId || !date) return [];
@@ -276,11 +368,8 @@ const rescheduleAppointment = async (
       .limit(1)
       .maybeSingle();
 
-    if (!workingHour || workingHour.is_closed) {
-      return [];
-    }
+    if (!workingHour || workingHour.is_closed) return [];
 
-    // Respect this doctor's own working days and hours
     const { data: doctor } = await supabase
       .from("clinic_doctors")
       .select("available_days, start_time, end_time")
@@ -291,10 +380,7 @@ const rescheduleAppointment = async (
       const doctorDays = doctor.available_days.map((day: string) =>
         day.toLowerCase()
       );
-
-      if (!doctorDays.includes(weekday.toLowerCase())) {
-        return [];
-      }
+      if (!doctorDays.includes(weekday.toLowerCase())) return [];
     }
 
     const { data: booked } = await supabase
@@ -310,7 +396,6 @@ const rescheduleAppointment = async (
 
     const slots: string[] = [];
 
-    // Doctor hours override clinic hours when configured.
     const doctorStart = String(
       doctor?.start_time || workingHour.open_time || "09:00"
     ).slice(0, 5);
@@ -328,9 +413,15 @@ const rescheduleAppointment = async (
     while (currentMinutes < closingMinutes) {
       const hour = Math.floor(currentMinutes / 60);
       const minute = currentMinutes % 60;
-      const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+      const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(
+        2,
+        "0"
+      )}`;
 
-      if (currentMinutes + duration <= closingMinutes && !bookedTimes.has(time)) {
+      if (
+        currentMinutes + duration <= closingMinutes &&
+        !bookedTimes.has(time)
+      ) {
         slots.push(time);
       }
 
@@ -356,7 +447,13 @@ const rescheduleAppointment = async (
   };
 
   const createAppointment = async () => {
-    if (!selectedCustomer || !appointmentDoctor || !appointmentService || !appointmentDate || !appointmentTime) {
+    if (
+      !selectedCustomer ||
+      !appointmentDoctor ||
+      !appointmentService ||
+      !appointmentDate ||
+      !appointmentTime
+    ) {
       alert("Please fill Doctor, Service, Date and Time.");
       return;
     }
@@ -364,7 +461,9 @@ const rescheduleAppointment = async (
     setSavingAppointment(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (!user) {
         alert("Please login again.");
@@ -373,7 +472,6 @@ const rescheduleAppointment = async (
 
       const clinicId = await getClinicId(user.id);
 
-      // Validate that the selected doctor can provide the selected service.
       const selectedService = services.find(
         (service) => service.id === appointmentService
       );
@@ -382,7 +480,9 @@ const rescheduleAppointment = async (
         selectedService?.assigned_doctors?.length &&
         !selectedService.assigned_doctors.includes(appointmentDoctor)
       ) {
-        alert("The selected doctor is not assigned to this service. Please select an assigned doctor.");
+        alert(
+          "The selected doctor is not assigned to this service. Please select an assigned doctor."
+        );
         return;
       }
 
@@ -403,19 +503,24 @@ const rescheduleAppointment = async (
         return;
       }
 
-      const { data: newAppointment, error } = await supabase.from("appointments").insert({
-        clinic_id: clinicId,
-        user_id: user.id,
-        contact_id: selectedCustomer.id,
-        doctor_id: appointmentDoctor,
-        service_id: appointmentService,
-        appointment_date: appointmentDate,
-        appointment_time: appointmentTime,
-        patient_name: appointmentPatientName.trim() || selectedCustomer.name || "",
-        gender: appointmentGender || null,
-        age: appointmentAge ? Number(appointmentAge) : null,
-        status: "pending",
-      }).select("id").single();
+      const { error } = await supabase
+        .from("appointments")
+        .insert({
+          clinic_id: clinicId,
+          user_id: user.id,
+          contact_id: selectedCustomer.id,
+          doctor_id: appointmentDoctor,
+          service_id: appointmentService,
+          appointment_date: appointmentDate,
+          appointment_time: appointmentTime,
+          patient_name:
+            appointmentPatientName.trim() || selectedCustomer.name || "",
+          gender: appointmentGender || null,
+          age: appointmentAge ? Number(appointmentAge) : null,
+          status: "pending",
+        })
+        .select("id")
+        .single();
 
       if (error) {
         console.error("Create appointment error:", error);
@@ -423,9 +528,6 @@ const rescheduleAppointment = async (
         return;
       }
 
-      // Send WhatsApp appointment confirmation.
-      // The appointment is already saved, so a WhatsApp failure must not
-      // cancel or roll back the appointment.
       try {
         const doctorName = getDoctorName(appointmentDoctor);
         const serviceName = getServiceName(appointmentService);
@@ -458,9 +560,7 @@ const rescheduleAppointment = async (
 
         const whatsappResponse = await fetch("/api/whatsapp/send", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contact_id: selectedCustomer.id,
             message_type: "text",
@@ -469,10 +569,9 @@ const rescheduleAppointment = async (
         });
 
         if (!whatsappResponse.ok) {
-          const whatsappError = await whatsappResponse.text();
           console.error(
             "Appointment WhatsApp confirmation failed:",
-            whatsappError
+            await whatsappResponse.text()
           );
         }
       } catch (whatsappError) {
@@ -516,13 +615,9 @@ const rescheduleAppointment = async (
       }
 
       setSelectedAppointment((current) =>
-        current?.id === appointmentId
-          ? { ...current, status }
-          : current
+        current?.id === appointmentId ? { ...current, status } : current
       );
 
-      // Send a status-specific WhatsApp notification.
-      // Notification failure must never undo the appointment status update.
       try {
         const appointment = appointments.find(
           (item) => item.id === appointmentId
@@ -536,15 +631,12 @@ const rescheduleAppointment = async (
           const doctorName = getDoctorName(appointment.doctor_id);
           const serviceName = getServiceName(appointment.service_id);
           const patientName =
-            appointment.patient_name ||
-            customer?.name ||
-            "Patient";
+            appointment.patient_name || customer?.name || "Patient";
 
           const statusMessages: Record<string, string> = {
             pending:
               "Your appointment is currently pending confirmation from the clinic.",
-            confirmed:
-              "Your appointment has been confirmed by the clinic.",
+            confirmed: "Your appointment has been confirmed by the clinic.",
             cancelled:
               "Your appointment has been cancelled. Please contact the clinic if you need a new appointment.",
             completed:
@@ -576,9 +668,7 @@ const rescheduleAppointment = async (
 
           const whatsappResponse = await fetch("/api/whatsapp/send", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               contact_id: appointment.contact_id,
               message_type: "text",
@@ -618,7 +708,6 @@ const rescheduleAppointment = async (
       return;
     }
 
-    // Notify the patient when an appointment is cancelled.
     try {
       const appointment = appointments.find(
         (item) => item.id === appointmentId
@@ -630,9 +719,7 @@ const rescheduleAppointment = async (
         );
 
         const patientName =
-          appointment.patient_name ||
-          customer?.name ||
-          "Patient";
+          appointment.patient_name || customer?.name || "Patient";
 
         const doctorName = getDoctorName(appointment.doctor_id);
         const serviceName = getServiceName(appointment.service_id);
@@ -662,9 +749,7 @@ const rescheduleAppointment = async (
 
         const whatsappResponse = await fetch("/api/whatsapp/send", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contact_id: appointment.contact_id,
             message_type: "text",
@@ -689,11 +774,7 @@ const rescheduleAppointment = async (
     await loadData();
   };
 
-  // ==================== APPOINTMENT CALENDAR ENGINE ====================
-
-  const formatCalendarDate = (date: Date) => {
-    return date.toLocaleDateString("en-CA");
-  };
+  // ==================== CALENDAR ENGINE ====================
 
   const calendarMonthLabel = calendarDate.toLocaleDateString("en-US", {
     month: "long",
@@ -769,9 +850,7 @@ const rescheduleAppointment = async (
           appointment.appointment_time,
         ]
           .filter(Boolean)
-          .some((value) =>
-            String(value).toLowerCase().includes(query)
-          );
+          .some((value) => String(value).toLowerCase().includes(query));
       })
       .filter(
         (appointment) =>
@@ -783,59 +862,7 @@ const rescheduleAppointment = async (
           !calendarStatusFilter ||
           appointment.status.toLowerCase() === calendarStatusFilter
       )
-      .sort((a, b) =>
-        a.appointment_time.localeCompare(b.appointment_time)
-      );
-  };
-
-  const getDoctorName = (doctorId?: string) => {
-    if (!doctorId) return "Unassigned";
-
-    return (
-      doctors.find((doctor) => doctor.id === doctorId)?.doctor_name ||
-      "Doctor"
-    );
-  };
-
-  const getServiceName = (serviceId?: string) => {
-    if (!serviceId) return "Consultation";
-
-    return (
-      services.find((service) => service.id === serviceId)?.service_name ||
-      "Service"
-    );
-  };
-
-  const getAppointmentStatusClass = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "confirmed":
-        return "border-green-200 bg-green-50 text-green-700";
-      case "completed":
-        return "border-blue-200 bg-blue-50 text-blue-700";
-      case "cancelled":
-      case "canceled":
-        return "border-red-200 bg-red-50 text-red-700";
-      case "no-show":
-        return "border-slate-200 bg-slate-100 text-slate-600";
-      default:
-        return "border-amber-200 bg-amber-50 text-amber-700";
-    }
-  };
-
-  const getAppointmentStatusLabel = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "confirmed":
-        return "Confirmed";
-      case "completed":
-        return "Completed";
-      case "cancelled":
-      case "canceled":
-        return "Cancelled";
-      case "no-show":
-        return "No-show";
-      default:
-        return "Pending";
-    }
+      .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
   };
 
   const changeCalendarDate = (direction: number) => {
@@ -854,13 +881,10 @@ const rescheduleAppointment = async (
     });
   };
 
-  const goToCalendarToday = () => {
-    setCalendarDate(new Date());
-  };
+  const goToCalendarToday = () => setCalendarDate(new Date());
 
   const isCalendarToday = (date: Date) => {
     const today = new Date();
-
     return (
       date.getFullYear() === today.getFullYear() &&
       date.getMonth() === today.getMonth() &&
@@ -868,47 +892,38 @@ const rescheduleAppointment = async (
     );
   };
 
-  // Customer Details View
-  if (selectedCustomer) {
-    const customerAppointments = getCustomerAppointments(
-      selectedCustomer.id
-    );
+  // ==================== CUSTOMER DETAILS VIEW ====================
 
-    if (customerNotes.length === 0) {
-      loadCustomerNotes(selectedCustomer.id);
-    }
+  if (selectedCustomer) {
+    const customerAppointments = getCustomerAppointments(selectedCustomer.id);
 
     return (
-      <div className="min-h-screen bg-white p-4 text-[#0a1628] md:p-6">
+      <div className="min-h-screen bg-slate-50 p-4 text-slate-900 md:p-6 lg:p-8">
         <div className="mx-auto max-w-5xl space-y-6">
-          {/* Back */}
           <button
             onClick={() => setSelectedCustomer(null)}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Customers
           </button>
 
           {/* Profile */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 bg-slate-50 p-6">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-2xl font-bold text-blue-600">
-                  {(selectedCustomer.name ||
-                    selectedCustomer.phone ||
-                    "?")
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-2xl font-bold text-white shadow-md">
+                  {(selectedCustomer.name || selectedCustomer.phone || "?")
                     .charAt(0)
                     .toUpperCase()}
                 </div>
 
                 <div className="flex-1">
-                  <h1 className="text-2xl font-bold">
+                  <h1 className="text-2xl font-bold text-slate-900">
                     {selectedCustomer.name || "Unnamed Customer"}
                   </h1>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    Customer ID: {selectedCustomer.id}
+                  <p className="mt-1 text-xs text-slate-500">
+                    ID: <span className="font-mono">{selectedCustomer.id}</span>
                   </p>
                 </div>
 
@@ -918,27 +933,25 @@ const rescheduleAppointment = async (
                     setAppointmentOpen(true);
                     loadAppointmentOptions();
                   }}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
                 >
-                  + New Appointment
+                  <Plus className="h-4 w-4" />
+                  New Appointment
                 </button>
               </div>
             </div>
 
-            {/* Contact Information */}
             <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
               <InfoCard
                 icon={<Phone className="h-4 w-4" />}
                 label="Phone"
                 value={selectedCustomer.phone || "Not available"}
               />
-
               <InfoCard
                 icon={<Mail className="h-4 w-4" />}
                 label="Email"
                 value={selectedCustomer.email || "Not available"}
               />
-
               <InfoCard
                 icon={<Building2 className="h-4 w-4" />}
                 label="Company"
@@ -947,31 +960,32 @@ const rescheduleAppointment = async (
             </div>
           </div>
 
-          {/* Appointment Summary */}
+          {/* Summary */}
           <div className="grid gap-4 sm:grid-cols-2">
             <StatCard
               title="Total Appointments"
               value={customerAppointments.length}
               icon={<CalendarDays className="h-5 w-5" />}
+              variant="blue"
             />
-
             <StatCard
               title="Active Appointments"
               value={
                 customerAppointments.filter(
-                  (a) =>
-                    a.status === "pending" ||
-                    a.status === "confirmed"
+                  (a) => a.status === "pending" || a.status === "confirmed"
                 ).length
               }
               icon={<Clock className="h-5 w-5" />}
+              variant="amber"
             />
           </div>
 
-          {/* Customer Notes */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          {/* Notes */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 p-5">
-              <h2 className="text-lg font-semibold">Customer Notes</h2>
+              <h2 className="text-lg font-semibold text-slate-900">
+                Customer Notes
+              </h2>
               <p className="mt-1 text-sm text-slate-500">
                 Internal notes about this customer
               </p>
@@ -983,14 +997,15 @@ const rescheduleAppointment = async (
                 onChange={(e) => setNewNote(e.target.value)}
                 placeholder="Write a note about this customer..."
                 rows={3}
-                className="w-full rounded-xl border border-slate-200 p-3 text-sm text-[#0a1628] outline-none focus:border-blue-500"
+                className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
               />
 
               <button
                 onClick={addCustomerNote}
                 disabled={savingNote || !newNote.trim()}
-                className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
+                {savingNote && <Loader2 className="h-4 w-4 animate-spin" />}
                 {savingNote ? "Saving..." : "Add Note"}
               </button>
 
@@ -998,7 +1013,7 @@ const rescheduleAppointment = async (
                 {customerNotes.length === 0 ? (
                   <p className="text-sm text-slate-400">No notes yet.</p>
                 ) : (
-                  customerNotes.map((note: { id: string; note_text: string; created_at: string }) => (
+                  customerNotes.map((note) => (
                     <div
                       key={note.id}
                       className="rounded-xl border border-slate-100 bg-slate-50 p-4"
@@ -1015,12 +1030,11 @@ const rescheduleAppointment = async (
           </div>
 
           {/* Appointment History */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 p-5">
-              <h2 className="text-lg font-semibold">
+              <h2 className="text-lg font-semibold text-slate-900">
                 Appointment History
               </h2>
-
               <p className="mt-1 text-sm text-slate-500">
                 All appointments for this customer
               </p>
@@ -1029,11 +1043,9 @@ const rescheduleAppointment = async (
             {customerAppointments.length === 0 ? (
               <div className="py-16 text-center">
                 <CalendarDays className="mx-auto h-10 w-10 text-slate-300" />
-
                 <p className="mt-3 text-sm font-medium text-slate-600">
                   No appointments yet
                 </p>
-
                 <p className="mt-1 text-xs text-slate-400">
                   Appointment history will appear here.
                 </p>
@@ -1043,79 +1055,83 @@ const rescheduleAppointment = async (
                 {customerAppointments.map((appointment) => (
                   <div
                     key={appointment.id}
-                    className="p-5 hover:bg-slate-50"
+                    className="p-5 transition hover:bg-slate-50"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-blue-600" />
-
-                          <span className="font-semibold">
+                          <span className="font-semibold text-slate-900">
                             {appointment.patient_name ||
                               selectedCustomer.name ||
                               "Patient"}
                           </span>
                         </div>
 
-                        <div className="grid gap-2 text-sm text-slate-500 sm:grid-cols-3">
-                          <span>
-                            📅 {appointment.appointment_date}
+                        <div className="flex flex-wrap gap-3 text-sm text-slate-500">
+                          <span className="inline-flex items-center gap-1">
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            {appointment.appointment_date}
                           </span>
-
-                          <span>
-                            🕐 {appointment.appointment_time}
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            {appointment.appointment_time}
                           </span>
-
                           {appointment.gender && (
-                            <span>
-                              ⚥ {appointment.gender}
-                            </span>
+                            <span>⚥ {appointment.gender}</span>
                           )}
-
                           {appointment.age && (
                             <span>🎂 Age: {appointment.age}</span>
                           )}
                         </div>
 
-                        {appointment.doctor_id && (
-                          <p className="text-xs text-slate-400">
-                            Doctor ID: {appointment.doctor_id}
-                          </p>
-                        )}
-
-                        {appointment.service_id && (
-                          <p className="text-xs text-slate-400">
-                            Service ID: {appointment.service_id}
-                          </p>
-                        )}
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <span className="rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-600">
+                            <Stethoscope className="mr-1 inline h-3 w-3" />
+                            {getDoctorName(appointment.doctor_id)}
+                          </span>
+                          <span className="rounded-md bg-blue-50 px-2 py-1 font-medium text-blue-600">
+                            {getServiceName(appointment.service_id)}
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge status={appointment.status} />
 
                         {(appointment.status === "pending" ||
                           appointment.status === "confirmed") && (
-                          <div className="flex gap-2">
+                          <>
                             <button
                               onClick={() => {
-                                const newDate = window.prompt("Enter new date (YYYY-MM-DD):");
+                                const newDate = window.prompt(
+                                  "Enter new date (YYYY-MM-DD):"
+                                );
                                 if (!newDate) return;
-                                const newTime = window.prompt("Enter new time (HH:MM):");
+                                const newTime = window.prompt(
+                                  "Enter new time (HH:MM):"
+                                );
                                 if (!newTime) return;
-                                rescheduleAppointment(appointment.id, newDate, newTime);
+                                rescheduleAppointment(
+                                  appointment.id,
+                                  newDate,
+                                  newTime
+                                );
                               }}
-                              className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                              className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
                             >
                               Reschedule
                             </button>
 
                             <button
-                              onClick={() => cancelAppointment(appointment.id)}
-                              className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+                              onClick={() =>
+                                cancelAppointment(appointment.id)
+                              }
+                              className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
                             >
                               Cancel
                             </button>
-                          </div>
+                          </>
                         )}
                       </div>
                     </div>
@@ -1129,35 +1145,39 @@ const rescheduleAppointment = async (
     );
   }
 
-  // Customer List
+  // ==================== CUSTOMER LIST VIEW ====================
+
   return (
-    <div className="min-h-screen bg-white p-4 text-[#0a1628] md:p-6">
+    <div className="min-h-screen bg-slate-50 p-4 text-slate-900 md:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">
               Customer Management
-              <button
-                onClick={() => setAddCustomerOpen(true)}
-                className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                + Add Customer
-              </button>
             </h1>
-
             <p className="mt-1 text-sm text-slate-500">
               Manage customers and their appointments from one place.
             </p>
           </div>
 
-          <button
-            onClick={loadData}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setAddCustomerOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4" />
+              Add Customer
+            </button>
+
+            <button
+              onClick={loadData}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -1166,46 +1186,43 @@ const rescheduleAppointment = async (
             title="Total Customers"
             value={customers.length}
             icon={<Users className="h-5 w-5" />}
+            variant="blue"
           />
-
           <StatCard
             title="Total Appointments"
             value={appointments.length}
             icon={<CalendarDays className="h-5 w-5" />}
+            variant="indigo"
           />
-
           <StatCard
             title="Pending"
             value={pendingAppointments}
             icon={<Clock className="h-5 w-5" />}
-
+            variant="amber"
           />
-
           <StatCard
             title="Cancelled"
             value={cancelledAppointments}
             icon={<XCircle className="h-5 w-5" />}
+            variant="red"
           />
         </div>
 
-
-        {/* ==================== PROFESSIONAL APPOINTMENT CALENDAR ==================== */}
+        {/* CALENDAR */}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 bg-slate-50/70 p-5 md:p-6">
+          <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50/40 p-5 md:p-6">
             <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-              <div>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
-                    <CalendarDays className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900">
-                      Appointment Calendar
-                    </h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Manage clinic appointments, doctors and patient schedules.
-                    </p>
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md">
+                  <CalendarDays className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    Appointment Calendar
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Manage clinic appointments, doctors and patient schedules.
+                  </p>
                 </div>
               </div>
 
@@ -1213,32 +1230,31 @@ const rescheduleAppointment = async (
                 <button
                   type="button"
                   onClick={goToCalendarToday}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
                 >
                   Today
                 </button>
 
-                <div className="flex items-center rounded-lg border border-slate-200 bg-white p-1">
+                <div className="flex items-center rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
                   <button
                     type="button"
                     onClick={() => changeCalendarDate(-1)}
-                    className="rounded-md px-3 py-2 text-lg font-medium text-slate-600 hover:bg-slate-100"
+                    className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-100"
                     aria-label="Previous"
                   >
-                    ‹
+                    <ChevronLeft className="h-5 w-5" />
                   </button>
-
                   <button
                     type="button"
                     onClick={() => changeCalendarDate(1)}
-                    className="rounded-md px-3 py-2 text-lg font-medium text-slate-600 hover:bg-slate-100"
+                    className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-100"
                     aria-label="Next"
                   >
-                    ›
+                    <ChevronRight className="h-5 w-5" />
                   </button>
                 </div>
 
-                <div className="flex rounded-lg border border-slate-200 bg-white p-1">
+                <div className="flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
                   {(["day", "week", "month"] as const).map((view) => (
                     <button
                       key={view}
@@ -1246,7 +1262,7 @@ const rescheduleAppointment = async (
                       onClick={() => setCalendarView(view)}
                       className={`rounded-md px-3 py-2 text-sm font-semibold capitalize transition ${
                         calendarView === view
-                          ? "bg-blue-600 text-white"
+                          ? "bg-blue-600 text-white shadow-sm"
                           : "text-slate-600 hover:bg-slate-100"
                       }`}
                     >
@@ -1257,13 +1273,14 @@ const rescheduleAppointment = async (
               </div>
             </div>
 
-            <div className="mt-5">
+            <div className="relative mt-5">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="search"
                 value={appointmentSearch}
                 onChange={(e) => setAppointmentSearch(e.target.value)}
                 placeholder="Search patient, phone, doctor, service, status or time..."
-                className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
@@ -1272,7 +1289,9 @@ const rescheduleAppointment = async (
                 {
                   label: "Today",
                   value: appointments.filter(
-                    (a) => a.appointment_date === formatCalendarDate(new Date())
+                    (a) =>
+                      a.appointment_date ===
+                      formatCalendarDate(new Date())
                   ).length,
                   className: "border-blue-200 bg-blue-50 text-blue-700",
                 },
@@ -1288,7 +1307,8 @@ const rescheduleAppointment = async (
                   value: appointments.filter(
                     (a) => a.status.toLowerCase() === "confirmed"
                   ).length,
-                  className: "border-green-200 bg-green-50 text-green-700",
+                  className:
+                    "border-emerald-200 bg-emerald-50 text-emerald-700",
                 },
                 {
                   label: "Completed",
@@ -1320,31 +1340,37 @@ const rescheduleAppointment = async (
             </div>
 
             <div className="mt-5 grid gap-3 border-t border-slate-200 pt-4 md:grid-cols-2">
-              <select
-                value={calendarDoctorFilter}
-                onChange={(e) => setCalendarDoctorFilter(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-blue-500"
-              >
-                <option value="">All Doctors</option>
-                {doctors.map((doctor) => (
-                  <option key={doctor.id} value={doctor.id}>
-                    {doctor.doctor_name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <select
+                  value={calendarDoctorFilter}
+                  onChange={(e) => setCalendarDoctorFilter(e.target.value)}
+                  className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500"
+                >
+                  <option value="">All Doctors</option>
+                  {doctors.map((doctor) => (
+                    <option key={doctor.id} value={doctor.id}>
+                      {doctor.doctor_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <select
-                value={calendarStatusFilter}
-                onChange={(e) => setCalendarStatusFilter(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none focus:border-blue-500"
-              >
-                <option value="">All Statuses</option>
-                <option value="pending">Pending</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="completed">Completed</option>
-                <option value="no-show">No-show</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+              <div className="relative">
+                <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <select
+                  value={calendarStatusFilter}
+                  onChange={(e) => setCalendarStatusFilter(e.target.value)}
+                  className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-8 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="completed">Completed</option>
+                  <option value="no-show">No-show</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
             </div>
 
             <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1352,20 +1378,20 @@ const rescheduleAppointment = async (
                 {calendarView === "month"
                   ? calendarMonthLabel
                   : calendarView === "week"
-                    ? `${calendarWeekDays[0].toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })} - ${calendarWeekDays[6].toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}`
-                    : calendarDate.toLocaleDateString("en-US", {
-                        weekday: "long",
-                        month: "long",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
+                  ? `${calendarWeekDays[0].toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })} - ${calendarWeekDays[6].toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}`
+                  : calendarDate.toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
               </h3>
 
               <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-slate-600">
@@ -1374,7 +1400,7 @@ const rescheduleAppointment = async (
                   Pending
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
                   Confirmed
                 </span>
                 <span className="flex items-center gap-1.5">
@@ -1414,18 +1440,20 @@ const rescheduleAppointment = async (
                     return (
                       <div
                         key={formatCalendarDate(date)}
-                        className={`min-h-[155px] border-b border-r border-slate-200 p-2 ${
-                          !isCurrentMonth ? "bg-slate-50/60" : "bg-white"
+                        className={`min-h-[155px] border-b border-r border-slate-200 p-2 transition ${
+                          !isCurrentMonth
+                            ? "bg-slate-50/60"
+                            : "bg-white hover:bg-slate-50/40"
                         }`}
                       >
                         <div className="mb-2 flex items-center justify-between">
                           <span
                             className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
                               isCalendarToday(date)
-                                ? "bg-blue-600 text-white"
+                                ? "bg-blue-600 text-white shadow-sm"
                                 : isCurrentMonth
-                                  ? "text-slate-700"
-                                  : "text-slate-400"
+                                ? "text-slate-700"
+                                : "text-slate-400"
                             }`}
                           >
                             {date.getDate()}
@@ -1443,12 +1471,7 @@ const rescheduleAppointment = async (
                             <button
                               key={appointment.id}
                               type="button"
-                              onClick={() => {
-                                const customer = customers.find(
-                                  (item) => item.id === appointment.contact_id
-                                );
-                                setSelectedAppointment(appointment);
-                              }}
+                              onClick={() => setSelectedAppointment(appointment)}
                               className={`w-full rounded-lg border p-2 text-left transition hover:shadow-sm ${getAppointmentStatusClass(
                                 appointment.status
                               )}`}
@@ -1537,14 +1560,10 @@ const rescheduleAppointment = async (
                               <button
                                 key={appointment.id}
                                 type="button"
-                                onClick={() => {
-                                  const customer = customers.find(
-                                    (item) =>
-                                      item.id === appointment.contact_id
-                                  );
-                                  setSelectedAppointment(appointment);
-                                }}
-                                className={`w-full rounded-xl border p-3 text-left ${getAppointmentStatusClass(
+                                onClick={() =>
+                                  setSelectedAppointment(appointment)
+                                }
+                                className={`w-full rounded-xl border p-3 text-left transition hover:shadow-sm ${getAppointmentStatusClass(
                                   appointment.status
                                 )}`}
                               >
@@ -1596,13 +1615,8 @@ const rescheduleAppointment = async (
                       <button
                         key={appointment.id}
                         type="button"
-                        onClick={() => {
-                          const customer = customers.find(
-                            (item) => item.id === appointment.contact_id
-                          );
-                        setSelectedAppointment(appointment);
-                      }}
-                      className="flex w-full flex-col gap-4 p-5 text-left transition hover:bg-slate-50 md:flex-row md:items-center"
+                        onClick={() => setSelectedAppointment(appointment)}
+                        className="flex w-full flex-col gap-4 p-5 text-left transition hover:bg-slate-50 md:flex-row md:items-center"
                       >
                         <div className="w-24 shrink-0">
                           <p className="text-lg font-bold text-slate-900">
@@ -1627,9 +1641,7 @@ const rescheduleAppointment = async (
                             </div>
 
                             <span className="w-fit rounded-full border bg-white/70 px-3 py-1 text-xs font-bold">
-                              {getAppointmentStatusLabel(
-                                appointment.status
-                              )}
+                              {getAppointmentStatusLabel(appointment.status)}
                             </span>
                           </div>
                         </div>
@@ -1643,24 +1655,22 @@ const rescheduleAppointment = async (
         </section>
 
         {/* Search */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="relative max-w-xl">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search customer by name, phone or email..."
-              className="w-full rounded-lg border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm text-[#0a1628] outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
         </div>
 
         {/* Customer List */}
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="font-semibold">Customers</h2>
-
+            <h2 className="font-semibold text-slate-900">Customers</h2>
             <p className="text-sm text-slate-500">
               {filteredCustomers.length} customer
               {filteredCustomers.length === 1 ? "" : "s"} found
@@ -1678,8 +1688,9 @@ const rescheduleAppointment = async (
           ) : (
             <div className="divide-y divide-slate-100">
               {filteredCustomers.map((customer) => {
-                const customerAppointments =
-                  getCustomerAppointments(customer.id);
+                const customerAppointments = getCustomerAppointments(
+                  customer.id
+                );
 
                 return (
                   <div
@@ -1688,23 +1699,19 @@ const rescheduleAppointment = async (
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 font-semibold text-blue-600">
-                          {(customer.name ||
-                            customer.phone ||
-                            "?")
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 font-semibold text-white shadow-sm">
+                          {(customer.name || customer.phone || "?")
                             .charAt(0)
                             .toUpperCase()}
                         </div>
 
                         <div className="min-w-0">
-                          <h3 className="font-semibold">
+                          <h3 className="font-semibold text-slate-900">
                             {customer.name || "Unnamed Customer"}
                           </h3>
-
                           <p className="text-sm text-slate-500">
                             {customer.phone}
                           </p>
-
                           {customer.email && (
                             <p className="truncate text-xs text-slate-400">
                               {customer.email}
@@ -1714,16 +1721,14 @@ const rescheduleAppointment = async (
                       </div>
 
                       <div className="flex flex-wrap items-center gap-3">
-                        <div className="text-sm text-slate-500">
+                        <div className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
                           {customerAppointments.length} appointment
-                          {customerAppointments.length === 1
-                            ? ""
-                            : "s"}
+                          {customerAppointments.length === 1 ? "" : "s"}
                         </div>
 
                         <button
                           onClick={() => setSelectedCustomer(customer)}
-                          className="rounded-lg bg-[#0a1628] px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                         >
                           View Details
                         </button>
@@ -1737,19 +1742,23 @@ const rescheduleAppointment = async (
         </div>
       </div>
 
+      {/* ==================== NEW APPOINTMENT MODAL ==================== */}
       {appointmentOpen && selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <div className="mb-5 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-bold text-[#0a1628]">New Appointment</h2>
+                <h2 className="text-xl font-bold text-slate-900">
+                  New Appointment
+                </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  For Customer
+                  For {selectedCustomer.name || selectedCustomer.phone}
                 </p>
               </div>
               <button
                 onClick={() => setAppointmentOpen(false)}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+                aria-label="Close"
               >
                 <XCircle className="h-5 w-5" />
               </button>
@@ -1763,7 +1772,7 @@ const rescheduleAppointment = async (
                   setAppointmentDoctor(doctorId);
                   refreshAvailableSlots(doctorId, appointmentDate);
                 }}
-                className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
+                className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               >
                 <option value="">Select Doctor</option>
                 {doctors.map((doctor) => (
@@ -1776,7 +1785,7 @@ const rescheduleAppointment = async (
               <select
                 value={appointmentService}
                 onChange={(e) => setAppointmentService(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
+                className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               >
                 <option value="">Select Service</option>
                 {services.map((service) => (
@@ -1801,11 +1810,11 @@ const rescheduleAppointment = async (
 
                   refreshAvailableSlots(appointmentDoctor, date);
                 }}
-                className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
+                className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-[#0a1628]">
+                <label className="mb-2 block text-sm font-medium text-slate-700">
                   Available Time
                 </label>
 
@@ -1814,7 +1823,8 @@ const rescheduleAppointment = async (
                     Select Doctor and Date first.
                   </p>
                 ) : loadingSlots ? (
-                  <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
+                  <p className="flex items-center gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Loading available slots...
                   </p>
                 ) : availableSlots.length === 0 ? (
@@ -1828,10 +1838,10 @@ const rescheduleAppointment = async (
                         key={slot}
                         type="button"
                         onClick={() => setAppointmentTime(slot)}
-                        className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+                        className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
                           appointmentTime === slot
-                            ? "border-blue-600 bg-blue-600 text-white"
-                            : "border-slate-200 bg-white text-[#0a1628] hover:border-blue-400"
+                            ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                            : "border-slate-200 bg-white text-slate-900 hover:border-blue-400 hover:bg-blue-50"
                         }`}
                       >
                         {slot}
@@ -1846,14 +1856,14 @@ const rescheduleAppointment = async (
                 value={appointmentPatientName}
                 onChange={(e) => setAppointmentPatientName(e.target.value)}
                 placeholder="Patient Name"
-                className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
+                className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
 
               <div className="grid grid-cols-2 gap-3">
                 <select
                   value={appointmentGender}
                   onChange={(e) => setAppointmentGender(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
+                  className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 >
                   <option value="">Gender</option>
                   <option value="Male">Male</option>
@@ -1867,15 +1877,18 @@ const rescheduleAppointment = async (
                   value={appointmentAge}
                   onChange={(e) => setAppointmentAge(e.target.value)}
                   placeholder="Age"
-                  className="w-full rounded-lg border border-slate-200 p-3 text-sm text-[#0a1628]"
+                  className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
               <button
                 onClick={createAppointment}
                 disabled={savingAppointment}
-                className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
+                {savingAppointment && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
                 {savingAppointment ? "Creating..." : "Create Appointment"}
               </button>
             </div>
@@ -1883,10 +1896,11 @@ const rescheduleAppointment = async (
         </div>
       )}
 
+      {/* ==================== APPOINTMENT DETAILS MODAL ==================== */}
       {selectedAppointment && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-5">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50/40 px-6 py-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
                   Appointment Details
@@ -1899,7 +1913,7 @@ const rescheduleAppointment = async (
               <button
                 type="button"
                 onClick={() => setSelectedAppointment(null)}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-200"
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200"
                 aria-label="Close appointment details"
               >
                 <XCircle className="h-6 w-6" />
@@ -1907,86 +1921,71 @@ const rescheduleAppointment = async (
             </div>
 
             <div className="grid gap-4 p-6 sm:grid-cols-2">
-          {(() => {
-            const customer = customers.find(
-              (item) => item.id === selectedAppointment.contact_id
-            );
-            const phone = customer?.phone || "";
+              {(() => {
+                const customer = customers.find(
+                  (item) => item.id === selectedAppointment.contact_id
+                );
+                const phone = customer?.phone || "";
 
-            return (
-              <div className="sm:col-span-2 flex flex-wrap gap-2 border-b border-slate-200 pb-4">
-                {phone && (
-                  <>
-                    <a
-                      href={`tel:${phone}`}
-                      className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
-                    >
-                      <Phone className="h-4 w-4" />
-                      Call Patient
-                    </a>
-                    <a
-                      href={`https://wa.me/${phone.replace(/[^0-9]/g, "")}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
-                    >
-                      WhatsApp
-                    </a>
-                  </>
-                )}
+                return (
+                  <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-4 sm:col-span-2">
+                    {phone && (
+                      <>
+                        <a
+                          href={`tel:${phone}`}
+                          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                        >
+                          <Phone className="h-4 w-4" />
+                          Call Patient
+                        </a>
+                        <a
+                          href={`https://wa.me/${phone.replace(
+                            /[^0-9]/g,
+                            ""
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-green-600"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          WhatsApp
+                        </a>
+                      </>
+                    )}
 
-                {customer && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedAppointment(null);
-                      setSelectedCustomer(customer);
-                    }}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <User className="h-4 w-4" />
-                    Patient Profile
-                  </button>
-                )}
-              </div>
-            );
-          })()}
+                    {customer && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedAppointment(null);
+                          setSelectedCustomer(customer);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <User className="h-4 w-4" />
+                        Patient Profile
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
 
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-400">
-                  Date
-                </p>
-                <p className="mt-1 font-semibold text-slate-900">
-                  {selectedAppointment.appointment_date}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-400">
-                  Time
-                </p>
-                <p className="mt-1 font-semibold text-slate-900">
-                  {selectedAppointment.appointment_time}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-400">
-                  Doctor
-                </p>
-                <p className="mt-1 font-semibold text-slate-900">
-                  {getDoctorName(selectedAppointment.doctor_id)}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-400">
-                  Service
-                </p>
-                <p className="mt-1 font-semibold text-slate-900">
-                  {getServiceName(selectedAppointment.service_id)}
-                </p>
-              </div>
+              <DetailBox
+                label="Date"
+                value={selectedAppointment.appointment_date}
+              />
+              <DetailBox
+                label="Time"
+                value={selectedAppointment.appointment_time}
+              />
+              <DetailBox
+                label="Doctor"
+                value={getDoctorName(selectedAppointment.doctor_id)}
+              />
+              <DetailBox
+                label="Service"
+                value={getServiceName(selectedAppointment.service_id)}
+              />
 
               <div className="rounded-xl border border-slate-200 p-4">
                 <p className="text-xs font-semibold uppercase text-slate-400">
@@ -2004,7 +2003,7 @@ const rescheduleAppointment = async (
                     <div className="mt-2 space-y-1 text-xs text-slate-500">
                       <p>📞 {customer?.phone || "Phone not available"}</p>
                       <p>✉️ {customer?.email || "Email not available"}</p>
-                      <p className="break-all">
+                      <p className="break-all font-mono text-[10px]">
                         ID: {selectedAppointment.contact_id}
                       </p>
                     </div>
@@ -2012,28 +2011,33 @@ const rescheduleAppointment = async (
                 })()}
               </div>
 
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase text-slate-400">
-                  Patient Details
-                </p>
-                <p className="mt-1 font-semibold text-slate-900">
-                  {selectedAppointment.gender || "Gender not set"}
-                  {selectedAppointment.age !== undefined &&
-                    selectedAppointment.age !== null
+              <DetailBox
+                label="Patient Details"
+                value={`${
+                  selectedAppointment.gender || "Gender not set"
+                }${
+                  selectedAppointment.age !== undefined &&
+                  selectedAppointment.age !== null
                     ? ` • ${selectedAppointment.age} years`
-                    : ""}
-                </p>
-              </div>
+                    : ""
+                }`}
+              />
             </div>
 
             <div className="border-t border-slate-200 px-6 py-5">
               <p className="mb-3 text-sm font-semibold text-slate-700">
-                Appointment Status
+                Update Appointment Status
               </p>
 
               <div className="mb-5 flex flex-wrap gap-2">
                 {(
-                  ["pending", "confirmed", "completed", "no-show", "cancelled"] as const
+                  [
+                    "pending",
+                    "confirmed",
+                    "completed",
+                    "no-show",
+                    "cancelled",
+                  ] as const
                 ).map((status) => (
                   <button
                     key={status}
@@ -2042,12 +2046,16 @@ const rescheduleAppointment = async (
                     onClick={() =>
                       updateAppointmentStatus(selectedAppointment.id, status)
                     }
-                    className={`rounded-lg border px-3 py-2 text-xs font-semibold capitalize transition ${
+                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold capitalize transition ${
                       selectedAppointment.status === status
-                        ? "border-blue-600 bg-blue-600 text-white"
+                        ? "border-blue-600 bg-blue-600 text-white shadow-sm"
                         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                     } disabled:cursor-not-allowed disabled:opacity-50`}
                   >
+                    {updatingAppointmentStatus &&
+                      selectedAppointment.status !== status && (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      )}
                     {status}
                   </button>
                 ))}
@@ -2057,7 +2065,7 @@ const rescheduleAppointment = async (
                 <button
                   type="button"
                   onClick={() => setSelectedAppointment(null)}
-                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
                   Close
                 </button>
@@ -2079,6 +2087,8 @@ const rescheduleAppointment = async (
   );
 }
 
+// ==================== SUB COMPONENTS ====================
+
 function InfoCard({
   icon,
   label,
@@ -2089,15 +2099,14 @@ function InfoCard({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 p-4">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 transition hover:shadow-sm">
       <div className="flex items-center gap-2 text-blue-600">
         {icon}
         <span className="text-xs font-semibold uppercase tracking-wide">
           {label}
         </span>
       </div>
-
-      <p className="mt-2 break-words text-sm font-medium text-[#0a1628]">
+      <p className="mt-2 break-words text-sm font-medium text-slate-900">
         {value}
       </p>
     </div>
@@ -2108,24 +2117,42 @@ function StatCard({
   title,
   value,
   icon,
+  variant = "blue",
 }: {
   title: string;
   value: number;
   icon: React.ReactNode;
+  variant?: "blue" | "indigo" | "amber" | "red";
 }) {
+  const variantClasses: Record<string, string> = {
+    blue: "bg-blue-50 text-blue-600",
+    indigo: "bg-indigo-50 text-indigo-600",
+    amber: "bg-amber-50 text-amber-600",
+    red: "bg-red-50 text-red-600",
+  };
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-slate-500">{title}</p>
-
-          <p className="mt-1 text-2xl font-bold">{value}</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
         </div>
-
-        <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
+        <div
+          className={`rounded-lg p-2 ${variantClasses[variant] || variantClasses.blue}`}
+        >
           {icon}
         </div>
       </div>
+    </div>
+  );
+}
+
+function DetailBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 p-4">
+      <p className="text-xs font-semibold uppercase text-slate-400">{label}</p>
+      <p className="mt-1 font-semibold text-slate-900">{value}</p>
     </div>
   );
 }
@@ -2140,10 +2167,29 @@ function StatusBadge({ status }: { status: string }) {
       ? "Pending"
       : normalized === "cancelled" || normalized === "canceled"
       ? "Cancelled"
+      : normalized === "completed"
+      ? "Completed"
+      : normalized === "no-show"
+      ? "No-show"
       : status;
 
+  const className =
+    normalized === "confirmed"
+      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : normalized === "pending"
+      ? "bg-amber-50 text-amber-700 border-amber-200"
+      : normalized === "cancelled" || normalized === "canceled"
+      ? "bg-red-50 text-red-700 border-red-200"
+      : normalized === "completed"
+      ? "bg-blue-50 text-blue-700 border-blue-200"
+      : normalized === "no-show"
+      ? "bg-slate-100 text-slate-600 border-slate-200"
+      : "bg-slate-100 text-slate-700 border-slate-200";
+
   return (
-    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium capitalize text-slate-700">
+    <span
+      className={`rounded-full border px-3 py-1.5 text-xs font-semibold capitalize ${className}`}
+    >
       {label}
     </span>
   );
