@@ -205,8 +205,18 @@ const [showManualConnect, setShowManualConnect] = useState(false);
             ? JSON.parse(event.data)
             : event.data;
 
-        console.log('[META SESSION INFO]', data);
-        alert('[META SESSION INFO]\n\n' + JSON.stringify(data, null, 2));
+        console.log("[META SESSION INFO RAW]", JSON.stringify(data, null, 2));
+
+        // Save Embedded Signup session information so the OAuth callback
+        // can use the WABA/phone selected by Meta without /me/businesses.
+        try {
+          sessionStorage.setItem(
+            "meta_embedded_signup_session",
+            JSON.stringify(data)
+          );
+        } catch {
+          // Ignore storage errors
+        }
       } catch {
         // Ignore non-JSON messages
       }
@@ -221,7 +231,19 @@ console.log('[META FULL RESPONSE]', JSON.stringify(response, null, 2));
 alert('[META FULL RESPONSE]\n\n' + JSON.stringify(response, null, 2));
         if (response?.authResponse?.code) {
           const code = response.authResponse.code;
-          window.location.href = `/api/whatsapp/embedded-signup/callback?code=${encodeURIComponent(code)}`;
+          let session = "";
+          try {
+            session =
+              sessionStorage.getItem("meta_embedded_signup_session") || "";
+          } catch {}
+
+          const callbackUrl =
+            `/api/whatsapp/embedded-signup/callback?code=${encodeURIComponent(code)}` +
+            (session
+              ? `&session=${encodeURIComponent(session)}`
+              : "");
+
+          window.location.href = callbackUrl;
         } else {
           let errorMsg = 'Meta Embedded Signup was cancelled or failed.';
           if (response?.error) {

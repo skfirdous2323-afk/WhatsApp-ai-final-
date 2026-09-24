@@ -67,8 +67,23 @@ console.log(
     const url = new URL(request.url)
 
     const code = url.searchParams.get('code')
+    const sessionParam = url.searchParams.get('session')
     const error = url.searchParams.get('error')
     const errorDescription = url.searchParams.get('error_description')
+
+    console.log('[Embedded Signup] Session received:', !!sessionParam)
+
+    if (sessionParam) {
+      try {
+        const sessionData = JSON.parse(sessionParam)
+        console.log(
+          '[Embedded Signup] SESSION DATA:',
+          JSON.stringify(sessionData, null, 2)
+        )
+      } catch (err) {
+        console.warn('[Embedded Signup] Invalid session JSON')
+      }
+    }
 
     if (error) {
       return NextResponse.json(
@@ -192,107 +207,113 @@ console.log(
     }
 
     // ------------------------------------------------------------
-    // 4. Find businesses available to this Meta user.
+    // 4. Get WABA/Phone information from Meta Embedded Signup session.
+    //    IMPORTANT: Do NOT call /me/businesses here.
+    //    That endpoint requires the business_management permission.
     // ------------------------------------------------------------
 
-    const businessesData = await metaJson(
-      `${META_API_BASE}/me/businesses?fields=id,name`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      },
-    )
+    let sessionData: any = null
 
-    const businesses = Array.isArray(businessesData?.data)
-      ? businessesData.data
-      : []
-
-    if (businesses.length === 0) {
-      throw new Error(
-        'Meta did not return a Business/WABA for this Embedded Signup.',
-      )
-    }
-
-    // ------------------------------------------------------------
-    // 5. Find WhatsApp Business Accounts under the businesses.
-    // ------------------------------------------------------------
-
-    let selectedWabaId: string | null = null
-    let selectedWabaName: string | null = null
-
-    for (const business of businesses) {
-      if (!business?.id) continue
-
+    if (sessionParam) {
       try {
-        const wabaData = await metaJson(
-          `${META_API_BASE}/${business.id}/owned_whatsapp_business_accounts?fields=id,name`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          },
-        )
-
-        const wabas = Array.isArray(wabaData?.data)
-          ? wabaData.data
-          : []
-
-        if (wabas.length > 0) {
-          selectedWabaId = wabas[0].id
-          selectedWabaName = wabas[0].name || null
-          break
-        }
-      } catch (err) {
-        console.warn(
-          `[embedded-signup] Failed to inspect business ${business.id}:`,
-          err,
-        )
+        sessionData = JSON.parse(sessionParam)
+      } catch {
+        console.warn('[embedded-signup] Could not parse session parameter.')
       }
     }
 
+    function findValue(obj: any, keys: string[]): string | null {
+      if (!obj || typeof obj !== 'object') return null
+
+      for (const key of keys) {
+        if (
+          typeof obj[key] === 'string' &&
+          obj[key].trim()
+        ) {
+          return obj[key].trim()
+        }
+      }
+
+      for (const value of Object.values(obj)) {
+        if (value && typeof value === 'object') {
+          const found = findValue(value, keys)
+          if (found) return found
+        }
+      }
+
+      return null
+    }
+
+    const selectedWabaId =
+      findValue(sessionData, [
+        'waba_id',
+        'wabaId',
+        'whatsapp_business_account_id',
+        'whatsapp_business_account',
+      ])
+
+    const phoneNumberId =
+      findValue(sessionData, [
+        'phone_number_id',
+        'phoneNumberId',
+      ])
+
+    const selectedWabaName =
+      findValue(sessionData, [
+        'waba_name',
+        'wabaName',
+        'whatsapp_business_account_name',
+      ])
+
+    console.log('[embedded-signup] WABA from session:', selectedWabaId)
+    console.log('[embedded-signup] Phone from session:', phoneNumberId)
+
     if (!selectedWabaId) {
       throw new Error(
-        'Could not find a WhatsApp Business Account from the Embedded Signup.',
+        'Meta Embedded Signup did not provide a WhatsApp Business Account ID.'
       )
     }
-
-    // ------------------------------------------------------------
-    // 6. Find the phone number belonging to the WABA.
-    // ------------------------------------------------------------
-
-    const phoneData = await metaJson(
-      `${META_API_BASE}/${selectedWabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      },
-    )
-
-    const phones = Array.isArray(phoneData?.data)
-      ? phoneData.data
-      : []
-
-    if (phones.length === 0) {
-      throw new Error(
-        'The WhatsApp Business Account has no phone number available.',
-      )
-    }
-
-    if (phones.length > 1) {
-      console.warn(
-        `[embedded-signup] Multiple phone numbers returned for WABA ${selectedWabaId}; selecting the first one.`,
-      )
-    }
-
-    const phone = phones[0]
-
-    const phoneNumberId = phone?.id as string | undefined
 
     if (!phoneNumberId) {
       throw new Error(
-        'Meta did not return a phone_number_id.',
+        'Meta Embedded Signup did not provide a phone_number_id.'
+      )
+    }
+
+    // ------------------------------------------------------------
+    // 6. Phone number information
+    // ------------------------------------------------------------
+
+    let phone: any = {
+      id: phoneNumberId,
+      display_phone_number: null,
+      verified_name: null,
+      quality_rating: null,
+    }
+
+    // If Meta permits the WABA phone_numbers endpoint with the
+    // whatsapp_business_management permission, enrich the phone data.
+    try {
+      const phoneData = await metaJson(
+        `${META_API_BASE}/${selectedWabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      )
+
+      const matchedPhone = Array.isArray(phoneData?.data)
+        ? phoneData.data.find((p: any) => p?.id === phoneNumberId)
+        : null
+
+      if (matchedPhone) {
+        phone = matchedPhone
+      }
+    } catch (err) {
+      console.warn(
+        '[embedded-signup] Could not enrich phone information:',
+        err,
       )
     }
 
