@@ -24,14 +24,11 @@ import { toast } from "sonner";
 import {
   WifiOff,
   AlertCircle,
-  MessageSquare,
   RefreshCw,
   Keyboard,
   X,
-  Plus,
-  Search,
-  Filter,
-  Zap,
+  MoreVertical,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,10 +44,10 @@ export default function InboxPage() {
 
 function InboxSkeleton() {
   return (
-    <div className="-m-4 flex h-[calc(100vh-3.5rem)] items-center justify-center bg-slate-50 sm:-m-6">
+    <div className="-m-4 flex h-[calc(100vh-3.5rem)] items-center justify-center bg-[#f0f2f5] sm:-m-6">
       <div className="flex flex-col items-center gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
-        <p className="text-xs font-medium text-slate-500">Loading inbox…</p>
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#008069]/20 border-t-[#008069]" />
+        <p className="text-xs font-medium text-slate-500">Loading WhatsApp…</p>
       </div>
     </div>
   );
@@ -80,7 +77,6 @@ function InboxPageInner() {
     } catch {}
   }, []);
 
-  // ---- UI-only state ----
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -141,7 +137,6 @@ function InboxPageInner() {
     }
   }, []);
 
-  // WhatsApp connection status
   useEffect(() => {
     const checkConnection = async () => {
       const supabase = createClient();
@@ -174,7 +169,6 @@ function InboxPageInner() {
     checkConnection();
   }, []);
 
-  // Realtime message events
   const handleMessageEvent = useCallback(
     (event: { eventType: string; new: Message; old: Partial<Message> }) => {
       const newMsg = event.new;
@@ -223,7 +217,6 @@ function InboxPageInner() {
     [activeConversation, hydrateConversation]
   );
 
-  // Realtime conversation events
   const handleConversationEvent = useCallback(
     (event: {
       eventType: string;
@@ -290,7 +283,6 @@ function InboxPageInner() {
     wasConnectedRef.current = isConnected;
   }, [isConnected]);
 
-  // Visibility refetch
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -307,14 +299,12 @@ function InboxPageInner() {
     setResyncToken((n) => n + 1);
   }, []);
 
-  // Top bar refresh (spins briefly)
   const handleTopRefresh = useCallback(() => {
     setIsRefreshing(true);
     setResyncToken((n) => n + 1);
     setTimeout(() => setIsRefreshing(false), 600);
   }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -468,113 +458,106 @@ function InboxPageInner() {
 
   const hasActiveConv = !!activeConversation;
 
-  // Computed totals
   const totals = useMemo(() => {
     const total = conversations.length;
     const unread = conversations.reduce(
       (sum, c) => sum + (c.unread_count || 0),
       0
     );
-    const open = conversations.filter(
-      (c) => c.status === "open" || !c.status
-    ).length;
-    return { total, unread, open };
+    return { total, unread };
   }, [conversations]);
 
   return (
-    <div className="-m-4 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-slate-50 sm:-m-6">
-      {/* ==================== TOP BAR ==================== */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4">
+    <div className="-m-4 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-[#f0f2f5] sm:-m-6">
+      {/* ==================== WHATSAPP-STYLE HEADER ==================== */}
+      <div className="flex shrink-0 items-center justify-between gap-3 bg-[#008069] px-4 py-2.5 text-white shadow-sm sm:px-5">
+        {/* Left: WhatsApp avatar + title */}
         <div className="flex min-w-0 items-center gap-3">
-          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600 text-white shadow-md shadow-emerald-500/20">
-            <MessageSquare className="h-5 w-5" />
+          <div className="relative">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5 fill-white"
+                aria-hidden="true"
+              >
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+              </svg>
+            </div>
             {totals.unread > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white ring-2 ring-white">
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#25d366] px-1 text-[10px] font-bold text-white ring-2 ring-[#008069]">
                 {totals.unread > 99 ? "99+" : totals.unread}
               </span>
             )}
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-sm font-bold tracking-tight text-slate-900">
+            <h1 className="truncate text-[15px] font-semibold leading-tight">
               Inbox
             </h1>
-            <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
-              <span className="truncate font-medium">
-                {totals.total} conversation{totals.total === 1 ? "" : "s"}
-              </span>
-              <span className="text-slate-300">•</span>
-              <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                {totals.open} open
-              </span>
+            <p className="truncate text-[11px] leading-tight text-white/80">
+              {totals.total} chat{totals.total === 1 ? "" : "s"}
+              {totals.unread > 0 && ` · ${totals.unread} unread`}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <ConnectionPill
-            connected={whatsappConnected}
-            wsConnected={isConnected}
-          />
+        {/* Right: connection + actions */}
+        <div className="flex items-center gap-1">
+          <LivePill connected={whatsappConnected} wsConnected={isConnected} />
 
-          <div className="hidden h-8 items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-0.5 sm:flex">
-            <button
-              type="button"
-              onClick={handleTopRefresh}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-100"
-              title="Refresh (R)"
-              aria-label="Refresh"
-            >
-              <RefreshCw
-                className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")}
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => setShortcutsOpen(true)}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-100"
-              title="Keyboard shortcuts (?)"
-              aria-label="Keyboard shortcuts"
-            >
-              <Keyboard className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          {/* Mobile-only refresh */}
           <button
             type="button"
             onClick={handleTopRefresh}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 sm:hidden"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10"
+            title="Refresh (R)"
             aria-label="Refresh"
           >
             <RefreshCw
-              className={cn("h-4 w-4", isRefreshing && "animate-spin")}
+              className={cn("h-[18px] w-[18px]", isRefreshing && "animate-spin")}
             />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShortcutsOpen(true)}
+            className="hidden h-9 w-9 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10 sm:inline-flex"
+            title="Keyboard shortcuts (?)"
+            aria-label="Keyboard shortcuts"
+          >
+            <Keyboard className="h-[18px] w-[18px]" />
+          </button>
+
+          <button
+            type="button"
+            onClick={handleToggleContactPanel}
+            className="hidden h-9 w-9 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10 lg:inline-flex"
+            title="Toggle contact panel"
+            aria-label="Toggle contact panel"
+          >
+            <MoreVertical className="h-[18px] w-[18px]" />
           </button>
         </div>
       </div>
 
-      {/* ==================== CONNECTION BANNER ==================== */}
+      {/* ==================== WHATSAPP CONNECTION BANNER ==================== */}
       {whatsappConnected === false && (
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-amber-200 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 px-3 py-2.5 sm:px-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-              <WifiOff className="h-4 w-4" />
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-amber-200 bg-[#fff8e6] px-4 py-2 sm:px-5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+              <WifiOff className="h-3.5 w-3.5" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-amber-900">
+              <p className="truncate text-[12px] font-semibold text-amber-900">
                 WhatsApp not connected
               </p>
-              <p className="truncate text-[11px] text-amber-700">
+              <p className="truncate text-[11px] text-amber-700/90">
                 {t("whatsappNotConnected")}
               </p>
             </div>
           </div>
           <a
             href="/settings/whatsapp"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600 active:scale-95"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#008069] px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#006b58] active:scale-95"
           >
-            <Zap className="h-3 w-3" />
             Connect
           </a>
         </div>
@@ -633,72 +616,50 @@ function InboxPageInner() {
       {/* ==================== SHORTCUTS DIALOG ==================== */}
       {shortcutsOpen && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           onClick={() => setShortcutsOpen(false)}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
+            className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-4">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white">
-                  <Keyboard className="h-4 w-4" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#008069] text-white">
+                  <Keyboard className="h-3.5 w-3.5" />
                 </div>
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900">
-                    Keyboard Shortcuts
-                  </h2>
-                  <p className="text-[11px] text-slate-500">
-                    Speed up your workflow
-                  </p>
-                </div>
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Keyboard Shortcuts
+                </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setShortcutsOpen(false)}
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+                className="rounded-full p-1.5 text-slate-500 transition hover:bg-slate-100"
                 aria-label="Close"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-1 p-5">
+            <div className="space-y-1 p-4">
               {[
-                {
-                  keys: ["R"],
-                  label: "Refresh inbox",
-                  description: "Reload conversations & messages",
-                },
-                {
-                  keys: ["Esc"],
-                  label: "Close thread",
-                  description: "Return to conversation list",
-                },
-                {
-                  keys: ["?"],
-                  label: "Show shortcuts",
-                  description: "Open this dialog",
-                },
+                { keys: ["R"], label: "Refresh inbox" },
+                { keys: ["Esc"], label: "Close thread" },
+                { keys: ["?"], label: "Show shortcuts" },
               ].map((item) => (
                 <div
                   key={item.label}
-                  className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/60 px-3.5 py-2.5"
+                  className="flex items-center justify-between rounded-lg px-3 py-2.5 transition hover:bg-slate-50"
                 >
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-900">
-                      {item.label}
-                    </p>
-                    <p className="text-[10px] text-slate-500">
-                      {item.description}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 gap-1">
+                  <span className="text-[13px] text-slate-700">
+                    {item.label}
+                  </span>
+                  <div className="flex gap-1">
                     {item.keys.map((k) => (
                       <kbd
                         key={k}
-                        className="rounded-md border border-slate-300 bg-white px-2 py-1 font-mono text-[11px] font-bold text-slate-700 shadow-sm"
+                        className="rounded border border-slate-300 bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-slate-700"
                       >
                         {k}
                       </kbd>
@@ -707,12 +668,6 @@ function InboxPageInner() {
                 </div>
               ))}
             </div>
-
-            <div className="border-t border-slate-100 bg-slate-50 px-5 py-3 text-center">
-              <p className="text-[10px] text-slate-500">
-                Tip: Press <kbd className="rounded border border-slate-300 bg-white px-1 py-0.5 font-mono">?</kbd> anytime to reopen this dialog
-              </p>
-            </div>
           </div>
         </div>
       )}
@@ -720,9 +675,9 @@ function InboxPageInner() {
   );
 }
 
-// ==================== CONNECTION PILL ====================
+// ==================== LIVE PILL (WhatsApp style) ====================
 
-function ConnectionPill({
+function LivePill({
   connected,
   wsConnected,
 }: {
@@ -731,8 +686,8 @@ function ConnectionPill({
 }) {
   if (connected === null) {
     return (
-      <span className="hidden h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-semibold text-slate-500 sm:inline-flex">
-        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400" />
+      <span className="hidden h-7 items-center gap-1.5 rounded-full bg-white/10 px-2.5 text-[11px] font-medium text-white/90 sm:inline-flex">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white/70" />
         Connecting
       </span>
     );
@@ -741,12 +696,12 @@ function ConnectionPill({
   if (connected && wsConnected) {
     return (
       <span
-        className="hidden h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-[11px] font-semibold text-emerald-700 sm:inline-flex"
-        title="WhatsApp connected · Realtime active"
+        className="hidden h-7 items-center gap-1.5 rounded-full bg-white/10 px-2.5 text-[11px] font-medium text-white sm:inline-flex"
+        title="Live"
       >
         <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#25d366] opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-[#25d366]" />
         </span>
         Live
       </span>
@@ -756,10 +711,10 @@ function ConnectionPill({
   if (connected && !wsConnected) {
     return (
       <span
-        className="hidden h-8 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-[11px] font-semibold text-amber-700 sm:inline-flex"
-        title="Reconnecting to realtime…"
+        className="hidden h-7 items-center gap-1.5 rounded-full bg-white/10 px-2.5 text-[11px] font-medium text-amber-200 sm:inline-flex"
+        title="Reconnecting…"
       >
-        <AlertCircle className="h-3 w-3 animate-pulse" />
+        <AlertCircle className="h-3 w-3" />
         Reconnecting
       </span>
     );
@@ -767,8 +722,8 @@ function ConnectionPill({
 
   return (
     <span
-      className="hidden h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 text-[11px] font-semibold text-red-700 sm:inline-flex"
-      title="WhatsApp not connected"
+      className="hidden h-7 items-center gap-1.5 rounded-full bg-white/10 px-2.5 text-[11px] font-medium text-red-200 sm:inline-flex"
+      title="Offline"
     >
       <WifiOff className="h-3 w-3" />
       Offline
