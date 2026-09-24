@@ -224,11 +224,25 @@ const [showManualConnect, setShowManualConnect] = useState(false);
 
     window.addEventListener('message', handleMetaMessage);
 
+    let callbackHandled = false;
+
     FB.login(
       (response: any) => {
+        // Meta/OAuth authorization codes are single-use.
+        // Never send the same code to the callback twice.
+        if (callbackHandled) {
+          console.warn('[Embedded Signup] Duplicate FB.login callback ignored.');
+          return;
+        }
+
+        callbackHandled = true;
         setIsEmbeddedSignupLoading(false);
-console.log('[META FULL RESPONSE]', JSON.stringify(response, null, 2));
-alert('[META FULL RESPONSE]\n\n' + JSON.stringify(response, null, 2));
+
+        console.log(
+          '[META FULL RESPONSE]',
+          JSON.stringify(response, null, 2)
+        );
+
         if (response?.authResponse?.code) {
           const code = response.authResponse.code;
           let session = "";
