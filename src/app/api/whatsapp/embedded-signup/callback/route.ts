@@ -95,7 +95,11 @@ export async function GET(request: Request) {
     if (error) {
       console.error('[embedded-signup] Meta authorization error:', error, errorDescription)
 
-      const settingsUrl = new URL('/settings', request.url)
+      const appUrl =
+        process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+        new URL(request.url).origin
+
+      const settingsUrl = new URL('/settings', appUrl)
       settingsUrl.searchParams.set('tab', 'whatsapp')
       settingsUrl.searchParams.set('whatsapp', 'error')
       settingsUrl.searchParams.set(
@@ -107,7 +111,11 @@ export async function GET(request: Request) {
     }
 
     if (!code) {
-      const settingsUrl = new URL('/settings', request.url)
+      const appUrl =
+        process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+        new URL(request.url).origin
+
+      const settingsUrl = new URL('/settings', appUrl)
       settingsUrl.searchParams.set('tab', 'whatsapp')
       settingsUrl.searchParams.set('whatsapp', 'error')
       settingsUrl.searchParams.set(
@@ -476,7 +484,11 @@ export async function GET(request: Request) {
     // ------------------------------------------------------------
     // Do NOT put access tokens, phone IDs, WABA IDs, or other
     // sensitive Meta data in the redirect URL.
-    const settingsUrl = new URL('/settings', request.url)
+    const appUrl =
+      process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+      new URL(request.url).origin
+
+    const settingsUrl = new URL('/settings', appUrl)
     settingsUrl.searchParams.set('tab', 'whatsapp')
     settingsUrl.searchParams.set('whatsapp', 'connected')
 
@@ -487,7 +499,11 @@ export async function GET(request: Request) {
 
     console.error('[embedded-signup] Callback failed:', message)
 
-    const settingsUrl = new URL('/settings', request.url)
+    const appUrl =
+      process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+      new URL(request.url).origin
+
+    const settingsUrl = new URL('/settings', appUrl)
     settingsUrl.searchParams.set('tab', 'whatsapp')
     settingsUrl.searchParams.set('whatsapp', 'error')
 
