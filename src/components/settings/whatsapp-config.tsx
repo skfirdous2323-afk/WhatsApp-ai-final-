@@ -851,13 +851,13 @@ const [showManualConnect, setShowManualConnect] = useState(false);
 
                 <div className="space-y-2">
                   <Label className="text-muted-foreground">
-                    Two-step Verification PIN <span className="ml-1 text-muted-foreground">(optional)</span>
+                    Cloud API Registration PIN <span className="ml-1 text-muted-foreground">(6 digits)</span>
                   </Label>
                   <Input
                     type="text"
                     inputMode="numeric"
                     maxLength={6}
-                    placeholder="6-digit PIN from Meta Business Manager"
+                    placeholder="Choose a new 6-digit PIN"
                     value={pin}
                     onChange={(e) =>
                       setPin(e.target.value.replace(/\D/g, '').slice(0, 6))
@@ -865,9 +865,9 @@ const [showManualConnect, setShowManualConnect] = useState(false);
                     className="bg-muted border-border text-foreground placeholder:text-muted-foreground tracking-widest"
                   />
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Needed to register a production number. Get it from Meta Business Manager →
-                    WhatsApp Accounts → Phone Numbers → Two-step verification.
-                    Leave blank for test numbers.
+                    Choose a new 6-digit PIN for Cloud API phone registration.
+                    This is separate from your Meta or Google Authenticator login code.
+                    Save this PIN securely.
                   </p>
                 </div>
               </CardContent>
@@ -906,6 +906,17 @@ const [showManualConnect, setShowManualConnect] = useState(false);
 
 
 
+          </div>
+
+          <div className="flex justify-end pt-4">
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="min-w-[180px]"
+            >
+              {saving ? 'Saving...' : 'Save Configuration'}
+            </Button>
           </div>
 
         </div>
