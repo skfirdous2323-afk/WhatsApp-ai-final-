@@ -187,9 +187,66 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { phone_number_id, waba_id, access_token, verify_token, pin } = body
 
-    if (!access_token || !phone_number_id) {
+    if (!phone_number_id) {
       return NextResponse.json(
-        { error: 'access_token and phone_number_id are required' },
+        { error: 'phone_number_id is required' },
+        { status: 400 }
+      )
+    }
+
+    // Load the existing config early so Embedded Signup customers can
+    // complete phone registration with only their PIN. The access token
+    // is already encrypted and stored server-side after Embedded Signup.
+    const { data: existingConfig, error: existingConfigError } = await supabase
+      .from('whatsapp_config')
+      .select('id, account_id, phone_number_id, waba_id, access_token, verify_token, registered_at, subscribed_apps_at')
+      .eq('account_id', accountId)
+      .maybeSingle()
+
+    if (existingConfigError) {
+      console.error('Error loading existing WhatsApp config:', existingConfigError)
+      return NextResponse.json(
+        { error: 'Failed to load existing WhatsApp configuration' },
+        { status: 500 }
+      )
+    }
+
+    let resolvedAccessToken: string | null =
+      typeof access_token === 'string' && access_token.trim()
+        ? access_token.trim()
+        : null
+
+    // For an existing Embedded Signup configuration, reuse the encrypted
+    // token already stored in Supabase. Never expose the decrypted token
+    // to the browser.
+    const existingSamePhone =
+      existingConfig?.phone_number_id === phone_number_id
+
+    if (
+      !resolvedAccessToken &&
+      existingSamePhone &&
+      existingConfig?.access_token
+    ) {
+      try {
+        resolvedAccessToken = decrypt(existingConfig.access_token)
+      } catch (err) {
+        console.error('Failed to decrypt stored WhatsApp access token:', err)
+        return NextResponse.json(
+          {
+            error:
+              'The saved WhatsApp access token could not be decrypted. Please reconnect WhatsApp with Meta.',
+          },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (!resolvedAccessToken) {
+      return NextResponse.json(
+        {
+          error:
+            'Access Token is required for a new WhatsApp connection. Please connect with Meta first.',
+        },
         { status: 400 }
       )
     }
@@ -240,7 +297,7 @@ export async function POST(request: Request) {
     try {
       phoneInfo = await verifyPhoneNumber({
         phoneNumberId: phone_number_id,
-        accessToken: access_token,
+        accessToken: resolvedAccessToken,
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown Meta API error'
@@ -251,12 +308,39 @@ export async function POST(request: Request) {
       )
     }
 
+    // Reuse the existing WABA ID / verify token when this is a
+    // PIN-only update for the same WhatsApp number.
+    const resolvedWabaId =
+      typeof waba_id === 'string' && waba_id.trim()
+        ? waba_id.trim()
+        : existingSamePhone
+          ? existingConfig?.waba_id ?? null
+          : null
+
+    let resolvedVerifyToken: string | null =
+      typeof verify_token === 'string' && verify_token.trim()
+        ? verify_token.trim()
+        : null
+
+    if (!resolvedVerifyToken && existingSamePhone && existingConfig?.verify_token) {
+      try {
+        resolvedVerifyToken = decrypt(existingConfig.verify_token)
+      } catch (err) {
+        console.warn(
+          'Failed to decrypt existing WhatsApp verify token; continuing without it:',
+          err,
+        )
+      }
+    }
+
     // Encrypt sensitive tokens before storing
     let encryptedAccessToken: string
     let encryptedVerifyToken: string | null
     try {
-      encryptedAccessToken = encrypt(access_token)
-      encryptedVerifyToken = verify_token ? encrypt(verify_token) : null
+      encryptedAccessToken = encrypt(resolvedAccessToken)
+      encryptedVerifyToken = resolvedVerifyToken
+        ? encrypt(resolvedVerifyToken)
+        : null
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown encryption error'
       console.error('Encryption failed:', message)
@@ -272,11 +356,7 @@ export async function POST(request: Request) {
     // Look up any pre-existing row for this account so we know whether
     // this number is already registered with Meta — if so we can skip
     // /register when the user didn't provide a PIN this time around.
-    const { data: existing } = await supabase
-      .from('whatsapp_config')
-      .select('id, registered_at, phone_number_id')
-      .eq('account_id', accountId)
-      .maybeSingle()
+    const existing = existingConfig
 
     const sameNumber =
       existing?.phone_number_id === phone_number_id &&
@@ -313,7 +393,7 @@ export async function POST(request: Request) {
         try {
           await registerPhoneNumber({
             phoneNumberId: phone_number_id,
-            accessToken: access_token,
+            accessToken: resolvedAccessToken,
             pin,
           })
           registeredAt = new Date().toISOString()
@@ -334,11 +414,11 @@ export async function POST(request: Request) {
     // Skipped only when there's no waba_id (legacy rows from before
     // we required it).
     let subscribedAppsAt: string | null = null
-    if (waba_id) {
+    if (resolvedWabaId) {
       try {
         await subscribeWabaToApp({
-          wabaId: waba_id,
-          accessToken: access_token,
+          wabaId: resolvedWabaId,
+          accessToken: resolvedAccessToken,
         })
         subscribedAppsAt = new Date().toISOString()
       } catch (err) {
@@ -355,13 +435,17 @@ export async function POST(request: Request) {
     // user through a retry.
     const baseRow = {
       phone_number_id,
-      waba_id: waba_id || null,
+      waba_id: resolvedWabaId,
       access_token: encryptedAccessToken,
       verify_token: encryptedVerifyToken,
       status: registrationError ? 'disconnected' : 'connected',
       connected_at: registrationError ? null : new Date().toISOString(),
       registered_at: registrationError ? null : registeredAt,
-      subscribed_apps_at: subscribedAppsAt ?? null,
+      subscribed_apps_at:
+        subscribedAppsAt ??
+        (existingSamePhone
+          ? existingConfig?.subscribed_apps_at ?? null
+          : null),
       last_registration_error: registrationError,
       updated_at: new Date().toISOString(),
     }

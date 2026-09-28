@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { encrypt } from '@/lib/whatsapp/encryption'
+import { subscribeWabaToApp } from '@/lib/whatsapp/meta-api'
 
 const META_API_VERSION = 'v21.0'
 const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`
@@ -92,17 +93,29 @@ export async function GET(request: Request) {
     const sessionRaw = url.searchParams.get('session')
 
     if (error) {
-      return NextResponse.json(
-        { success: false, error, error_description: errorDescription },
-        { status: 400 },
+      console.error('[embedded-signup] Meta authorization error:', error, errorDescription)
+
+      const settingsUrl = new URL('/settings', request.url)
+      settingsUrl.searchParams.set('tab', 'whatsapp')
+      settingsUrl.searchParams.set('whatsapp', 'error')
+      settingsUrl.searchParams.set(
+        'message',
+        'WhatsApp connection was cancelled or could not be completed.',
       )
+
+      return NextResponse.redirect(settingsUrl)
     }
 
     if (!code) {
-      return NextResponse.json(
-        { success: false, error: 'Missing Meta authorization code' },
-        { status: 400 },
+      const settingsUrl = new URL('/settings', request.url)
+      settingsUrl.searchParams.set('tab', 'whatsapp')
+      settingsUrl.searchParams.set('whatsapp', 'error')
+      settingsUrl.searchParams.set(
+        'message',
+        'Meta authorization code is missing. Please connect WhatsApp again.',
       )
+
+      return NextResponse.redirect(settingsUrl)
     }
 
     // ------------------------------------------------------------
@@ -360,13 +373,42 @@ export async function GET(request: Request) {
     }
 
     // ------------------------------------------------------------
-    // 8. Save/update the whatsapp_config row
+    // 8. Subscribe the WABA to this app
+    //    Embedded Signup previously skipped this step, which left
+    //    the number connected in CRM but not subscribed for webhooks.
+    // ------------------------------------------------------------
+    let subscribedAppsAt: string | null = null
+
+    try {
+      await subscribeWabaToApp({
+        wabaId: selectedWabaId,
+        accessToken,
+      })
+
+      subscribedAppsAt = new Date().toISOString()
+
+      console.log('[embedded-signup] WABA subscribed to app:', {
+        waba_id: selectedWabaId,
+        subscribed_apps_at: subscribedAppsAt,
+      })
+    } catch (subscriptionError) {
+      console.warn(
+        '[embedded-signup] WABA subscription failed:',
+        subscriptionError,
+      )
+    }
+
+    // ------------------------------------------------------------
+    // 9. Save/update the whatsapp_config row
     // ------------------------------------------------------------
     const { data: existing } = await supabase
       .from('whatsapp_config')
-      .select('id')
+      .select('id, phone_number_id, registered_at, subscribed_apps_at, last_registration_error')
       .eq('account_id', accountId)
       .maybeSingle()
+
+    const existingSameNumber =
+      existing?.phone_number_id === phoneNumberId
 
     const configPayload = {
       account_id: accountId,
@@ -376,6 +418,14 @@ export async function GET(request: Request) {
       access_token: encryptedAccessToken,
       status: 'connected',
       connected_at: new Date().toISOString(),
+      registered_at: existingSameNumber
+        ? existing?.registered_at ?? null
+        : null,
+      subscribed_apps_at: subscribedAppsAt
+        ?? (existingSameNumber ? existing?.subscribed_apps_at ?? null : null),
+      last_registration_error: existingSameNumber
+        ? existing?.last_registration_error ?? null
+        : null,
     }
 
     let savedConfig
@@ -422,41 +472,40 @@ export async function GET(request: Request) {
     }
 
     // ------------------------------------------------------------
-    // 9. Return safe info to the browser
+    // 10. Return the customer to WhatsApp settings
     // ------------------------------------------------------------
-    return NextResponse.json({
-      success: true,
-      connected: true,
-      whatsapp: {
-        phone_number_id: savedConfig.phone_number_id,
-        waba_id: savedConfig.waba_id,
-        display_phone_number: phone.display_phone_number || null,
-        verified_name: phone.verified_name || null,
-        quality_rating: phone.quality_rating || null,
-      },
-    })
+    // Do NOT put access tokens, phone IDs, WABA IDs, or other
+    // sensitive Meta data in the redirect URL.
+    const settingsUrl = new URL('/settings', request.url)
+    settingsUrl.searchParams.set('tab', 'whatsapp')
+    settingsUrl.searchParams.set('whatsapp', 'connected')
+
+    return NextResponse.redirect(settingsUrl)
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Unknown Embedded Signup error'
 
     console.error('[embedded-signup] Callback failed:', message)
 
+    const settingsUrl = new URL('/settings', request.url)
+    settingsUrl.searchParams.set('tab', 'whatsapp')
+    settingsUrl.searchParams.set('whatsapp', 'error')
+
     // Special handling for "code already used"
     if (message.includes('This authorization code has been used')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            'This signup link was already used. Please click "Connect WhatsApp" again to start a fresh signup.',
-          code_already_used: true,
-        },
-        { status: 400 },
+      settingsUrl.searchParams.set(
+        'message',
+        'This signup session was already used. Please click Connect WhatsApp again to start a fresh signup.',
       )
+      return NextResponse.redirect(settingsUrl)
     }
 
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 400 },
+    // Never expose raw Meta/API/database errors in the browser.
+    settingsUrl.searchParams.set(
+      'message',
+      'WhatsApp connection could not be completed. Please try connecting again.',
     )
+
+    return NextResponse.redirect(settingsUrl)
   }
 }

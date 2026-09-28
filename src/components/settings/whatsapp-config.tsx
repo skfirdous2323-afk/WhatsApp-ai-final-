@@ -2,6 +2,7 @@
 
 import Script from 'next/script';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Eye,
@@ -39,6 +40,7 @@ type ResetReason = 'token_corrupted' | 'meta_api_error' | null;
 
 export function WhatsAppConfig() {
   const t = useTranslations('Settings.whatsapp');
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const { user, accountId, loading: authLoading, profileLoading } = useAuth();
 
@@ -162,6 +164,35 @@ const [showManualConnect, setShowManualConnect] = useState(false);
   // ============================================================
   // Effects
   // ============================================================
+
+  // ============================================================
+  // Embedded Signup Result
+  // ============================================================
+
+  useEffect(() => {
+    const result = searchParams.get('whatsapp');
+    const message = searchParams.get('message');
+
+    if (result === 'connected') {
+      toast.success(
+        'WhatsApp credentials connected successfully. Please verify registration status before using WhatsApp.',
+        { duration: 10000 },
+      );
+    } else if (result === 'error') {
+      toast.error(
+        message || 'WhatsApp connection could not be completed. Please try again.',
+        { duration: 10000 },
+      );
+    }
+
+    // Remove callback result parameters after showing the message.
+    if (result) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('whatsapp');
+      url.searchParams.delete('message');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (authLoading || profileLoading) return;
