@@ -16,6 +16,7 @@ interface Doctor {
   availableDays: string[];
   startTime: string;
   endTime: string;
+  doctorPhoto?: string;
 }
 
 export default function DoctorsPage() {
@@ -31,7 +32,8 @@ export default function DoctorsPage() {
     fees: "",
     availableDays: [] as string[],
     startTime: "09:00",
-    endTime: "18:00"
+    endTime: "18:00",
+    doctorPhoto: ""
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -152,6 +154,58 @@ export default function DoctorsPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handlePhotoUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file.");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Doctor photo must be less than 2 MB.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      const supabase = createClient();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        throw new Error("You must be logged in.");
+      }
+
+      const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const filePath = `${user.id}/doctor-${Date.now()}.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("doctor-photos")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,
+          contentType: file.type,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data } = supabase.storage
+        .from("doctor-photos")
+        .getPublicUrl(filePath);
+
+      setFormData((prev) => ({
+        ...prev,
+        doctorPhoto: data.publicUrl,
+      }));
+    } catch (error: any) {
+      console.error("Doctor photo upload error:", error);
+      alert(error?.message || "Failed to upload doctor photo.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -190,7 +244,8 @@ export default function DoctorsPage() {
             consultation_fee: formData.fees,
             available_days: formData.availableDays,
             start_time: formData.startTime,
-            end_time: formData.endTime
+            end_time: formData.endTime,
+            doctor_photo: formData.doctorPhoto || null
           })
           .eq('id', editingId)
           .eq('clinic_id', clinicId);
@@ -210,7 +265,8 @@ export default function DoctorsPage() {
             consultation_fee: formData.fees || null,
             available_days: formData.availableDays,
             start_time: formData.startTime,
-            end_time: formData.endTime
+            end_time: formData.endTime,
+            doctor_photo: formData.doctorPhoto || null
           }]);
 
         if (error) throw error;
@@ -241,7 +297,8 @@ export default function DoctorsPage() {
       fees: doctor.fees || "",
       availableDays: doctor.availableDays || [],
       startTime: doctor.startTime || "09:00",
-      endTime: doctor.endTime || "18:00"
+      endTime: doctor.endTime || "18:00",
+      doctorPhoto: doctor.doctorPhoto || ""
     });
     setEditingId(doctor.id || null);
     document.getElementById('doctor-form')?.scrollIntoView({ behavior: 'smooth' });
@@ -290,7 +347,8 @@ export default function DoctorsPage() {
       fees: "",
       availableDays: [],
       startTime: "09:00",
-      endTime: "18:00"
+      endTime: "18:00",
+      doctorPhoto: ""
     });
     setEditingId(null);
   };
@@ -419,6 +477,43 @@ export default function DoctorsPage() {
 
                 <div className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Doctor Photo */}
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                        Doctor Photo
+                      </label>
+
+                      <div className="flex items-center gap-4">
+                        {formData.doctorPhoto ? (
+                          <img
+                            src={formData.doctorPhoto}
+                            alt="Doctor preview"
+                            className="h-20 w-20 rounded-full object-cover border-2 border-blue-100"
+                          />
+                        ) : (
+                          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 text-2xl text-gray-400">
+                            👨‍⚕️
+                          </div>
+                        )}
+
+                        <div>
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handlePhotoUpload(file);
+                            }}
+                            disabled={isSaving}
+                          />
+                          <p className="mt-1 text-xs text-gray-500">
+                            PNG, JPG or WEBP • Max 2 MB
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
                     <div>
                       <label className="mb-1.5 block text-sm font-semibold text-gray-700">
                         Doctor Name <span className="text-red-500">*</span>
@@ -618,8 +713,21 @@ export default function DoctorsPage() {
                           className="group rounded-xl border border-gray-200 bg-white p-5 hover:border-blue-300 hover:shadow-md transition-all"
                         >
                           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex items-start gap-4 flex-1 min-w-0">
+                              {doctor.doctorPhoto ? (
+                                <img
+                                  src={doctor.doctorPhoto}
+                                  alt={doctor.name}
+                                  className="h-16 w-16 flex-shrink-0 rounded-full object-cover border-2 border-blue-100"
+                                />
+                              ) : (
+                                <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-2xl">
+                                  👨‍⚕️
+                                </div>
+                              )}
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
                                 <h3 className="text-lg font-bold text-gray-900 truncate">{doctor.name}</h3>
                                 <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 whitespace-nowrap">
                                   {doctor.specialization}
@@ -662,6 +770,7 @@ export default function DoctorsPage() {
                                     </span>
                                   </div>
                                 )}
+                              </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">

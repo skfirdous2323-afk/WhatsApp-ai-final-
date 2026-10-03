@@ -2,6 +2,7 @@ import {
   engineSendText,
   engineSendInteractiveList,
   engineSendInteractiveButtons,
+  engineSendMedia,
 } from "@/lib/flows/meta-send";
 import { supabaseAdmin } from "@/lib/ai/admin-client";
 import { sendMainMenu } from "@/lib/whatsapp-bot/menu";
@@ -407,7 +408,7 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
 
     const { data: doctors } = await db
       .from("clinic_doctors")
-      .select("id, doctor_name, specialization, start_time, end_time")
+      .select("id, doctor_name, specialization, start_time, end_time, doctor_photo")
       .eq("clinic_id", clinicId)
       .order("created_at", { ascending: false });
 
@@ -450,6 +451,22 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
 
     const startTime = doctor.start_time ? doctor.start_time.slice(0, 5) : "09:00";
     const endTime = doctor.end_time ? doctor.end_time.slice(0, 5) : "18:00";
+
+    if (doctor.doctor_photo) {
+      try {
+        await engineSendMedia({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          kind: "image",
+          link: doctor.doctor_photo,
+          caption: `👨‍⚕️ ${doctor.doctor_name}`,
+        });
+      } catch (photoError) {
+        console.error("Doctor photo send failed:", photoError);
+      }
+    }
 
     await engineSendInteractiveButtons({
       accountId, userId, conversationId, contactId,
