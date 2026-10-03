@@ -495,6 +495,334 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
     }
 
     // ---- STEP: Doctor Selection ----
+    // ---- SERVICE SELECTION FROM DOCTOR PROFILE ----
+    if (command.startsWith("doctorservice_")) {
+      const serviceId = command.replace("doctorservice_", "");
+      const doctorId = session.doctorId;
+
+      if (!doctorId) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Doctor session expired. Please start again.",
+        });
+        clearSession(contactId);
+        return true;
+      }
+
+      const { data: service } = await db
+        .from("clinic_services")
+        .select("id, service_name, assigned_doctors")
+        .eq("clinic_id", clinicId)
+        .eq("id", serviceId)
+        .maybeSingle();
+
+      if (!service) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Service not found. Please select again.",
+        });
+        return true;
+      }
+
+      const assigned = Array.isArray(service.assigned_doctors)
+        ? service.assigned_doctors
+        : [];
+
+      if (!assigned.some((id: any) => String(id) === String(doctorId))) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ This service is not available for the selected doctor.",
+        });
+        return true;
+      }
+
+      setSession(contactId, {
+        step: "date",
+        serviceId: service.id,
+        serviceName: service.service_name,
+        doctorId: doctorId,
+        doctorName: session.doctorName,
+      });
+
+      const { data: appointmentSettings } = await db
+        .from("clinic_appointment_settings")
+        .select("slot_duration, max_booking_days")
+        .eq("clinic_id", clinicId)
+        .maybeSingle();
+
+      const bookingDays = appointmentSettings?.max_booking_days || 30;
+      const slotDuration = appointmentSettings?.slot_duration || 30;
+
+      const dates = await getAvailableBookingDates(
+        db,
+        clinicId,
+        doctorId,
+        bookingDays,
+        slotDuration
+      );
+
+      if (!dates || dates.length === 0) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text:
+            `📅 *${service.service_name}*\\n\\n` +
+            "❌ No available appointment dates for this doctor.",
+        });
+        clearSession(contactId);
+        return true;
+      }
+
+      await engineSendInteractiveList({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        bodyText:
+          `📅 *Select Appointment Date*\\n\\n` +
+          `👨‍⚕️ ${session.doctorName || "Doctor"}\\n` +
+          `🩺 ${service.service_name}\\n\\n` +
+          "Please choose an available date.",
+        buttonLabel: "Select Date",
+        footerText: "🏥 Powered by ZIVEXO",
+        sections: [
+          {
+            title: "Available Dates",
+            rows: dates.map((date: any) => ({
+              id: date.id,
+              title: date.title,
+              description: date.description,
+            })),
+          },
+        ],
+      });
+
+      return true;
+    }
+
+    // ---- BOOK APPOINTMENT FROM DOCTOR PROFILE ----
+    if (command.startsWith("doctor_book_")) {
+      const doctorId = command.replace("doctor_book_", "");
+
+      const { data: doctor } = await db
+        .from("clinic_doctors")
+        .select("id, doctor_name, specialization")
+        .eq("clinic_id", clinicId)
+        .eq("id", doctorId)
+        .maybeSingle();
+
+      if (!doctor) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Doctor not found. Please try again.",
+        });
+        return true;
+      }
+
+      const { data: services } = await db
+        .from("clinic_services")
+        .select("id, service_name, assigned_doctors")
+        .eq("clinic_id", clinicId);
+
+      const doctorServices = (services || []).filter((service: any) => {
+        const assigned = service.assigned_doctors;
+
+        if (!Array.isArray(assigned)) return false;
+
+        return assigned.some(
+          (id: any) => String(id) === String(doctor.id)
+        );
+      });
+
+      if (doctorServices.length === 0) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text:
+            `👨‍⚕️ *${doctor.doctor_name}*\\n\\n` +
+            "❌ No appointment services are currently available for this doctor.\\n\\n" +
+            "Please contact the clinic for assistance.",
+        });
+        return true;
+      }
+
+      setSession(contactId, {
+        step: "doctor_service",
+        doctorId: doctor.id,
+        doctorName: doctor.doctor_name,
+      });
+
+      await engineSendInteractiveList({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        bodyText:
+          `📅 *Book Appointment*\\n\\n` +
+          `👨‍⚕️ ${doctor.doctor_name}\\n` +
+          `🩺 ${doctor.specialization || "Medical Specialist"}\\n\\n` +
+          "Please select a service.",
+        buttonLabel: "Select Service",
+        footerText: "🏥 Powered by ZIVEXO",
+        sections: [
+          {
+            title: "Available Services",
+            rows: doctorServices.map((service: any) => ({
+              id: `doctorservice_${service.id}`,
+              title:
+                service.service_name.length > 24
+                  ? service.service_name.substring(0, 21) + "..."
+                  : service.service_name,
+              description: "Book appointment",
+            })),
+          },
+        ],
+      });
+
+      return true;
+    }
+
+    // ---- DOCTORS BACK / MAIN MENU ----
+  if (command === "main_menu") {
+    clearSession(contactId);
+
+    await sendMainMenu({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      clinicId,
+    });
+
+    return true;
+  }
+
+  if (command === "doctors_back") {
+    clearSession(contactId);
+
+    const { data: doctors } = await db
+      .from("clinic_doctors")
+      .select("id, doctor_name, specialization")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false });
+
+    if (!doctors || doctors.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text:
+          "👨‍⚕️ *Our Doctors*\\n\\n" +
+          "No doctors are currently available. Please contact the clinic for assistance.",
+      });
+      return true;
+    }
+
+    await engineSendInteractiveList({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      bodyText:
+        "👨‍⚕️ *Our Doctors*\\n\\n" +
+        "Meet our available doctors and specialists.\\n\\n" +
+        "Please select a doctor to continue.",
+      buttonLabel: "👨‍⚕️ View Doctors",
+      footerText: "🏥 Powered by ZIVEXO",
+      sections: [
+        {
+          title: "Available Doctors",
+          rows: doctors.map((d: any) => ({
+            id: `doctor_profile_${d.id}`,
+            title: d.doctor_name,
+            description: d.specialization || "Medical Specialist",
+          })),
+        },
+      ],
+    });
+
+    return true;
+  }
+
+  // ---- DOCTOR PROFILE ----
+    if (command.startsWith("doctor_profile_")) {
+      const doctorId = command.replace("doctor_profile_", "");
+
+      const { data: doctor } = await db
+        .from("clinic_doctors")
+        .select("id, doctor_name, specialization, start_time, end_time")
+        .eq("clinic_id", clinicId)
+        .eq("id", doctorId)
+        .maybeSingle();
+
+      if (!doctor) {
+        await engineSendText({
+          accountId,
+          userId,
+          conversationId,
+          contactId,
+          text: "❌ Doctor not found. Please try again.",
+        });
+        return true;
+      }
+
+      const startTime = doctor.start_time
+        ? doctor.start_time.slice(0, 5)
+        : "09:00";
+
+      const endTime = doctor.end_time
+        ? doctor.end_time.slice(0, 5)
+        : "18:00";
+
+      const profileText =
+        `👨‍⚕️ *${doctor.doctor_name}*\\n\\n` +
+        `🩺 *Specialization:* ${doctor.specialization || "Medical Specialist"}\\n` +
+        `🕒 *Availability:* ${startTime} - ${endTime}\\n\\n` +
+        `Please choose an option below.`;
+
+      await engineSendInteractiveButtons({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        bodyText: profileText,
+        buttons: [
+          {
+            id: `doctor_book_${doctor.id}`,
+            title: "📅 Book Appointment",
+          },
+          {
+            id: "doctors_back",
+            title: "⬅️ Back to Doctors",
+          },
+          {
+            id: "main_menu",
+            title: "🏠 Main Menu",
+          },
+        ],
+        footerText: "🏥 Powered by ZIVEXO",
+      });
+
+      return true;
+    }
+
     if (session.step === "doctor") {
       let selected;
 
@@ -1260,7 +1588,7 @@ We'll send you a reminder before your appointment.
   if (msg === "doctors" || command === "2" || command === "doctors") {
     const { data: doctors } = await db
       .from("clinic_doctors")
-      .select("doctor_name, specialization")
+      .select("id, doctor_name, specialization")
       .eq("clinic_id", clinicId)
       .order("created_at", { ascending: false });
 
@@ -1270,24 +1598,34 @@ We'll send you a reminder before your appointment.
         userId,
         conversationId,
         contactId,
-        text: "❌ No doctors available.",
+        text:
+          "👨‍⚕️ *Our Doctors*\\n\\n" +
+          "No doctors are currently available. Please contact the clinic for assistance.",
       });
       return true;
     }
 
-    const list = doctors
-      .map(
-        (d: any, i: number) =>
-          `${i + 1}. ${d.doctor_name} (${d.specialization})`
-      )
-      .join("\n");
-
-    await engineSendText({
+    await engineSendInteractiveList({
       accountId,
       userId,
       conversationId,
       contactId,
-      text: `👨‍⚕️ Our Doctors:\n\n${list}`,
+      bodyText:
+        "👨‍⚕️ *Our Doctors*\\n\\n" +
+        "Meet our available doctors and specialists.\\n\\n" +
+        "Please select a doctor to continue.",
+      buttonLabel: "👨‍⚕️ View Doctors",
+      footerText: "🏥 Powered by ZIVEXO",
+      sections: [
+        {
+          title: "Available Doctors",
+          rows: doctors.map((d: any) => ({
+            id: `doctor_profile_${d.id}`,
+            title: d.doctor_name,
+            description: d.specialization || "Medical Specialist",
+          })),
+        },
+      ],
     });
 
     return true;
