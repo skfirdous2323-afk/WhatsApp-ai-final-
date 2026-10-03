@@ -758,6 +758,14 @@ async function processMessage(
 const inboundText = contentText ?? message.text?.body ?? ''
 const command = interactiveReplyId || inboundText
 
+console.log('[webhook] Bot input:', {
+  messageType: message.type,
+  contentText,
+  interactiveReplyId,
+  inboundText,
+  command,
+})
+
 const botHandled = await runWhatsAppBot({
   accountId,
   userId: configOwnerUserId,
