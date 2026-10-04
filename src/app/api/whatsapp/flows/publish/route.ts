@@ -200,6 +200,7 @@ export async function POST(request: Request) {
     const accessToken = decrypt(config.access_token)
 
     const assetBody = new FormData()
+    assetBody.append('name', 'flow.json')
     assetBody.append('asset_type', 'FLOW_JSON')
     assetBody.append(
       'file',
