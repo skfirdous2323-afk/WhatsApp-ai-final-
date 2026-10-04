@@ -62,6 +62,7 @@ export function WhatsAppConfig() {
   const [pin, setPin] = useState('');
   const [tokenEdited, setTokenEdited] = useState(false);
   const [isEmbeddedSignupLoading, setIsEmbeddedSignupLoading] = useState(false);
+  const [creatingFlow, setCreatingFlow] = useState(false);
 const [showManualConnect, setShowManualConnect] = useState(false);
 
   const isRegistered = Boolean(config?.registered_at);
@@ -82,6 +83,29 @@ const [showManualConnect, setShowManualConnect] = useState(false);
     typeof window !== 'undefined'
       ? `${window.location.origin}/api/whatsapp/webhook`
       : '';
+
+  const handleCreateMetaFlow = async () => {
+    setCreatingFlow(true);
+
+    try {
+      const response = await fetch('/api/whatsapp/flows/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.details?.error?.message || result?.error || 'Failed to create WhatsApp Flow');
+      }
+
+      toast.success(`WhatsApp Flow created: ${result.flow_id}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create WhatsApp Flow');
+    } finally {
+      setCreatingFlow(false);
+    }
+  };
 
   // Meta configuration
   const metaAppId = process.env.NEXT_PUBLIC_META_APP_ID;
@@ -908,7 +932,16 @@ const [showManualConnect, setShowManualConnect] = useState(false);
 
           </div>
 
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-between items-center pt-4 gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCreateMetaFlow}
+              disabled={creatingFlow || authLoading || profileLoading}
+            >
+              {creatingFlow ? 'Creating Flow...' : 'Create Appointment Flow'}
+            </Button>
+
             <Button
               type="button"
               onClick={handleSave}
