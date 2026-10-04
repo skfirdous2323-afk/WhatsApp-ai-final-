@@ -84,6 +84,37 @@ const [showManualConnect, setShowManualConnect] = useState(false);
       ? `${window.location.origin}/api/whatsapp/webhook`
       : '';
 
+  const handlePublishMetaFlow = async () => {
+    const flowId = window.prompt('Enter Meta Flow ID')
+    if (!flowId?.trim()) return
+
+    try {
+      const response = await fetch('/api/whatsapp/flows/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flow_id: flowId.trim() }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          result?.details?.error?.message ||
+          result?.error ||
+          'Failed to publish WhatsApp Flow'
+        )
+      }
+
+      toast.success(`WhatsApp Flow published: ${flowId.trim()}`)
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to publish WhatsApp Flow'
+      )
+    }
+  }
+
   const handleCreateMetaFlow = async () => {
     setCreatingFlow(true);
 
@@ -933,14 +964,25 @@ const [showManualConnect, setShowManualConnect] = useState(false);
           </div>
 
           <div className="flex justify-between items-center pt-4 gap-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCreateMetaFlow}
-              disabled={creatingFlow || authLoading || profileLoading}
-            >
-              {creatingFlow ? 'Creating Flow...' : 'Create Appointment Flow'}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCreateMetaFlow}
+                disabled={creatingFlow || authLoading || profileLoading}
+              >
+                {creatingFlow ? 'Creating Flow...' : 'Create Appointment Flow'}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handlePublishMetaFlow}
+                disabled={authLoading || profileLoading}
+              >
+                Publish Appointment Flow
+              </Button>
+            </div>
 
             <Button
               type="button"
