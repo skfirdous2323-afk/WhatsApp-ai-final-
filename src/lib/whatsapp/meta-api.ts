@@ -763,6 +763,95 @@ export interface SendInteractiveButtonsArgs {
  * Validation throws BEFORE the network call so misconfigured flows
  * fail at save time, not during a live conversation.
  */
+
+export interface SendWhatsAppFlowArgs {
+  phoneNumberId: string
+  accessToken: string
+  to: string
+  flowId: string
+  flowToken?: string
+  flowCta?: string
+  headerText?: string
+  bodyText: string
+  footerText?: string
+  flowActionPayload?: Record<string, unknown>
+}
+
+export async function sendWhatsAppFlow(
+  args: SendWhatsAppFlowArgs
+): Promise<MetaSendResult> {
+  const {
+    phoneNumberId,
+    accessToken,
+    to,
+    flowId,
+    flowToken,
+    flowCta = 'Book Appointment',
+    headerText,
+    bodyText,
+    footerText,
+    flowActionPayload,
+  } = args
+
+  if (!flowId) throw new Error('WhatsApp Flow ID is required.')
+  if (!bodyText) throw new Error('WhatsApp Flow body text is required.')
+  if (flowCta.length > 20) {
+    throw new Error('WhatsApp Flow CTA must be 20 characters or fewer.')
+  }
+
+  const action: Record<string, unknown> = {
+    name: 'flow',
+    parameters: {
+      flow_message_version: '3',
+      flow_id: flowId,
+      flow_cta: flowCta,
+      flow_action: 'navigate',
+    },
+  }
+
+  if (flowToken) {
+    ;(action.parameters as Record<string, unknown>).flow_token = flowToken
+  }
+
+  if (flowActionPayload) {
+    ;(action.parameters as Record<string, unknown>).flow_action_payload =
+      flowActionPayload
+  }
+
+  const interactive: Record<string, unknown> = {
+    type: 'flow',
+    body: { text: bodyText },
+    action,
+  }
+
+  if (headerText) interactive.header = { type: 'text', text: headerText }
+  if (footerText) interactive.footer = { text: footerText }
+
+  const body = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive,
+  }
+
+  const url = `${META_API_BASE}/${phoneNumberId}/messages`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    await throwMetaError(response, `Meta API error: ${response.status}`)
+  }
+
+  return (await response.json()) as MetaSendResult
+}
+
 export async function sendInteractiveButtons(
   args: SendInteractiveButtonsArgs
 ): Promise<MetaSendResult> {
