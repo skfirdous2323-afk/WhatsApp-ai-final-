@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const { data: profile } = await admin
       .from('profiles')
       .select('account_id')
-      .eq('id', user.id)
+      .eq('user_id', user.id)
       .single()
 
     if (!profile?.account_id) {
