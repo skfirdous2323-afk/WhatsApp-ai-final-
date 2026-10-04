@@ -84,6 +84,37 @@ const [showManualConnect, setShowManualConnect] = useState(false);
       ? `${window.location.origin}/api/whatsapp/webhook`
       : '';
 
+  const handleCheckMetaFlowStatus = async () => {
+    const flowId = window.prompt('Enter Meta Flow ID')
+    if (!flowId?.trim()) return
+
+    try {
+      const response = await fetch('/api/whatsapp/flows/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flow_id: flowId.trim() }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          result?.details?.error?.message ||
+          result?.error ||
+          'Failed to check WhatsApp Flow status'
+        )
+      }
+
+      window.alert(JSON.stringify(result, null, 2))
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to check WhatsApp Flow status'
+      )
+    }
+  }
+
   const handlePublishMetaFlow = async () => {
     const flowId = window.prompt('Enter Meta Flow ID')
     if (!flowId?.trim()) return
@@ -981,6 +1012,15 @@ const [showManualConnect, setShowManualConnect] = useState(false);
                 disabled={authLoading || profileLoading}
               >
                 Publish Appointment Flow
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCheckMetaFlowStatus}
+                disabled={authLoading || profileLoading}
+              >
+                Check Flow Status
               </Button>
             </div>
 
