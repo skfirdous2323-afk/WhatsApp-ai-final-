@@ -199,10 +199,13 @@ export async function POST(request: Request) {
 
     const accessToken = decrypt(config.access_token)
 
-    const assetBody = new URLSearchParams({
-      asset_type: 'FLOW_JSON',
-      asset: JSON.stringify(FLOW_JSON),
-    })
+    const assetBody = new FormData()
+    assetBody.append('asset_type', 'FLOW_JSON')
+    assetBody.append(
+      'file',
+      new Blob([JSON.stringify(FLOW_JSON)], { type: 'application/json' }),
+      'flow.json',
+    )
 
     const uploadResponse = await fetch(
       `https://graph.facebook.com/v21.0/${flowId}/assets`,
@@ -210,9 +213,8 @@ export async function POST(request: Request) {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: assetBody.toString(),
+        body: assetBody,
       },
     )
 
