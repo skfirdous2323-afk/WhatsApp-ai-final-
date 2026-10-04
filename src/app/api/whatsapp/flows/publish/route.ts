@@ -56,6 +56,9 @@ const FLOW_JSON = {
               name: {
                 type: 'string',
               },
+              title: {
+                type: 'string',
+              },
             },
           },
           __example__: [],

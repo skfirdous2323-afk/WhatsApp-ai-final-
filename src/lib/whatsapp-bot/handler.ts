@@ -2,6 +2,7 @@ import {
   engineSendText,
   engineSendInteractiveList,
   engineSendInteractiveButtons,
+  engineSendWhatsAppFlow,
   engineSendMedia,
 } from "@/lib/flows/meta-send";
 import { supabaseAdmin } from "@/lib/ai/admin-client";
@@ -518,6 +519,44 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
       await engineSendText({
         accountId, userId, conversationId, contactId,
         text: `👨‍⚕️ *${doctor.doctor_name}*\n\nNo appointment services are configured for this doctor. Please contact the clinic.`,
+      });
+      return true;
+    }
+
+    const { data: waConfig } = await db
+      .from("whatsapp_config")
+      .select("meta_flow_id, meta_flow_token")
+      .eq("account_id", accountId)
+      .maybeSingle();
+
+    if (waConfig?.meta_flow_id) {
+      await engineSendWhatsAppFlow({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        flowId: waConfig.meta_flow_id,
+        flowToken: waConfig.meta_flow_token || undefined,
+        flowCta: "Book Appointment",
+        bodyText:
+          `📅 *Book Appointment*\\n\\n` +
+          `👨‍⚕️ ${doctor.doctor_name}\\n` +
+          `🩺 ${doctor.specialization || "Medical Specialist"}\\n\\n` +
+          "Complete your appointment details below.",
+        footerText: "🏥 Powered by ZIVEXO",
+        flowActionPayload: {
+          screen: "APPOINTMENT",
+          data: {
+            doctor_id: doctor.id,
+            doctor_name: doctor.doctor_name,
+            specialization: doctor.specialization || "Medical Specialist",
+            services: doctorServices.map((service: any) => ({
+              id: service.id,
+              name: service.service_name,
+              title: service.service_name,
+            })),
+          },
+        },
       });
       return true;
     }
