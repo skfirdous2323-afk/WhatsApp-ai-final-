@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { decrypt } from '@/lib/whatsapp/encryption'
 
 async function resolveAccountId(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -60,6 +61,16 @@ export async function POST() {
       )
     }
 
+    let accessToken: string
+    try {
+      accessToken = decrypt(config.access_token)
+    } catch {
+      return NextResponse.json(
+        { error: 'WhatsApp access token could not be decrypted. Please reconnect WhatsApp.' },
+        { status: 400 },
+      )
+    }
+
     const appId = process.env.META_APP_ID
     const appSecret = process.env.META_APP_SECRET
 
@@ -78,7 +89,7 @@ export async function POST() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           name: flowName,
