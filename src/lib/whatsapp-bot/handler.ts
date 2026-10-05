@@ -570,9 +570,11 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
     await engineSendInteractiveList({
       accountId, userId, conversationId, contactId,
       bodyText:
-        `📅 *Book Appointment*\n\n👨‍⚕️ ${doctor.doctor_name}\n` +
-        `🩺 ${doctor.specialization || "Medical Specialist"}\n\nPlease select a service.`,
-      buttonLabel: "Select Service",
+        `📅 *Book an Appointment*\n\n` +
+        `👨‍⚕️ *Doctor:* ${doctor.doctor_name}\n` +
+        `🩺 *Specialization:* ${doctor.specialization || "Medical Specialist"}\n\n` +
+        "Please select a service to continue.",
+      buttonLabel: "🩺 View Services",
       footerText: "🏥 Powered by ZIVEXO",
       sections: [{
         title: "Available Services",
