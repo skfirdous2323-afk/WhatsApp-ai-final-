@@ -1572,9 +1572,11 @@ Thank you for choosing us. 🏥`,
       userId,
       conversationId,
       contactId,
-      bodyText: "📋 Select a Service",
-      footerText: "Please choose a service",
-      buttonLabel: "View Services",
+      bodyText:
+        "🩺 *Choose a Service*\n\n" +
+        "Select the service or consultation you would like to book.",
+      footerText: "🏥 Powered by ZIVEXO",
+      buttonLabel: "🩺 View Services",
       sections: [
         {
           title: "Available Services",
