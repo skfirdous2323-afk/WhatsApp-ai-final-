@@ -1648,7 +1648,7 @@ Thank you for choosing us. 🏥`,
   if (msg === "services" || command === "3" || command === "services") {
     const { data: services } = await db
       .from("clinic_services")
-      .select("service_name, price, duration_minutes")
+      .select("id, service_name, price, duration_minutes")
       .eq("clinic_id", clinicId)
       .order("created_at", { ascending: false });
 
@@ -1965,7 +1965,7 @@ if (command === "faq_main_menu") {
     userId,
     conversationId,
     contactId,
-    text: `❌ I didn't understand that.\n\nPlease reply with:\n1️⃣ Book Appointment\n2️⃣ Doctors\n3️⃣ Services\n4️⃣ Working Hours\n5️⃣ FAQ\n6️⃣ Contact\n7️⃣ Location\n\nOr type "Hi" to see the menu.`,
+    text: `❓ *How can we help?*\n\nI couldn't understand that message. Please choose an option from the menu or type *Hi* to get started.\n\n🏥 *Available options:*\n1️⃣ Book Appointment\n2️⃣ Doctors\n3️⃣ Services\n4️⃣ Working Hours\n5️⃣ FAQ\n6️⃣ Contact\n7️⃣ Location\n\n💬 Type *Hi* anytime to return to the main menu.`,
   });
 
   return true;
