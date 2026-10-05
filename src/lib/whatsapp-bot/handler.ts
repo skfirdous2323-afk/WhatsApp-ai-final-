@@ -669,9 +669,12 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
         userId,
         conversationId,
         contactId,
-        bodyText: `👨‍⚕️ Select a Doctor for ${selected.service_name}`,
-        footerText: "Please choose a doctor",
-        buttonLabel: "View Doctors",
+        bodyText:
+          `👨‍⚕️ *Choose Your Doctor*\n\n` +
+          `Available doctors for *${selected.service_name}*.\n\n` +
+          `Please select a doctor to continue.`,
+        footerText: "🏥 Powered by ZIVEXO",
+        buttonLabel: "👨‍⚕️ View Doctors",
         sections: [
           {
             title: "Available Doctors",
@@ -681,7 +684,8 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
                 d.doctor_name.length > 24
                   ? d.doctor_name.substring(0, 21) + "..."
                   : d.doctor_name,
-              description: d.specialization,
+              description:
+                d.specialization || "Medical Specialist",
             })),
           },
         ],
@@ -789,8 +793,8 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
           `📅 *Select Appointment Date*\\n\\n` +
           `👨‍⚕️ ${session.doctorName || "Doctor"}\\n` +
           `🩺 ${service.service_name}\\n\\n` +
-          "Please choose an available date.",
-        buttonLabel: "Select Date",
+          "Please select an available date to continue.",
+        buttonLabel: "📅 View Dates",
         footerText: "🏥 Powered by ZIVEXO",
         sections: [
           {
@@ -860,7 +864,7 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
           userId,
           conversationId,
           contactId,
-          text: "❌ No available dates for this doctor. Please try another doctor.",
+          text: "❌ No available dates are currently found for this doctor.\n\nPlease choose another doctor or try again later.",
         });
         clearSession(contactId);
         return true;
@@ -872,8 +876,8 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
         conversationId,
         contactId,
         bodyText: `📅 Select Appointment Date for ${selected.doctor_name}`,
-        buttonLabel: "View Dates",
-        footerText: "Choose a date",
+        buttonLabel: "📅 View Available Dates",
+        footerText: "🏥 Powered by ZIVEXO",
         sections: [
           {
             title: "Available Dates",
@@ -988,9 +992,13 @@ if (session.step === "date") {
     userId,
     conversationId,
     contactId,
-    bodyText: `🕐 Select Appointment Time for ${session.serviceName} with ${session.doctorName}`,
-    footerText: "Choose a time slot",
-    buttonLabel: "View Time Slots",
+    bodyText:
+          `🕐 *Choose Your Appointment Time*\n\n` +
+          `👨‍⚕️ ${session.doctorName || "Doctor"}\n` +
+          `🩺 ${session.serviceName || "Service"}\n\n` +
+          "Please select an available time slot to continue.",
+    footerText: "🏥 Powered by ZIVEXO",
+    buttonLabel: "🕐 View Time Slots",
     sections: [
       {
         title: "Available Time Slots",
@@ -1038,9 +1046,13 @@ if (session.step === "date") {
           userId,
           conversationId,
           contactId,
-          bodyText: `🕐 Select Appointment Time for ${session.serviceName} with ${session.doctorName}`,
-          footerText: "Choose a time slot",
-          buttonLabel: "View Time Slots",
+          bodyText:
+          `🕐 *Choose Your Appointment Time*\n\n` +
+          `👨‍⚕️ ${session.doctorName || "Doctor"}\n` +
+          `🩺 ${session.serviceName || "Service"}\n\n` +
+          "Please select an available time slot to continue.",
+          footerText: "🏥 Powered by ZIVEXO",
+          buttonLabel: "🕐 View Time Slots",
           sections: [
             {
               title: "Available Time Slots",
@@ -1070,9 +1082,13 @@ if (session.step === "date") {
           userId,
           conversationId,
           contactId,
-          bodyText: `🕐 Select Appointment Time for ${session.serviceName} with ${session.doctorName}`,
-          footerText: "Choose a time slot",
-          buttonLabel: "View Time Slots",
+          bodyText:
+          `🕐 *Choose Your Appointment Time*\n\n` +
+          `👨‍⚕️ ${session.doctorName || "Doctor"}\n` +
+          `🩺 ${session.serviceName || "Service"}\n\n` +
+          "Please select an available time slot to continue.",
+          footerText: "🏥 Powered by ZIVEXO",
+          buttonLabel: "🕐 View Time Slots",
           sections: [
             {
               title: "Available Time Slots",
@@ -1141,7 +1157,9 @@ if (session.step === "date") {
         userId,
         conversationId,
         contactId,
-        text: `👤 Please enter your full name.`,
+        text:
+        "👤 *Patient Details*\n\n" +
+        "Please enter the patient's full name to continue.",
       });
 
       return true;
@@ -1174,9 +1192,9 @@ if (session.step === "date") {
         userId,
         conversationId,
         contactId,
-        bodyText: "👤 Select Gender",
-        buttonLabel: "Choose",
-        footerText: "Please select",
+        bodyText: "👤 *Select Gender*\n\nPlease choose the patient's gender.",
+        buttonLabel: "👤 Choose Gender",
+        footerText: "🏥 Powered by ZIVEXO",
         sections: [
           {
             title: "Gender",
@@ -1206,7 +1224,7 @@ if (session.step === "date") {
           userId,
           conversationId,
           contactId,
-          text: "❌ Please select your gender from the list.",
+          text: "❌ Please select a gender from the options above.",
         });
         return true;
       }
@@ -1222,7 +1240,7 @@ if (session.step === "date") {
         userId,
         conversationId,
         contactId,
-        text: "🎂 Please enter your age.",
+        text: "🎂 *Patient Age*\n\nPlease enter the patient's age.",
       });
 
       return true;
@@ -1238,7 +1256,7 @@ if (session.step === "date") {
           userId,
           conversationId,
           contactId,
-          text: "❌ Please enter a valid age (1-120).",
+          text: "❌ Please enter a valid age between 1 and 120.",
         });
         return true;
       }
@@ -1281,17 +1299,20 @@ if (session.step === "date") {
       });
 
       // Build confirmation summary
-      const summaryText = `📋 *Appointment Summary*
+      const summaryText = `📋 *Confirm Your Appointment*
 
-👤 *Name:* ${session.patientName}
+Please review your appointment details before confirming.
+
+👤 *Patient:* ${session.patientName}
 ⚥ *Gender:* ${session.gender}
 🎂 *Age:* ${age}
+
 🩺 *Service:* ${session.serviceName}
 👨‍⚕️ *Doctor:* ${session.doctorName}
 📅 *Date:* ${formattedDate}
 🕐 *Time:* ${session.time}
 
-Please confirm your booking:`;
+Please choose an option below:`;
 
       // ✅ Show interactive buttons for confirmation
       await engineSendInteractiveButtons({
@@ -1305,7 +1326,7 @@ Please confirm your booking:`;
           { id: "reschedule_booking", title: "🔄 Reschedule" },
           { id: "cancel_booking", title: "❌ Cancel" },
         ],
-        footerText: "ZIVEXO",
+        footerText: "🏥 Powered by ZIVEXO",
       });
 
       return true;
@@ -1391,18 +1412,21 @@ Please confirm your booking:`;
             userId,
             conversationId,
             contactId,
-            text: `✅ *Appointment Confirmed!*
+            text: `✅ *Appointment Confirmed*
 
-📋 *Service:* ${session.serviceName}
+Your appointment has been successfully booked.
+
+📋 *Appointment ID:* ${appointmentId}
+
+👤 *Patient:* ${session.patientName}
+🩺 *Service:* ${session.serviceName}
 👨‍⚕️ *Doctor:* ${session.doctorName}
 📅 *Date:* ${formattedDate}
 🕐 *Time:* ${session.time}
-👤 *Patient:* ${session.patientName}
-📋 *ID:* ${appointmentId}
 
-We'll send you a reminder before your appointment.
+🔔 We'll send you a reminder before your appointment.
 
-*Thank you for booking with us!* 🏥`,
+Thank you for choosing us. 🏥`,
           });
 
           return true;
@@ -1442,7 +1466,7 @@ We'll send you a reminder before your appointment.
             userId,
             conversationId,
             contactId,
-            text: "❌ No available dates for this doctor. Please try another doctor.",
+            text: "❌ No available dates are currently found for this doctor.\n\nPlease choose another doctor or try again later.",
           });
           clearSession(contactId);
           return true;
@@ -1453,9 +1477,9 @@ We'll send you a reminder before your appointment.
           userId,
           conversationId,
           contactId,
-          bodyText: `📅 Select New Date for ${session.doctorName}`,
-          buttonLabel: "View Dates",
-          footerText: "Choose a date",
+          bodyText: `📅 *Choose a New Appointment Date*\n\n👨‍⚕️ ${session.doctorName}\n\nPlease select an available date to reschedule your appointment.`,
+          buttonLabel: "📅 View Available Dates",
+          footerText: "🏥 Powered by ZIVEXO",
           sections: [
             {
               title: "Available Dates",
@@ -1480,7 +1504,7 @@ We'll send you a reminder before your appointment.
           userId,
           conversationId,
           contactId,
-          text: "❌ *Booking Cancelled.*\n\nType *Hi* to start again.",
+          text: "❌ *Appointment Cancelled*\n\nYour booking request has been cancelled.\n\nType *Hi* whenever you would like to book a new appointment.",
         });
 
         return true;
@@ -1635,21 +1659,46 @@ We'll send you a reminder before your appointment.
       return true;
     }
 
-    const list = services
-      .map(
-        (s: any) =>
-          `🩺 ${s.service_name}${s.price ? ` - ₹${s.price}` : ""}${
-            s.duration_minutes ? ` (${s.duration_minutes} min)` : ""
-          }`
-      )
-      .join("\n");
+    const uniqueServices = Array.from(
+      new Map(
+        services
+          .filter((s: any) => s.service_name)
+          .map((s: any) => [
+            String(s.service_name).trim().toLowerCase(),
+            s,
+          ])
+      ).values()
+    );
 
-    await engineSendText({
+    await engineSendInteractiveList({
       accountId,
       userId,
       conversationId,
       contactId,
-      text: `🩺 Our Services:\n\n${list}`,
+      bodyText:
+        "🩺 *Our Services*\n\n" +
+        "Explore our available services and consultation options.\n\n" +
+        "Please select a service to continue.",
+      buttonLabel: "🩺 View Services",
+      footerText: "🏥 Powered by ZIVEXO",
+      sections: [
+        {
+          title: "Available Services",
+          rows: uniqueServices.map((s: any) => ({
+            id: `service_${s.id}`,
+            title: String(s.service_name).trim().slice(0, 24),
+            description:
+              [
+                s.price ? `₹${s.price}` : null,
+                s.duration_minutes
+                  ? `${s.duration_minutes} min`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" • ") || "Service available",
+          })),
+        },
+      ],
     });
 
     return true;

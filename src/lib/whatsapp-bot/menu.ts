@@ -47,9 +47,6 @@ export async function sendMainMenu({
   const clinicName =
     clinic?.clinic_name || "Sunrise Health Clinic";
 
-  const whatsappNumber =
-    clinic?.whatsapp_number || "";
-
   const logoUrl =
     clinic?.logo_url || clinic?.clinic_logo || null;
 
@@ -86,7 +83,7 @@ export async function sendMainMenu({
     menuLabels.doctors || "👨‍⚕️ Doctors";
 
   const servicesLabel =
-    menuLabels.services || "🦷 Services";
+    menuLabels.services || "🩺 Services";
 
   const hoursLabel =
     menuLabels.hours || "🕒 Working Hours";
@@ -159,19 +156,15 @@ export async function sendMainMenu({
 
   // Welcome message
   let welcomeText =
-    `👋 Welcome to *${clinicName}*!`;
+    `👋 Welcome to *${clinicName}*`;
 
   if (hoursSummary) {
-    welcomeText += `\n${hoursSummary}`;
-  }
-
-  if (whatsappNumber) {
-    welcomeText +=
-      `\n📱 WhatsApp: ${whatsappNumber}`;
+    welcomeText += `\n🕒 ${hoursSummary}`;
   }
 
   welcomeText +=
-    `\n\n*Please choose an option from the menu below.*`;
+    `\n\nWe're here to help with appointments, doctors and clinic information.` +
+    `\n\n*Please choose an option below.*`;
 
   // Build menu dynamically
   const rows: any[] = [];
@@ -182,7 +175,7 @@ export async function sendMainMenu({
       id: "book",
       title: bookLabel,
       description:
-        menuDescriptions.book || "Book a new appointment",
+        menuDescriptions.book || "Schedule your visit",
     });
   }
 
@@ -192,7 +185,7 @@ export async function sendMainMenu({
       id: "doctors",
       title: doctorsLabel,
       description:
-        menuDescriptions.doctors || "View all doctors",
+        menuDescriptions.doctors || "Meet our doctors",
     });
   }
 
@@ -202,7 +195,7 @@ export async function sendMainMenu({
       id: "services",
       title: servicesLabel,
       description:
-        menuDescriptions.services || "Our treatments",
+        menuDescriptions.services || "Explore available services",
     });
   }
 
@@ -212,7 +205,7 @@ export async function sendMainMenu({
       id: "hours",
       title: hoursLabel,
       description:
-        menuDescriptions.hours || "Clinic timing",
+        menuDescriptions.hours || "View clinic timings",
     });
   }
 
@@ -222,7 +215,7 @@ export async function sendMainMenu({
       id: "faq",
       title: faqLabel,
       description:
-        menuDescriptions.faq || "Frequently asked questions",
+        menuDescriptions.faq || "Common questions",
     });
   }
 
@@ -232,7 +225,7 @@ export async function sendMainMenu({
       id: "contact",
       title: contactLabel,
       description:
-        menuDescriptions.contact || "Contact clinic",
+        menuDescriptions.contact || "Get in touch",
     });
   }
 
@@ -242,7 +235,7 @@ export async function sendMainMenu({
       id: "location",
       title: locationLabel,
       description:
-        menuDescriptions.location || "Clinic address",
+        menuDescriptions.location || "Find the clinic",
     });
   }
 
@@ -261,6 +254,6 @@ export async function sendMainMenu({
       },
     ],
     footerText:
-      `🏥 ${clinicName} • ZIVEXO`,
+      `🏥 ${clinicName} • Powered by ZIVEXO`,
   });
 }
