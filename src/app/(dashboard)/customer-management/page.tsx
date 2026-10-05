@@ -432,6 +432,16 @@ export default function CustomerManagementPage() {
   const loadData = async () => {
     setLoading(true);
     try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        setLoading(false);
+        return;
+      }
+
       const [
         { data: contacts, error: contactsError },
         { data: appointmentData, error: appointmentsError },
@@ -439,6 +449,7 @@ export default function CustomerManagementPage() {
         supabase
           .from("contacts")
           .select("id, name, phone, email, company, created_at")
+          .eq("user_id", user.id)
           .order("created_at", { ascending: false }),
 
         supabase
