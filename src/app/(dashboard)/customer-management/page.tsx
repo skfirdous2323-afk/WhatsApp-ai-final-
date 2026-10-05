@@ -442,6 +442,8 @@ export default function CustomerManagementPage() {
         return;
       }
 
+      const clinicId = await getClinicId(user.id);
+
       const [
         { data: contacts, error: contactsError },
         { data: appointmentData, error: appointmentsError },
@@ -457,6 +459,7 @@ export default function CustomerManagementPage() {
           .select(
             "id, contact_id, patient_name, gender, age, appointment_date, appointment_time, status, doctor_id, service_id, amount, payment_status, payment_method"
           )
+          .eq("clinic_id", clinicId)
           .order("appointment_date", { ascending: false }),
       ]);
 
