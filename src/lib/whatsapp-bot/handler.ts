@@ -630,9 +630,23 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
       });
 
       // Get ONLY doctors assigned to this service
-      const assignedDoctorIds = Array.isArray(selected.assigned_doctors)
-        ? selected.assigned_doctors.map((id: any) => String(id))
-        : [];
+      let assignedDoctorIds: string[] = [];
+
+      if (Array.isArray(selected.assigned_doctors)) {
+        assignedDoctorIds = selected.assigned_doctors.map((id: any) => String(id));
+      } else if (typeof selected.assigned_doctors === "string") {
+        try {
+          const parsed = JSON.parse(selected.assigned_doctors);
+          if (Array.isArray(parsed)) {
+            assignedDoctorIds = parsed.map((id: any) => String(id));
+          }
+        } catch {
+          assignedDoctorIds = selected.assigned_doctors
+            .split(",")
+            .map((id: string) => id.trim())
+            .filter(Boolean);
+        }
+      }
 
       if (assignedDoctorIds.length === 0) {
         await engineSendText({
