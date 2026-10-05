@@ -27,9 +27,35 @@ import type {
 
 type DB = SupabaseClient
 
+async function getCurrentClinicId(db: DB): Promise<string> {
+  const {
+    data: { user },
+    error: userError,
+  } = await db.auth.getUser()
+
+  if (userError || !user) {
+    throw new Error("User not authenticated")
+  }
+
+  const { data: clinic, error: clinicError } = await db
+    .from("clinics")
+    .select("id")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single()
+
+  if (clinicError || !clinic) {
+    throw new Error("Clinic not found")
+  }
+
+  return clinic.id
+}
+
 // --- 1. Metric cards ---------------------------------------------------
 
 export async function loadMetrics(db: DB): Promise<MetricsBundle> {
+  const clinicId = await getCurrentClinicId(db)
   const todayStart = startOfLocalDay().toISOString()
   const yesterdayStart = daysAgoStart(1).toISOString()
 
@@ -43,7 +69,7 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
     messagesToday,
     messagesYesterday,
   ] = await Promise.all([
-    db.from('conversations').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+    db.from('conversations').select('id', { count: 'exact', head: true }).eq('status', 'open').eq('clinic_id', clinicId),
     db
       .from('conversations')
       .select('id', { count: 'exact', head: true })
@@ -55,13 +81,13 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
       .eq('status', 'open')
       .gte('created_at', yesterdayStart)
       .lt('created_at', todayStart),
-    db.from('contacts').select('id', { count: 'exact', head: true }).gte('created_at', todayStart),
+    db.from('contacts').select('id', { count: 'exact', head: true }).eq('user_id', (await db.auth.getUser()).data.user?.id ?? '').gte('created_at', todayStart),
     db
       .from('contacts')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', yesterdayStart)
       .lt('created_at', todayStart),
-    db.from('deals').select('value, status').eq('status', 'open'),
+    db.from('deals').select('value, status').eq('status', 'open').eq('clinic_id', clinicId),
     db
       .from('messages')
       .select('id', { count: 'exact', head: true })
@@ -105,10 +131,12 @@ export async function loadConversationsSeries(
   db: DB,
   rangeDays: number,
 ): Promise<ConversationsSeriesPoint[]> {
+  const clinicId = await getCurrentClinicId(db)
   const start = daysAgoStart(rangeDays - 1).toISOString()
   const { data, error } = await db
     .from('messages')
     .select('created_at, sender_type')
+    .eq('clinic_id', clinicId)
     .gte('created_at', start)
     .order('created_at', { ascending: true })
   if (error) throw error
@@ -131,9 +159,10 @@ export async function loadConversationsSeries(
 // --- 3. Pipeline donut -------------------------------------------------
 
 export async function loadPipelineDonut(db: DB): Promise<PipelineDonutData> {
+  const clinicId = await getCurrentClinicId(db)
   const [stagesRes, dealsRes] = await Promise.all([
-    db.from('pipeline_stages').select('id, name, color, pipeline_id, position').order('position'),
-    db.from('deals').select('stage_id, value, status').eq('status', 'open'),
+    db.from('pipeline_stages').select('id, name, color, pipeline_id, position').eq('clinic_id', clinicId).order('position'),
+    db.from('deals').select('stage_id, value, status').eq('status', 'open').eq('clinic_id', clinicId),
   ])
 
   const stages =
@@ -170,6 +199,7 @@ export async function loadPipelineDonut(db: DB): Promise<PipelineDonutData> {
 // --- 4. Response time by day of week ----------------------------------
 
 export async function loadResponseTime(db: DB): Promise<ResponseTimeSummary> {
+  const clinicId = await getCurrentClinicId(db)
   // Pull the last 14 days of messages in one shot, then walk per
   // conversation to find each "first inbound" → "first subsequent
   // outbound" pair. 14 days gives us both "this week" + "last week"
@@ -179,6 +209,7 @@ export async function loadResponseTime(db: DB): Promise<ResponseTimeSummary> {
   const { data, error } = await db
     .from('messages')
     .select('conversation_id, sender_type, created_at')
+    .eq('clinic_id', clinicId)
     .gte('created_at', fourteenDaysAgo)
     .order('conversation_id', { ascending: true })
     .order('created_at', { ascending: true })
@@ -266,6 +297,7 @@ export async function loadResponseTime(db: DB): Promise<ResponseTimeSummary> {
 // --- 5. Activity feed --------------------------------------------------
 
 export async function loadActivity(db: DB, limit = 20): Promise<ActivityItem[]> {
+  const clinicId = await getCurrentClinicId(db)
   // Pull ~10 from each source (plenty of headroom after merge-sort),
   // then interleave by timestamp. The individual per-table limits
   // keep the payload small; the final limit is enforced after sort.
@@ -274,26 +306,31 @@ export async function loadActivity(db: DB, limit = 20): Promise<ActivityItem[]> 
       .from('messages')
       .select('id, content_text, sender_type, created_at, conversation_id, conversations(contact_id, contacts(name, phone))')
       .eq('sender_type', 'customer')
+      .eq('clinic_id', clinicId)
       .order('created_at', { ascending: false })
       .limit(10),
     db
       .from('contacts')
       .select('id, name, phone, created_at')
+      .eq('user_id', (await db.auth.getUser()).data.user?.id ?? '')
       .order('created_at', { ascending: false })
       .limit(10),
     db
       .from('deals')
       .select('id, title, updated_at, stage:pipeline_stages(name)')
+      .eq('clinic_id', clinicId)
       .order('updated_at', { ascending: false })
       .limit(10),
     db
       .from('broadcasts')
       .select('id, name, status, total_recipients, created_at')
+      .eq('clinic_id', clinicId)
       .order('created_at', { ascending: false })
       .limit(5),
     db
       .from('automation_logs')
       .select('id, trigger_event, status, created_at, automation:automations(name), contact:contacts(name, phone)')
+      .eq('clinic_id', clinicId)
       .order('created_at', { ascending: false })
       .limit(10),
   ])
