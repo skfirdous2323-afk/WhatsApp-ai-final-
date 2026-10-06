@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { NextIntlClientProvider } from 'next-intl';
+import { ClerkProvider } from "@clerk/nextjs";
 import { getLocale, getMessages } from 'next-intl/server';
 import { Inter } from "next/font/google";
 import Script from "next/script";
@@ -108,12 +109,14 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-full bg-background text-foreground font-sans">
-        <NextIntlClientProvider messages={messages} locale={locale}>
-          <ThemeProvider>
-            {children}
-            <ThemedToaster />
-          </ThemeProvider>
-        </NextIntlClientProvider>
+        <ClerkProvider>
+          <NextIntlClientProvider messages={messages} locale={locale}>
+            <ThemeProvider>
+              {children}
+              <ThemedToaster />
+            </ThemeProvider>
+          </NextIntlClientProvider>
+        </ClerkProvider>
       </body>
     </html>
   );
