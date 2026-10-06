@@ -110,8 +110,33 @@ export default function DashboardPage() {
     { id: string; name: string; count: number }[]
   >([]);
 
-  const loadAll = useCallback(() => {
+  const loadAll = useCallback(async () => {
     const db = createClient();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await db.auth.getUser();
+
+    if (userError || !user) {
+      console.error("[dashboard] user auth failed:", userError);
+      return;
+    }
+
+    const { data: clinic, error: clinicError } = await db
+      .from("clinics")
+      .select("id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (clinicError || !clinic) {
+      console.error("[dashboard] clinic lookup failed:", clinicError);
+      return;
+    }
+
+    const clinicId = clinic.id;
 
     void loadMetrics(db)
       .then((m) => setMetrics(m))
@@ -147,6 +172,7 @@ export default function DashboardPage() {
         "id, patient_name, appointment_time, status, doctor_id, amount, payment_status, contact_id"
       )
       .eq("appointment_date", todayKey)
+      .eq("clinic_id", clinicId)
       .order("appointment_time", { ascending: true })
       .then(({ data, error }) => {
         if (error) console.error("[dashboard] today appts:", error);
@@ -157,6 +183,7 @@ export default function DashboardPage() {
     void db
       .from("appointments")
       .select("amount, payment_status, appointment_date")
+      .eq("clinic_id", clinicId)
       .then(({ data, error }) => {
         if (error) console.error("[dashboard] revenue:", error);
         const rows = data || [];
@@ -179,6 +206,7 @@ export default function DashboardPage() {
     void db
       .from("clinic_doctors")
       .select("id, doctor_name")
+      .eq("clinic_id", clinicId)
       .then(({ data, error }) => {
         if (error) console.error("[dashboard] doctors:", error);
         const docs = data || [];
@@ -187,6 +215,7 @@ export default function DashboardPage() {
         void db
           .from("appointments")
           .select("doctor_id")
+          .eq("clinic_id", clinicId)
           .then(({ data: appts }) => {
             const counts: Record<string, number> = {};
             (appts || []).forEach((a: any) => {
