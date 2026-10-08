@@ -38,7 +38,12 @@ export default function LoginPage() {
       if (error) throw error;
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err?.message === "Invalid login credentials" ? "Wrong password." : (err?.message || "Login failed."));
+      const message = err?.message || "";
+      if (message === "Invalid login credentials") {
+        setError("Invalid email or password.");
+      } else {
+        setError(message || "Login failed.");
+      }
     } finally {
       setLoading(false);
     }
