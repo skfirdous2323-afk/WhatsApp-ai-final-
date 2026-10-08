@@ -38,7 +38,7 @@ export default function LoginPage() {
       if (error) throw error;
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || "Invalid email or password");
+      setError(err?.message === "Invalid login credentials" ? "Wrong password." : (err?.message || "Login failed."));
     } finally {
       setLoading(false);
     }
