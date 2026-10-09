@@ -1688,6 +1688,7 @@ Thank you for choosing us. 🏥`,
       ).values()
     );
 
+    setSession(contactId, { step: "service" });
     await engineSendInteractiveList({
       accountId,
       userId,
