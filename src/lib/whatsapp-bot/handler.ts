@@ -386,7 +386,15 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
 
   return true;
 }
-  if (session && command !== "1" && ["2", "3", "4", "5", "6", "7"].includes(command)) {
+  if (
+    session &&
+    (
+      (command !== "1" && ["2", "3", "4", "5", "6", "7"].includes(command)) ||
+      command === "clinic_hours" ||
+      command === "doctor_hours" ||
+      command.startsWith("doctor_hours_")
+    )
+  ) {
     clearSession(contactId);
     session = null;
   }
@@ -1723,40 +1731,83 @@ Thank you for choosing us. 🏥`,
     return true;
   }
 
-  // 4. View Working Hours
-  if (msg === "hours" || command === "4" || command === "hours") {
-    const { data: hours } = await db
+  // 4. Working Hours Menu
+  const formatHoursTime = (value: string | null | undefined) => {
+    if (!value) return "Not configured";
+    const parts = value.split(":");
+    const hour = Number(parts[0]);
+    const minute = parts[1] || "00";
+
+    if (!Number.isFinite(hour) || hour < 0 || hour > 23) return value;
+
+    const suffix = hour >= 12 ? "PM" : "AM";
+    const hour12 = hour % 12 || 12;
+    return `${String(hour12).padStart(2, "0")}:${minute} ${suffix}`;
+  };
+
+  if (
+    msg === "hours" ||
+    command === "4" ||
+    command === "hours"
+  ) {
+    await engineSendInteractiveList({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      bodyText:
+        "🕒 *Working Hours*\n\n" +
+        "Choose which schedule you would like to view.",
+      buttonLabel: "View Hours",
+      footerText: "🏥 Powered by ZIVEXO",
+      sections: [
+        {
+          title: "Working Hours",
+          rows: [
+            {
+              id: "clinic_hours",
+              title: "Clinic Working Hours",
+              description: "Clinic opening and closing times",
+            },
+            {
+              id: "doctor_hours",
+              title: "Doctor Working Hours",
+              description: "View individual doctor schedules",
+            },
+          ],
+        },
+      ],
+    });
+
+    return true;
+  }
+
+  // 4A. Display Clinic Working Hours
+  if (command === "clinic_hours") {
+    const { data: hours, error: hoursError } = await db
       .from("clinic_working_hours")
       .select("day_name, open_time, close_time, is_closed")
       .eq("clinic_id", clinicId)
       .order("created_at", { ascending: true });
 
-    if (!hours || hours.length === 0) {
+    if (hoursError || !hours || hours.length === 0) {
       await engineSendText({
         accountId,
         userId,
         conversationId,
         contactId,
-        text: "❌ Working hours not available.",
+        text:
+          "❌ Clinic working hours are not available right now.\n\n" +
+          "Please contact the clinic for assistance.",
       });
       return true;
     }
-
-    const formatTime = (value: string) => {
-      const parts = value.split(":");
-      const hour = Number(parts[0]);
-      const minute = parts[1] || "00";
-      if (!Number.isFinite(hour) || hour < 0 || hour > 23) return value;
-      const suffix = hour >= 12 ? "PM" : "AM";
-      const hour12 = hour % 12 || 12;
-      return `${String(hour12).padStart(2, "0")}:${minute} ${suffix}`;
-    };
 
     const list = hours
       .map((h: any) =>
         h.is_closed
           ? `• ${h.day_name}: Closed`
-          : `• ${h.day_name}: ${formatTime(h.open_time)} – ${formatTime(h.close_time)}`
+          : `• ${h.day_name}: ${formatHoursTime(h.open_time)} – ${formatHoursTime(h.close_time)}`
       )
       .join("\n");
 
@@ -1765,7 +1816,119 @@ Thank you for choosing us. 🏥`,
       userId,
       conversationId,
       contactId,
-      text: `🕒 *Clinic Working Hours*\n\n${list}\n\n🏥 Powered by ZIVEXO`,
+      text:
+        `🏥 *Clinic Working Hours*\n\n${list}` +
+        "\n\nReply *hours* to view the other option." +
+        "\n\n🏥 Powered by ZIVEXO",
+    });
+
+    return true;
+  }
+
+  // 4B. Show Doctor List for Working Hours
+  if (command === "doctor_hours") {
+    const { data: doctors, error: doctorsError } = await db
+      .from("clinic_doctors")
+      .select("id, doctor_name, specialization")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false });
+
+    if (doctorsError || !doctors || doctors.length === 0) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "👨‍⚕️ No doctors are currently available.",
+      });
+      return true;
+    }
+
+    await engineSendInteractiveList({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      bodyText:
+        "👨‍⚕️ *Doctor Working Hours*\n\n" +
+        "Select a doctor to view their working days and hours.",
+      buttonLabel: "Choose Doctor",
+      footerText: "🏥 Powered by ZIVEXO",
+      sections: [
+        {
+          title: "Available Doctors",
+          rows: doctors.slice(0, 10).map((d: any) => ({
+            id: `doctor_hours_${d.id}`,
+            title:
+              d.doctor_name.length > 24
+                ? d.doctor_name.substring(0, 21) + "..."
+                : d.doctor_name,
+            description: d.specialization || "Medical Specialist",
+          })),
+        },
+      ],
+    });
+
+    if (doctors.length > 10) {
+      console.warn(
+        "Working Hours doctor list limited to 10 entries:",
+        doctors.length
+      );
+    }
+
+    return true;
+  }
+
+  // 4C. Display Selected Doctor's Working Hours
+  if (command.startsWith("doctor_hours_")) {
+    const doctorId = command.slice("doctor_hours_".length);
+
+    const { data: doctor, error: doctorError } = await db
+      .from("clinic_doctors")
+      .select("doctor_name, specialization, start_time, end_time, available_days")
+      .eq("id", doctorId)
+      .eq("clinic_id", clinicId)
+      .maybeSingle();
+
+    if (doctorError || !doctor) {
+      await engineSendText({
+        accountId,
+        userId,
+        conversationId,
+        contactId,
+        text: "❌ Doctor not found. Please reply *hours* and try again.",
+      });
+      return true;
+    }
+
+    const days = Array.isArray(doctor.available_days)
+      ? doctor.available_days
+          .map((day: string) =>
+            String(day).charAt(0).toUpperCase() +
+            String(day).slice(1).toLowerCase()
+          )
+          .join(", ")
+      : "";
+
+    const hasStartTime = Boolean(doctor.start_time);
+    const hasEndTime = Boolean(doctor.end_time);
+    const timeRange =
+      hasStartTime && hasEndTime
+        ? `${formatHoursTime(doctor.start_time)} – ${formatHoursTime(doctor.end_time)}`
+        : "Working hours not configured";
+
+    await engineSendText({
+      accountId,
+      userId,
+      conversationId,
+      contactId,
+      text:
+        `👨‍⚕️ *${doctor.doctor_name}*\n\n` +
+        `🩺 *Specialization:* ${doctor.specialization || "Medical Specialist"}\n` +
+        `📅 *Working Days:* ${days || "Not configured"}\n` +
+        `🕒 *Working Hours:* ${timeRange}\n\n` +
+        "Reply *hours* to view clinic and doctor working hours." +
+        "\n\n🏥 Powered by ZIVEXO",
     });
 
     return true;
