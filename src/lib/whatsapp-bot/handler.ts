@@ -1742,11 +1742,21 @@ Thank you for choosing us. 🏥`,
       return true;
     }
 
+    const formatTime = (value: string) => {
+      const parts = value.split(":");
+      const hour = Number(parts[0]);
+      const minute = parts[1] || "00";
+      if (!Number.isFinite(hour) || hour < 0 || hour > 23) return value;
+      const suffix = hour >= 12 ? "PM" : "AM";
+      const hour12 = hour % 12 || 12;
+      return `${String(hour12).padStart(2, "0")}:${minute} ${suffix}`;
+    };
+
     const list = hours
       .map((h: any) =>
         h.is_closed
-          ? `${h.day_name}: Closed`
-          : `${h.day_name}: ${h.open_time} - ${h.close_time}`
+          ? `• ${h.day_name}: Closed`
+          : `• ${h.day_name}: ${formatTime(h.open_time)} – ${formatTime(h.close_time)}`
       )
       .join("\n");
 
@@ -1755,7 +1765,7 @@ Thank you for choosing us. 🏥`,
       userId,
       conversationId,
       contactId,
-      text: `🕒 Working Hours:\n\n${list}`,
+      text: `🕒 *Clinic Working Hours*\n\n${list}\n\n🏥 Powered by ZIVEXO`,
     });
 
     return true;
