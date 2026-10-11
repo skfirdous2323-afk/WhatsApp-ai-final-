@@ -25,6 +25,9 @@ export async function sendMainMenu({
     .select(`
       clinic_name,
       whatsapp_number,
+      phone_number,
+      address,
+      google_maps,
       logo_url,
       clinic_logo,
       menu_labels,
@@ -154,17 +157,34 @@ export async function sendMainMenu({
     }
   }
 
-  // Welcome message
-  let welcomeText =
-    `👋 Welcome to *${clinicName}*`;
+  // Professional clinic welcome message
+  let welcomeText = `👋 *Welcome to ${clinicName}*`;
+
+  welcomeText += `\n\n💙 Your Health, Our Priority.`;
+
+  const address = clinic?.address;
+  const googleMaps = clinic?.google_maps;
+  const contactNumber =
+    clinic?.phone_number || clinic?.whatsapp_number;
+
+  if (address) {
+    welcomeText += `\n\n📍 *Clinic Address*\n${address}`;
+  }
+
+  if (googleMaps) {
+    welcomeText += `\n🗺️ *Get Directions*\n${googleMaps}`;
+  }
+
+  if (contactNumber) {
+    welcomeText += `\n\n📞 *Contact Us*\n${contactNumber}`;
+  }
 
   if (hoursSummary) {
-    welcomeText += `\n🕒 ${hoursSummary}`;
+    welcomeText += `\n\n🕒 *Today's Working Hours*\n${hoursSummary}`;
   }
 
   welcomeText +=
-    `\n\nWe're here to help with appointments, doctors and clinic information.` +
-    `\n\n*Please choose an option below.*`;
+    `\n\nWe're here to help with your healthcare needs.`;
 
   // Build menu dynamically
   const rows: any[] = [];
