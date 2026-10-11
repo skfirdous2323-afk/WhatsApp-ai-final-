@@ -892,7 +892,7 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
         conversationId,
         contactId,
         bodyText: `📅 Select Appointment Date for ${selected.doctor_name}`,
-        buttonLabel: "📅 View Available Dates",
+        buttonLabel: "Select Date",
         footerText: "🏥 Powered by ZIVEXO",
         sections: [
           {
