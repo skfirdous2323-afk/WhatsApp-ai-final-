@@ -10,6 +10,7 @@ import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
 import {
   Bell,
   Bot,
+  CreditCard,
   Crown,
   GitBranch,
   LayoutDashboard,
@@ -20,6 +21,7 @@ import {
   Shield,
   User,
   UserCog,
+  UserRound,
   Users,
   UsersRound,
   Workflow,
@@ -93,19 +95,16 @@ const navItems: NavItem[] = [
   { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard },
   { href: "/inbox", labelKey: "inbox", icon: MessageSquare },
   { href: "/notifications", labelKey: "notifications", icon: Bell },
-  { href: "/contacts", labelKey: "contacts", icon: Users },
+  { href: "/contacts", labelKey: "contacts", icon: UserRound },
   { href: "/pipelines", labelKey: "pipelines", icon: GitBranch },
   { href: "/broadcasts", labelKey: "broadcasts", icon: Radio },
   { href: "/automations", labelKey: "automations", icon: Zap },
   { href: "/flows", labelKey: "flows", icon: Workflow, beta: true },
   { href: "/agents", labelKey: "aiAgents", icon: Bot },
-{ href: "/whatsapp-bot", labelKey: "whatsappBot", icon: Bot },
-
-{ href: "/customer-management", labelKey: "customerManagement", icon: UsersRound },
+  { href: "/whatsapp-bot", labelKey: "whatsappBot", icon: MessageSquare },
+  { href: "/customer-management", labelKey: "customerManagement", icon: UsersRound },
   { href: "/settings?tab=whatsapp", labelKey: "whatsappConnection", icon: MessageSquare },
-  { href: "/pricing", labelKey: "pricing", icon: Crown },
-
-
+  { href: "/pricing", labelKey: "pricing", icon: CreditCard },
 ];
 
 const bottomNavItems = [
