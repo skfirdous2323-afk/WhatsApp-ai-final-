@@ -254,10 +254,22 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                   >
                     <span
                       className={cn(
-                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200",
-                        isActive
-                          ? "bg-primary/15 text-primary"
-                          : "text-muted-foreground group-hover:bg-background group-hover:text-foreground",
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-all duration-200",
+                        item.href === "/dashboard" && "border-blue-500/25 bg-blue-500/10 text-blue-500",
+                        item.href === "/inbox" && "border-emerald-500/25 bg-emerald-500/10 text-emerald-500",
+                        item.href === "/notifications" && "border-amber-500/25 bg-amber-500/10 text-amber-500",
+                        item.href === "/contacts" && "border-violet-500/25 bg-violet-500/10 text-violet-500",
+                        item.href === "/pipelines" && "border-indigo-500/25 bg-indigo-500/10 text-indigo-500",
+                        item.href === "/broadcasts" && "border-pink-500/25 bg-pink-500/10 text-pink-500",
+                        item.href === "/automations" && "border-orange-500/25 bg-orange-500/10 text-orange-500",
+                        item.href === "/flows" && "border-cyan-500/25 bg-cyan-500/10 text-cyan-500",
+                        item.href === "/agents" && "border-fuchsia-500/25 bg-fuchsia-500/10 text-fuchsia-500",
+                        item.href === "/whatsapp-bot" && "border-green-500/25 bg-green-500/10 text-green-500",
+                        item.href === "/customer-management" && "border-sky-500/25 bg-sky-500/10 text-sky-500",
+                        item.href.startsWith("/settings") && "border-slate-500/25 bg-slate-500/10 text-slate-500",
+                        item.href === "/pricing" && "border-teal-500/25 bg-teal-500/10 text-teal-500",
+                        isActive && "ring-2 ring-current/20 shadow-md",
+                        "group-hover:scale-105",
                       )}
                     >
                       <item.icon
