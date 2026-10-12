@@ -247,13 +247,26 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                     href={item.href}
                     className={cn(
                       // Taller on mobile so fingers can hit the row reliably (≥44px).
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors lg:py-2",
+                      "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out lg:py-2.5",
                       isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ? "bg-primary/10 text-primary shadow-sm ring-1 ring-inset ring-primary/15"
+                        : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
                     )}
                   >
-                    <item.icon className="h-4 w-4" />
+                    <span
+                      className={cn(
+                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200",
+                        isActive
+                          ? "bg-primary/15 text-primary"
+                          : "text-muted-foreground group-hover:bg-background group-hover:text-foreground",
+                      )}
+                    >
+                      <item.icon
+                        className="h-5 w-5"
+                        strokeWidth={1.8}
+                        aria-hidden="true"
+                      />
+                    </span>
                     <span className="flex-1">{t(item.labelKey as string)}</span>
                     {item.beta && (
                       <span
@@ -296,13 +309,26 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                   <Link
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors lg:py-2",
+                      "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out lg:py-2.5",
                       isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ? "bg-primary/10 text-primary shadow-sm ring-1 ring-inset ring-primary/15"
+                        : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
                     )}
                   >
-                    <item.icon className="h-4 w-4" />
+                    <span
+                      className={cn(
+                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200",
+                        isActive
+                          ? "bg-primary/15 text-primary"
+                          : "text-muted-foreground group-hover:bg-background group-hover:text-foreground",
+                      )}
+                    >
+                      <item.icon
+                        className="h-5 w-5"
+                        strokeWidth={1.8}
+                        aria-hidden="true"
+                      />
+                    </span>
                     {t(item.labelKey as string)}
                   </Link>
                 </li>
