@@ -279,69 +279,97 @@ export default function DashboardPage() {
   }, [todayAppointments]);
 
   return (
-    <div className="min-h-screen bg-slate-50/70">
-      <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6 lg:p-8">
-        {/* ===== HEADER ===== */}
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                <Sparkles className="h-3 w-3" />
-                {greeting.emoji} {greeting.label}
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                Live · {apptStats.total} appointments today
-              </span>
+    <div className="min-h-screen bg-[#f4f6fb] text-slate-900">
+      <div className="mx-auto max-w-[1500px] space-y-7 p-4 sm:p-6 lg:p-8">
+
+        {/* Dashboard header */}
+        <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-indigo-600">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+              {greeting.emoji} {greeting.label} · Your workspace is ready
             </div>
-            <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+            <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
               {t("title")}
             </h1>
-            <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600">
-              <CalendarDays className="h-3.5 w-3.5" />
-              <span>
-                {today.toLocaleDateString("en-IN", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </span>
-              <span className="text-slate-400">•</span>
-              <span>{t("description")}</span>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+              {today.toLocaleDateString("en-IN", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}{" "}
+              <span className="mx-1 text-slate-300">/</span>
+              {t("description")}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={loadAll}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50"
             >
               <RefreshCw className="h-4 w-4" />
-              <span className="hidden sm:inline">Refresh</span>
+              Refresh data
             </button>
             <Link
               href="/inbox"
-              className="relative inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700"
             >
-              <span className="relative">
-                <Bell className="h-4 w-4" />
-                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-              </span>
-              <span className="hidden sm:inline">Inbox</span>
+              <MessageSquare className="h-4 w-4" />
+              Open inbox
+              <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>
         </header>
 
-        {/* ===== BUSINESS KPI ===== */}
-        <section className="space-y-3">
-          <SectionHeader
-            icon={<Zap className="h-3.5 w-3.5" />}
-            label="Today at a glance"
-            description="Your clinic's live performance"
-          />
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {/* Welcome / overview banner */}
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-indigo-800 p-6 text-white shadow-xl shadow-indigo-950/10 sm:p-8">
+          <div className="pointer-events-none absolute -right-12 -top-24 h-72 w-72 rounded-full border-[36px] border-white/5" />
+          <div className="pointer-events-none absolute -bottom-32 right-1/3 h-64 w-64 rounded-full bg-indigo-400/10 blur-3xl" />
+          <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-indigo-100">
+                <Sparkles className="h-3.5 w-3.5" />
+                YOUR BUSINESS OVERVIEW
+              </div>
+              <h2 className="max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
+                Everything important, in one place.
+              </h2>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-indigo-100/80">
+                Track appointments, payments, WhatsApp conversations and your team's activity from one dashboard.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:min-w-[300px]">
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                <CalendarDays className="mb-3 h-5 w-5 text-sky-300" />
+                <p className="text-2xl font-bold">{appointmentsLoading ? "—" : apptStats.total}</p>
+                <p className="mt-1 text-xs text-indigo-100/75">Appointments today</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                <MessageSquare className="mb-3 h-5 w-5 text-emerald-300" />
+                <p className="text-2xl font-bold">
+                  {metrics ? metrics.activeConversations.current.toLocaleString() : "—"}
+                </p>
+                <p className="mt-1 text-xs text-indigo-100/75">Active conversations</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Clinic operations */}
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Clinic operations</h2>
+              <p className="mt-1 text-sm text-slate-500">A live snapshot of today's activity</p>
+            </div>
+            <Link href="/appointments" className="text-sm font-semibold text-indigo-600 hover:text-indigo-800">
+              Manage appointments <ArrowUpRight className="ml-1 inline h-4 w-4" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <BizKpiCard
               label="Today's Collection"
               value={formatCurrency(todayRevenue, defaultCurrency)}
@@ -353,9 +381,7 @@ export default function DashboardPage() {
             <BizKpiCard
               label="Today's Appointments"
               value={String(apptStats.total)}
-              hint={`${apptStats.completed} done · ${
-                apptStats.pending + apptStats.confirmed
-              } upcoming`}
+              hint={`${apptStats.completed} completed · ${apptStats.pending + apptStats.confirmed} upcoming`}
               icon={<CalendarDays className="h-5 w-5" />}
               tone="blue"
               href="/appointments"
@@ -363,18 +389,14 @@ export default function DashboardPage() {
             <BizKpiCard
               label="Pending Payments"
               value={formatCurrency(pendingPayments, defaultCurrency)}
-              hint="To be collected"
+              hint="Awaiting collection"
               icon={<AlertCircle className="h-5 w-5" />}
               tone="amber"
               href="/appointments"
             />
             <BizKpiCard
               label="Active Chats"
-              value={
-                metrics
-                  ? metrics.activeConversations.current.toLocaleString()
-                  : "—"
-              }
+              value={metrics ? metrics.activeConversations.current.toLocaleString() : "—"}
               hint="WhatsApp conversations"
               icon={<MessageCircle className="h-5 w-5" />}
               tone="violet"
@@ -383,18 +405,15 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* ===== BUSINESS METRICS ===== */}
-        <section className="space-y-3">
-          <SectionHeader
-            icon={<BarChart3 className="h-3.5 w-3.5" />}
-            label="Business Metrics"
-            description="Comparing with previous period"
-          />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Business performance */}
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Business performance</h2>
+            <p className="mt-1 text-sm text-slate-500">Key metrics compared with the previous period</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {metricsLoading || !metrics ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <SkeletonCard key={i} />
-              ))
+              Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
             ) : (
               <>
                 <MetricCard
@@ -403,11 +422,7 @@ export default function DashboardPage() {
                   icon={MessageSquare}
                   delta={{
                     sign: metrics.activeConversations.previous,
-                    label: deltaLabel(
-                      metrics.activeConversations.previous,
-                      t("newTodayVsYesterday"),
-                      t("noChange", { suffix: t("newTodayVsYesterday") })
-                    ),
+                    label: deltaLabel(metrics.activeConversations.previous, t("newTodayVsYesterday"), t("noChange", { suffix: t("newTodayVsYesterday") })),
                   }}
                 />
                 <MetricCard
@@ -415,23 +430,13 @@ export default function DashboardPage() {
                   value={metrics.newContactsToday.current.toLocaleString()}
                   icon={UserPlus}
                   delta={{
-                    sign:
-                      metrics.newContactsToday.current -
-                      metrics.newContactsToday.previous,
-                    label: deltaLabel(
-                      metrics.newContactsToday.current -
-                        metrics.newContactsToday.previous,
-                      t("vsYesterday"),
-                      t("noChange", { suffix: t("vsYesterday") })
-                    ),
+                    sign: metrics.newContactsToday.current - metrics.newContactsToday.previous,
+                    label: deltaLabel(metrics.newContactsToday.current - metrics.newContactsToday.previous, t("vsYesterday"), t("noChange", { suffix: t("vsYesterday") })),
                   }}
                 />
                 <MetricCard
                   title={t("openDealsValue")}
-                  value={formatCurrency(
-                    metrics.openDealsValue,
-                    defaultCurrency
-                  )}
+                  value={formatCurrency(metrics.openDealsValue, defaultCurrency)}
                   icon={DollarSign}
                   subtitle={t("openDeals", { count: metrics.openDealsCount })}
                 />
@@ -440,15 +445,8 @@ export default function DashboardPage() {
                   value={metrics.messagesSentToday.current.toLocaleString()}
                   icon={Send}
                   delta={{
-                    sign:
-                      metrics.messagesSentToday.current -
-                      metrics.messagesSentToday.previous,
-                    label: deltaLabel(
-                      metrics.messagesSentToday.current -
-                        metrics.messagesSentToday.previous,
-                      t("vsYesterday"),
-                      t("noChange", { suffix: t("vsYesterday") })
-                    ),
+                    sign: metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
+                    label: deltaLabel(metrics.messagesSentToday.current - metrics.messagesSentToday.previous, t("vsYesterday"), t("noChange", { suffix: t("vsYesterday") })),
                   }}
                 />
               </>
@@ -456,15 +454,14 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* ===== ACTION CENTER ===== */}
-        <section className="space-y-3">
-          <SectionHeader
-            icon={<Sparkles className="h-3.5 w-3.5" />}
-            label="Action Center"
-            description="What needs your attention right now"
-          />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+        {/* Schedule and shortcuts */}
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Action centre</h2>
+            <p className="mt-1 text-sm text-slate-500">Appointments and shortcuts for your daily work</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <div className="min-w-0 xl:col-span-2">
               <TodayScheduleCard
                 appointments={todayAppointments}
                 loading={appointmentsLoading}
@@ -472,33 +469,20 @@ export default function DashboardPage() {
                 currency={defaultCurrency}
               />
             </div>
-            <div>
+            <div className="min-w-0">
               <QuickActionsCard />
             </div>
           </div>
         </section>
 
-        {/* ===== TOP DOCTORS ===== */}
-        {topDoctors.length > 0 && (
-          <section className="space-y-3">
-            <SectionHeader
-              icon={<Stethoscope className="h-3.5 w-3.5" />}
-              label="Doctor Performance"
-              description="Appointment load distribution"
-            />
-            <TopDoctorsCard doctors={topDoctors} />
-          </section>
-        )}
-
-        {/* ===== CHARTS ===== */}
-        <section className="space-y-3">
-          <SectionHeader
-            icon={<TrendingUp className="h-3.5 w-3.5" />}
-            label="Performance Analytics"
-            description="Conversation trends and pipeline breakdown"
-          />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-            <div className="h-full lg:col-span-3">
+        {/* Analytics */}
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Analytics & insights</h2>
+            <p className="mt-1 text-sm text-slate-500">Understand conversation trends and your sales pipeline</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+            <div className="min-w-0 xl:col-span-3">
               <ConversationsChartCard
                 series={series}
                 loading={seriesLoading}
@@ -506,42 +490,46 @@ export default function DashboardPage() {
                 onRangeChange={handleRangeChange}
               />
             </div>
-            <div className="h-full lg:col-span-2">
-              <PipelineDonutCard
-                data={pipeline}
-                loading={pipelineLoading}
-                currency={defaultCurrency}
-              />
+            <div className="min-w-0 xl:col-span-2">
+              <PipelineDonutCard data={pipeline} loading={pipelineLoading} currency={defaultCurrency} />
             </div>
           </div>
         </section>
 
-        {/* ===== RESPONSE TIME ===== */}
-        <section className="space-y-3">
-          <SectionHeader
-            icon={<Clock className="h-3.5 w-3.5" />}
-            label="Response Performance"
-            description="How fast your team replies to patients"
-          />
-          <ResponseTimeCard data={responseTime} loading={responseTimeLoading} />
+        {/* Team and service quality */}
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {topDoctors.length > 0 && (
+            <div className="min-w-0 space-y-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Doctor performance</h2>
+                <p className="mt-1 text-sm text-slate-500">Appointment load distribution</p>
+              </div>
+              <TopDoctorsCard doctors={topDoctors} />
+            </div>
+          )}
+          <div className="min-w-0 space-y-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Response performance</h2>
+              <p className="mt-1 text-sm text-slate-500">How quickly your team responds to patients</p>
+            </div>
+            <ResponseTimeCard data={responseTime} loading={responseTimeLoading} />
+          </div>
         </section>
 
-        {/* ===== ACTIVITY ===== */}
+        {/* Activity */}
         <section className="space-y-3">
-          <SectionHeader
-            icon={<Activity className="h-3.5 w-3.5" />}
-            label="Recent Activity"
-            description="Latest events across your workspace"
-          />
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Recent activity</h2>
+            <p className="mt-1 text-sm text-slate-500">Latest events across your workspace</p>
+          </div>
           <ActivityFeedCard items={activity} loading={activityLoading} />
         </section>
 
-        {/* ===== FOOTER ===== */}
-        <footer className="flex flex-col items-center justify-between gap-2 border-t border-slate-200 pt-6 text-xs text-slate-500 sm:flex-row">
-          <p>© {new Date().getFullYear()} — Built with care for your clinic</p>
-          <p className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            All systems operational
+        <footer className="flex flex-col justify-between gap-2 border-t border-slate-200 pt-5 text-xs text-slate-400 sm:flex-row sm:items-center">
+          <p>© {new Date().getFullYear()} ZIVEXO CRM · Built for better business management</p>
+          <p className="inline-flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            Dashboard ready
           </p>
         </footer>
       </div>
