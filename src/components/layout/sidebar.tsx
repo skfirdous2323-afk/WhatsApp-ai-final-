@@ -182,17 +182,17 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       <aside
         className={cn(
           // Mobile: fixed drawer that slides in from the left.
-          "fixed inset-y-0 left-0 z-40 flex h-full w-64 flex-col border-r border-border bg-card",
+          "fixed inset-y-0 left-0 z-40 flex h-full w-72 flex-col border-r border-slate-800 bg-slate-950 text-slate-100 shadow-2xl shadow-slate-950/20",
           "transition-transform duration-200 ease-out will-change-transform",
           open ? "translate-x-0" : "-translate-x-full",
           // Desktop: static, always visible — reset all the mobile framing.
-          "lg:static lg:z-0 lg:w-60 lg:translate-x-0 lg:transition-none",
+          "lg:sticky lg:top-0 lg:z-0 lg:h-screen lg:w-64 lg:translate-x-0 lg:transition-none",
         )}
         aria-label="Primary"
       >
         {/* Logo row. On mobile we put a close button here; on desktop the
             close button is hidden since the sidebar is always-visible. */}
-        <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
+        <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-slate-800 px-5">
           <Link href="/dashboard" className="flex items-center gap-2">
 
 
@@ -205,7 +205,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   className="h-9 w-9 object-contain"
 />
 
-<span className="text-sm font-semibold text-foreground">
+<span className="text-sm font-bold tracking-[0.16em] text-white">
   ZIVEXO
 </span>
 
@@ -216,14 +216,14 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             type="button"
             onClick={onClose}
             aria-label={t("closeMenu")}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Main navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <nav className="flex-1 overflow-y-auto px-3 py-5">
           <ul className="flex flex-col gap-1">
             {navItems.map((item) => {
               const isActive =
@@ -246,15 +246,15 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                     href={item.href}
                     className={cn(
                       // Taller on mobile so fingers can hit the row reliably (≥44px).
-                      "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out lg:py-2.5",
+                      "group flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out lg:py-2.5",
                       isActive
-                        ? "bg-primary/10 text-primary shadow-sm ring-1 ring-inset ring-primary/15"
-                        : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+                        ? "border-indigo-400/25 bg-indigo-500/15 text-white shadow-sm"
+                        : "text-slate-400 hover:border-slate-800 hover:bg-slate-900 hover:text-white",
                     )}
                   >
                     <span
                       className={cn(
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-all duration-200",
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-700/70 bg-slate-900 shadow-sm transition-all duration-200",
                         item.href === "/dashboard" && "border-blue-500/25 bg-blue-500/10 text-blue-500",
                         item.href === "/inbox" && "border-emerald-500/25 bg-emerald-500/10 text-emerald-500",
                         item.href === "/notifications" && "border-amber-500/25 bg-amber-500/10 text-amber-500",
@@ -320,10 +320,10 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                   <Link
                     href={item.href}
                     className={cn(
-                      "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out lg:py-2.5",
+                      "group flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out lg:py-2.5",
                       isActive
-                        ? "bg-primary/10 text-primary shadow-sm ring-1 ring-inset ring-primary/15"
-                        : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+                        ? "border-indigo-400/25 bg-indigo-500/15 text-white shadow-sm"
+                        : "text-slate-400 hover:border-slate-800 hover:bg-slate-900 hover:text-white",
                     )}
                   >
                     <span

@@ -278,44 +278,42 @@ export default function DashboardPage() {
     };
   }, [todayAppointments]);
 
-  return (
-    <div className="min-h-screen bg-[#f4f6fb] text-slate-900">
-      <div className="mx-auto max-w-[1500px] space-y-7 p-4 sm:p-6 lg:p-8">
 
-        {/* Dashboard header */}
-        <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+  return (
+    <div className="min-h-screen bg-slate-100/80 text-slate-900">
+      <div className="mx-auto max-w-[1600px] space-y-6 p-4 sm:p-6 xl:p-8">
+
+        <header className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:p-7">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-indigo-600">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-              {greeting.emoji} {greeting.label} · Your workspace is ready
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              ZIVEXO BUSINESS INTELLIGENCE
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
               {t("title")}
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+            <p className="mt-2 text-sm text-slate-500">
+              {greeting.emoji} {greeting.label} ·{" "}
               {today.toLocaleDateString("en-IN", {
                 weekday: "long",
                 day: "numeric",
                 month: "long",
                 year: "numeric",
-              })}{" "}
-              <span className="mx-1 text-slate-300">/</span>
-              {t("description")}
+              })}
             </p>
           </div>
-
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={loadAll}
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               <RefreshCw className="h-4 w-4" />
-              Refresh data
+              Refresh
             </button>
             <Link
               href="/inbox"
-              className="inline-flex h-11 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
             >
               <MessageSquare className="h-4 w-4" />
               Open inbox
@@ -324,52 +322,75 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {/* Welcome / overview banner */}
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-indigo-800 p-6 text-white shadow-xl shadow-indigo-950/10 sm:p-8">
-          <div className="pointer-events-none absolute -right-12 -top-24 h-72 w-72 rounded-full border-[36px] border-white/5" />
-          <div className="pointer-events-none absolute -bottom-32 right-1/3 h-64 w-64 rounded-full bg-indigo-400/10 blur-3xl" />
-          <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-indigo-100">
-                <Sparkles className="h-3.5 w-3.5" />
-                YOUR BUSINESS OVERVIEW
+        <section className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
+          <div className="relative overflow-hidden rounded-2xl bg-slate-950 p-6 text-white shadow-sm sm:p-8">
+            <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full border-[35px] border-indigo-400/10" />
+            <div className="relative">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-md border border-indigo-300/20 bg-indigo-400/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-indigo-200">
+                <Sparkles className="h-4 w-4" />
+                Enterprise overview
               </div>
-              <h2 className="max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
-                Everything important, in one place.
+              <h2 className="max-w-xl text-2xl font-bold tracking-tight sm:text-3xl">
+                Your business. One command centre.
               </h2>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-indigo-100/80">
-                Track appointments, payments, WhatsApp conversations and your team's activity from one dashboard.
+              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+                Monitor appointments, collections, customer conversations and team performance from one workspace.
               </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:min-w-[300px]">
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                <CalendarDays className="mb-3 h-5 w-5 text-sky-300" />
-                <p className="text-2xl font-bold">{appointmentsLoading ? "—" : apptStats.total}</p>
-                <p className="mt-1 text-xs text-indigo-100/75">Appointments today</p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link href="/appointments" className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100">
+                  <CalendarDays className="h-4 w-4" />
+                  Manage appointments
+                </Link>
+                <Link href="/customer-management" className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10">
+                  <Users className="h-4 w-4" />
+                  Customers
+                </Link>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                <MessageSquare className="mb-3 h-5 w-5 text-emerald-300" />
-                <p className="text-2xl font-bold">
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
+            <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Appointments today</p>
+                <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+                  {appointmentsLoading ? "—" : apptStats.total}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {apptStats.completed} completed · {apptStats.pending + apptStats.confirmed} upcoming
+                </p>
+              </div>
+              <div className="rounded-xl bg-blue-50 p-3 text-blue-700">
+                <CalendarDays className="h-6 w-6" />
+              </div>
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Active conversations</p>
+                <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
                   {metrics ? metrics.activeConversations.current.toLocaleString() : "—"}
                 </p>
-                <p className="mt-1 text-xs text-indigo-100/75">Active conversations</p>
+                <p className="mt-1 text-xs text-slate-500">WhatsApp customer activity</p>
+              </div>
+              <div className="rounded-xl bg-emerald-50 p-3 text-emerald-700">
+                <MessageSquare className="h-6 w-6" />
               </div>
             </div>
           </div>
         </section>
 
-        {/* Clinic operations */}
         <section className="space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-2">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Clinic operations</h2>
-              <p className="mt-1 text-sm text-slate-500">A live snapshot of today's activity</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">01 / Operations</p>
+              <h2 className="mt-1 text-xl font-bold text-slate-950">Daily operations</h2>
+              <p className="mt-1 text-sm text-slate-500">A live snapshot of today's business activity.</p>
             </div>
             <Link href="/appointments" className="text-sm font-semibold text-indigo-600 hover:text-indigo-800">
-              Manage appointments <ArrowUpRight className="ml-1 inline h-4 w-4" />
+              View appointments <ArrowUpRight className="ml-1 inline h-4 w-4" />
             </Link>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
             <BizKpiCard
               label="Today's Collection"
               value={formatCurrency(todayRevenue, defaultCurrency)}
@@ -405,13 +426,13 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Business performance */}
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Business performance</h2>
-            <p className="mt-1 text-sm text-slate-500">Key metrics compared with the previous period</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">02 / Performance</p>
+            <h2 className="mt-1 text-xl font-bold text-slate-950">Business performance</h2>
+            <p className="mt-1 text-sm text-slate-500">Key metrics compared with the previous period.</p>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
             {metricsLoading || !metrics ? (
               Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
             ) : (
@@ -454,14 +475,14 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Schedule and shortcuts */}
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Action centre</h2>
-            <p className="mt-1 text-sm text-slate-500">Appointments and shortcuts for your daily work</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">03 / Workflow</p>
+            <h2 className="mt-1 text-xl font-bold text-slate-950">Operations workspace</h2>
+            <p className="mt-1 text-sm text-slate-500">Manage today's schedule and access common actions.</p>
           </div>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <div className="min-w-0 xl:col-span-2">
+          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-3">
+            <div className="min-w-0 2xl:col-span-2">
               <TodayScheduleCard
                 appointments={todayAppointments}
                 loading={appointmentsLoading}
@@ -475,14 +496,14 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Analytics */}
         <section className="space-y-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Analytics & insights</h2>
-            <p className="mt-1 text-sm text-slate-500">Understand conversation trends and your sales pipeline</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">04 / Intelligence</p>
+            <h2 className="mt-1 text-xl font-bold text-slate-950">Analytics & insights</h2>
+            <p className="mt-1 text-sm text-slate-500">Conversation trends, pipeline value and customer response quality.</p>
           </div>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
-            <div className="min-w-0 xl:col-span-3">
+          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-5">
+            <div className="min-w-0 2xl:col-span-3">
               <ConversationsChartCard
                 series={series}
                 loading={seriesLoading}
@@ -490,52 +511,54 @@ export default function DashboardPage() {
                 onRangeChange={handleRangeChange}
               />
             </div>
-            <div className="min-w-0 xl:col-span-2">
+            <div className="min-w-0 2xl:col-span-2">
               <PipelineDonutCard data={pipeline} loading={pipelineLoading} currency={defaultCurrency} />
             </div>
           </div>
         </section>
 
-        {/* Team and service quality */}
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <section className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
           {topDoctors.length > 0 && (
             <div className="min-w-0 space-y-3">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">Doctor performance</h2>
-                <p className="mt-1 text-sm text-slate-500">Appointment load distribution</p>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">05 / Team</p>
+                <h2 className="mt-1 text-xl font-bold text-slate-950">Doctor performance</h2>
+                <p className="mt-1 text-sm text-slate-500">Appointment load distribution.</p>
               </div>
               <TopDoctorsCard doctors={topDoctors} />
             </div>
           )}
           <div className="min-w-0 space-y-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Response performance</h2>
-              <p className="mt-1 text-sm text-slate-500">How quickly your team responds to patients</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">Service quality</p>
+              <h2 className="mt-1 text-xl font-bold text-slate-950">Response performance</h2>
+              <p className="mt-1 text-sm text-slate-500">How quickly your team responds to customers.</p>
             </div>
             <ResponseTimeCard data={responseTime} loading={responseTimeLoading} />
           </div>
         </section>
 
-        {/* Activity */}
         <section className="space-y-3">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Recent activity</h2>
-            <p className="mt-1 text-sm text-slate-500">Latest events across your workspace</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">06 / Workspace</p>
+            <h2 className="mt-1 text-xl font-bold text-slate-950">Recent activity</h2>
+            <p className="mt-1 text-sm text-slate-500">Latest events across your workspace.</p>
           </div>
           <ActivityFeedCard items={activity} loading={activityLoading} />
         </section>
 
-        <footer className="flex flex-col justify-between gap-2 border-t border-slate-200 pt-5 text-xs text-slate-400 sm:flex-row sm:items-center">
-          <p>© {new Date().getFullYear()} ZIVEXO CRM · Built for better business management</p>
+        <footer className="flex flex-col justify-between gap-2 border-t border-slate-200 pt-5 text-xs text-slate-500 sm:flex-row sm:items-center">
+          <p>© {new Date().getFullYear()} ZIVEXO CRM · Business management workspace</p>
           <p className="inline-flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Dashboard ready
+            Workspace overview
           </p>
         </footer>
       </div>
     </div>
   );
 }
+
 
 // ==================== SECTION HEADER ====================
 
