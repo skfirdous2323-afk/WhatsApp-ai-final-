@@ -533,7 +533,7 @@ function ConversationItem({
         event.stopPropagation();
         onDelete(conversation);
       }}
-      className="absolute right-2 top-3 z-10 rounded-full p-2 text-muted-foreground opacity-100 transition hover:bg-red-50 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
+      className="absolute right-2 top-3 z-10 rounded-full p-2 text-red-600 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
     >
       <Trash2 className="h-4 w-4" />
     </button>
