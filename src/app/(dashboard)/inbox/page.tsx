@@ -29,6 +29,7 @@ import {
   X,
   MoreVertical,
   Users,
+  MessageSquarePlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -78,6 +79,11 @@ function InboxPageInner() {
   }, []);
 
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [newChatOpen, setNewChatOpen] = useState(false);
+  const [newChatSearch, setNewChatSearch] = useState("");
+  const [newChatContacts, setNewChatContacts] = useState<Contact[]>([]);
+  const [newChatLoading, setNewChatLoading] = useState(false);
+  const [creatingChatFor, setCreatingChatFor] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleToggleContactPanel = useCallback(() => {
@@ -456,6 +462,168 @@ function InboxPageInner() {
     [activeConversation]
   );
 
+
+  const handleOpenNewChat = useCallback(async () => {
+    setNewChatOpen(true);
+    setNewChatSearch("");
+    setNewChatLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Please sign in again.");
+        return;
+      }
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("account_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (profileError || !profile?.account_id) {
+        toast.error("Could not find your workspace.");
+        return;
+      }
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("*")
+        .eq("account_id", profile.account_id)
+        .order("name", { ascending: true })
+        .limit(200);
+      if (error) {
+        console.error("Failed to load customers for new chat:", error.message);
+        toast.error("Could not load customers.");
+        return;
+      }
+      setNewChatContacts((data ?? []) as Contact[]);
+    } catch (error) {
+      console.error("Failed to open new chat:", error);
+      toast.error("Could not load customers.");
+    } finally {
+      setNewChatLoading(false);
+    }
+  }, []);
+
+  const handleStartNewChat = useCallback(async (contact: Contact) => {
+    setCreatingChatFor(contact.id);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Please sign in again.");
+        return;
+      }
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("account_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (profileError || !profile?.account_id) {
+        toast.error("Could not find your workspace.");
+        return;
+      }
+
+      const { data: existing, error: lookupError } = await supabase
+        .from("conversations")
+        .select(CONVERSATION_SELECT)
+        .eq("account_id", profile.account_id)
+        .eq("contact_id", contact.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (lookupError) {
+        console.error("Failed to find existing conversation:", lookupError.message);
+        toast.error("Could not open this customer's chat.");
+        return;
+      }
+
+      if (existing) {
+        handleSelectConversation(normalizeConversation(existing));
+        setNewChatOpen(false);
+        return;
+      }
+
+      const { data: created, error: createError } = await supabase
+        .from("conversations")
+        .insert({
+          user_id: user.id,
+          account_id: profile.account_id,
+          contact_id: contact.id,
+          status: "open",
+        })
+        .select(CONVERSATION_SELECT)
+        .single();
+
+      if (createError || !created) {
+        console.error("Failed to create conversation:", createError?.message);
+        toast.error("Could not create the chat.");
+        return;
+      }
+
+      const conversation = normalizeConversation(created);
+      setConversations((prev) =>
+        prev.some((item) => item.id === conversation.id)
+          ? prev
+          : [conversation, ...prev]
+      );
+      handleSelectConversation(conversation);
+      setNewChatOpen(false);
+      toast.success("Chat opened.");
+    } catch (error) {
+      console.error("Failed to start new chat:", error);
+      toast.error("Could not start the chat.");
+    } finally {
+      setCreatingChatFor(null);
+    }
+  }, [handleSelectConversation]);
+
+  const handleDeleteConversation = useCallback(async (conversation: Conversation) => {
+    const label = conversation.contact?.name || conversation.contact?.phone || "this chat";
+    if (!window.confirm(`Delete the chat with ${label}? The customer record will be kept.`)) return;
+
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Please sign in again.");
+        return;
+      }
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("account_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (profileError || !profile?.account_id) {
+        toast.error("Could not verify your workspace.");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("conversations")
+        .delete()
+        .eq("id", conversation.id)
+        .eq("account_id", profile.account_id);
+
+      if (error) {
+        console.error("Failed to delete conversation:", error.message);
+        toast.error("Could not delete this chat.");
+        return;
+      }
+
+      setConversations((prev) => prev.filter((item) => item.id !== conversation.id));
+      if (activeConversation?.id === conversation.id) {
+        setActiveConversation(null);
+        setActiveContact(null);
+        setMessages([]);
+        router.replace("/inbox");
+      }
+      toast.success("Chat deleted. Customer record kept.");
+    } catch (error) {
+      console.error("Failed to delete conversation:", error);
+      toast.error("Could not delete this chat.");
+    }
+  }, [activeConversation, router]);
+
   const hasActiveConv = !!activeConversation;
 
   const totals = useMemo(() => {
@@ -502,6 +670,15 @@ function InboxPageInner() {
 
         {/* Right: connection + actions */}
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleOpenNewChat}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white/15 px-3 text-xs font-semibold text-white transition hover:bg-white/25"
+            title="Start a chat with a CRM customer"
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+            <span>New Chat</span>
+          </button>
           <LivePill connected={whatsappConnected} wsConnected={isConnected} />
 
           <button
@@ -575,6 +752,7 @@ function InboxPageInner() {
           <ConversationList
             activeConversationId={activeConversation?.id ?? null}
             onSelect={handleSelectConversation}
+            onDelete={handleDeleteConversation}
             conversations={conversations}
             onConversationsLoaded={handleConversationsLoaded}
             resyncToken={resyncToken}
@@ -612,6 +790,82 @@ function InboxPageInner() {
           </div>
         )}
       </div>
+
+      {newChatOpen && (
+        <div
+          className="fixed inset-0 z-[85] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onClick={() => setNewChatOpen(false)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">New Chat</h2>
+                <p className="mt-1 text-xs text-slate-500">Choose a customer from your CRM.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNewChatOpen(false)}
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="Close new chat"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-4">
+              <input
+                value={newChatSearch}
+                onChange={(event) => setNewChatSearch(event.target.value)}
+                placeholder="Search customer name or phone..."
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-[#008069]"
+                autoFocus
+              />
+              <div className="mt-3 max-h-72 overflow-y-auto">
+                {newChatLoading ? (
+                  <p className="py-8 text-center text-sm text-slate-500">Loading customers…</p>
+                ) : newChatContacts.filter((contact) => {
+                  const query = newChatSearch.trim().toLowerCase();
+                  return !query ||
+                    (contact.name ?? "").toLowerCase().includes(query) ||
+                    (contact.phone ?? "").toLowerCase().includes(query);
+                }).length === 0 ? (
+                  <p className="py-8 text-center text-sm text-slate-500">No customers found.</p>
+                ) : (
+                  newChatContacts.filter((contact) => {
+                    const query = newChatSearch.trim().toLowerCase();
+                    return !query ||
+                      (contact.name ?? "").toLowerCase().includes(query) ||
+                      (contact.phone ?? "").toLowerCase().includes(query);
+                  }).map((contact) => (
+                    <button
+                      key={contact.id}
+                      type="button"
+                      disabled={creatingChatFor !== null}
+                      onClick={() => handleStartNewChat(contact)}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-50 text-sm font-semibold text-emerald-700">
+                        {contact.avatar_url ? (
+                          <img src={contact.avatar_url} alt="" className="h-full w-full object-cover" />
+                        ) : (contact.name || contact.phone || "?").charAt(0).toUpperCase()}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-slate-900">{contact.name || "Unnamed customer"}</span>
+                        <span className="block truncate text-xs text-slate-500">{contact.phone}</span>
+                      </span>
+                      {creatingChatFor === contact.id && (
+                        <span className="text-xs text-slate-500">Opening…</span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ==================== SHORTCUTS DIALOG ==================== */}
       {shortcutsOpen && (

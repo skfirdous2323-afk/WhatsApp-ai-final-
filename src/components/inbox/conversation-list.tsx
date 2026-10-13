@@ -9,7 +9,7 @@ import {
 } from "@/lib/inbox/conversations";
 import { cn } from "@/lib/utils";
 import type { Conversation, ConversationStatus, Tag } from "@/types";
-import { Search, ChevronDown, X } from "lucide-react";
+import { Search, ChevronDown, X, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 interface ConversationListProps {
   activeConversationId: string | null;
   onSelect: (conversation: Conversation) => void;
+  onDelete: (conversation: Conversation) => void;
   conversations: Conversation[];
   onConversationsLoaded: (conversations: Conversation[]) => void;
   /**
@@ -49,6 +50,7 @@ type InboxFilter = ConversationStatus | "all" | "unread";
 export function ConversationList({
   activeConversationId,
   onSelect,
+  onDelete,
   conversations,
   onConversationsLoaded,
   resyncToken = 0,
@@ -413,6 +415,7 @@ export function ConversationList({
                 conversation={conv}
                 isActive={conv.id === activeConversationId}
                 onSelect={handleSelect}
+                onDelete={onDelete}
                 t={t}
               />
             ))}
@@ -427,6 +430,7 @@ interface ConversationItemProps {
   conversation: Conversation;
   isActive: boolean;
   onSelect: (conversation: Conversation) => void;
+  onDelete: (conversation: Conversation) => void;
   t: ReturnType<typeof useTranslations>;
 }
 
@@ -434,6 +438,7 @@ function ConversationItem({
   conversation,
   isActive,
   onSelect,
+  onDelete,
   t,
 }: ConversationItemProps) {
   const contact = conversation.contact;
@@ -453,11 +458,12 @@ function ConversationItem({
   const unread = conversation.unread_count > 0;
 
   return (
+    <div className="group relative">
     <button
       onClick={handleClick}
       aria-current={isActive ? "true" : undefined}
       className={cn(
-        "group relative flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-3.5 text-left transition-all duration-200",
+        "relative flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-3.5 pr-10 text-left transition-all duration-200",
         "hover:border-border/70 hover:bg-muted/60",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         isActive && "border-primary/15 bg-primary/[0.07] shadow-sm hover:bg-primary/[0.09]"
@@ -519,5 +525,18 @@ function ConversationItem({
         </div>
       </div>
     </button>
+    <button
+      type="button"
+      title="Delete chat"
+      aria-label={`Delete chat with ${displayName}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onDelete(conversation);
+      }}
+      className="absolute right-2 top-3 z-10 rounded-full p-2 text-muted-foreground opacity-100 transition hover:bg-red-50 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
+    >
+      <Trash2 className="h-4 w-4" />
+    </button>
+    </div>
   );
 }
