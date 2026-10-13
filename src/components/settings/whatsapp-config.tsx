@@ -784,31 +784,31 @@ const [showManualConnect, setShowManualConnect] = useState(false);
             )}
 
             {/* Meta Embedded Signup */}
-            <Card className="overflow-hidden border-border bg-gradient-to-br from-card via-card to-emerald-500/5 shadow-sm">
-              <CardHeader className="pb-4">
-                <div className="flex items-start gap-4">
+            <Card className="w-full min-w-0 overflow-hidden border-border bg-gradient-to-br from-card via-card to-emerald-500/5 shadow-sm">
+              <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-4">
+                <div className="flex min-w-0 items-start gap-3 sm:gap-4">
                   <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#1877F2] shadow-sm">
                     <svg viewBox="0 0 24 24" className="size-7 fill-white" aria-hidden="true">
                       <path d="M14 8h3V4h-3c-3.31 0-5 1.69-5 5v2H6v4h3v5h4v-5h3l1-4h-4V9c0-.66.34-1 1-1Z" />
                     </svg>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <CardTitle className="text-lg text-foreground">
+                    <CardTitle className="break-words text-base leading-snug text-foreground sm:text-lg">
                       Connect WhatsApp with Meta
                     </CardTitle>
-                    <CardDescription className="mt-1 text-muted-foreground">
+                    <CardDescription className="mt-1 break-words text-sm leading-relaxed text-muted-foreground">
                       Securely connect your WhatsApp Business account through Meta.
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-lg border border-border bg-muted/40 px-4 py-3">
+              <CardContent className="space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
+                <div className="min-w-0 rounded-lg border border-border bg-muted/40 px-3 py-3 sm:px-4">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <CheckCircle2 className="size-4 text-emerald-500" />
                     Secure Meta connection
                   </div>
-                  <p className="mt-1 pl-6 text-xs text-muted-foreground">
+                  <p className="mt-1 break-words pl-6 text-xs leading-relaxed text-muted-foreground">
                     Your WhatsApp credentials are connected directly through Meta.
                   </p>
                 </div>
@@ -816,7 +816,7 @@ const [showManualConnect, setShowManualConnect] = useState(false);
                 <Button
                   onClick={handleEmbeddedSignup}
                   disabled={isEmbeddedSignupLoading}
-                  className="h-11 w-full bg-[#1877F2] text-white shadow-sm transition-all hover:bg-[#166FE5] hover:shadow-md"
+                  className="h-11 w-full max-w-full whitespace-normal bg-[#1877F2] text-white shadow-sm transition-all hover:bg-[#166FE5] hover:shadow-md"
                 >
                   {isEmbeddedSignupLoading ? (
                     <>
@@ -840,19 +840,19 @@ const [showManualConnect, setShowManualConnect] = useState(false);
             </Card>
 
             {/* Manual Connect */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-foreground">Manual Connect</CardTitle>
-                <CardDescription className="text-muted-foreground">
+            <Card className="w-full min-w-0 overflow-hidden">
+              <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-4">
+                <CardTitle className="break-words text-base sm:text-lg text-foreground">Manual Connect</CardTitle>
+                <CardDescription className="break-words text-sm leading-relaxed text-muted-foreground">
                   Use API credentials and webhook settings to connect WhatsApp manually.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowManualConnect((v) => !v)}
-                  className="w-full"
+                  className="h-11 w-full max-w-full whitespace-normal"
                 >
                   {showManualConnect ? 'Hide Manual Connection' : 'Connect Manually'}
                 </Button>
@@ -994,41 +994,12 @@ const [showManualConnect, setShowManualConnect] = useState(false);
 
           </div>
 
-          <div className="flex justify-between items-center pt-4 gap-4">
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCreateMetaFlow}
-                disabled={creatingFlow || authLoading || profileLoading}
-              >
-                {creatingFlow ? 'Creating Flow...' : 'Create Appointment Flow'}
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handlePublishMetaFlow}
-                disabled={authLoading || profileLoading}
-              >
-                Publish Appointment Flow
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCheckMetaFlowStatus}
-                disabled={authLoading || profileLoading}
-              >
-                Check Flow Status
-              </Button>
-            </div>
-
+          <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-end">
             <Button
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="min-w-[180px]"
+              className="h-11 w-full sm:w-auto sm:min-w-[180px]"
             >
               {saving ? 'Saving...' : 'Save Configuration'}
             </Button>
