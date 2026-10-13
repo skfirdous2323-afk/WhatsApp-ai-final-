@@ -450,53 +450,72 @@ function ConversationItem({
       })
     : "";
 
+  const unread = conversation.unread_count > 0;
+
   return (
     <button
       onClick={handleClick}
+      aria-current={isActive ? "true" : undefined}
       className={cn(
-        "flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
-        isActive && "border-l-2 border-primary bg-muted/70"
+        "group relative flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-3.5 text-left transition-all duration-200",
+        "hover:border-border/70 hover:bg-muted/60",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        isActive && "border-primary/15 bg-primary/[0.07] shadow-sm hover:bg-primary/[0.09]"
       )}
     >
-      {/* Avatar */}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
-        {contact?.avatar_url ? (
-          <img
-            src={contact.avatar_url}
-            alt={displayName}
-            className="h-10 w-10 rounded-full object-cover"
-          />
-        ) : (
-          initials
-        )}
+      <div className="relative shrink-0">
+        <div className={cn(
+          "flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted text-sm font-semibold text-foreground ring-1 ring-border/60",
+          isActive && "ring-2 ring-primary/30"
+        )}>
+          {contact?.avatar_url ? (
+            <img
+              src={contact.avatar_url}
+              alt={displayName}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            initials
+          )}
+        </div>
+        <span
+          className={cn(
+            "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-card",
+            STATUS_COLORS[conversation.status]
+          )}
+          title={conversation.status}
+          aria-label={conversation.status}
+        />
       </div>
 
-      {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground">
+          <span className={cn(
+            "truncate text-[13px] text-foreground",
+            unread ? "font-bold" : "font-semibold"
+          )}>
             {displayName}
           </span>
-          <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo}</span>
+          <span className={cn(
+            "shrink-0 text-[10px]",
+            unread ? "font-medium text-primary" : "text-muted-foreground"
+          )}>
+            {timeAgo}
+          </span>
         </div>
-        <div className="mt-0.5 flex items-center justify-between gap-2">
-          <p className="truncate text-xs text-muted-foreground">
+
+        <div className="mt-1.5 flex items-center justify-between gap-2">
+          <p className={cn(
+            "min-w-0 flex-1 truncate text-xs leading-5",
+            unread ? "font-medium text-foreground/80" : "text-muted-foreground"
+          )}>
             {conversation.last_message_text || t("noMessagesYet")}
           </p>
-          <div className="flex shrink-0 items-center gap-1.5">
-            {conversation.unread_count > 0 && (
-              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-                {conversation.unread_count}
-              </span>
-            )}
-            <span
-              className={cn(
-                "h-2 w-2 rounded-full",
-                STATUS_COLORS[conversation.status]
-              )}
-              title={conversation.status}
-            />
-          </div>
+          {unread && (
+            <span className="flex h-[19px] min-w-[19px] shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground shadow-sm">
+              {conversation.unread_count > 99 ? "99+" : conversation.unread_count}
+            </span>
+          )}
         </div>
       </div>
     </button>
