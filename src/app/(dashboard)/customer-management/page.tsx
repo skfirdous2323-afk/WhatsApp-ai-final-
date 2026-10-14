@@ -1,1727 +1,716 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { ContactForm } from "@/components/contacts/contact-form";
 import {
   Search,
+  Plus,
   Users,
+  UserRound,
   CalendarDays,
   Clock,
-  XCircle,
-  RefreshCw,
-  Loader2,
   Phone,
   Mail,
-  Building2,
-  ArrowLeft,
-  User,
   MessageCircle,
-  Plus,
-  ChevronLeft,
+  RefreshCw,
+  Loader2,
   ChevronRight,
-  Filter,
-  Stethoscope,
-  Tag,
-  Download,
-  Printer,
-  FileText,
+  UserPlus,
   Activity,
-  TrendingUp,
-  IndianRupee,
-  CheckSquare,
-  Square,
-  Bell,
-  Keyboard,
-  Edit3,
-  Paperclip,
-  Moon,
-  Sun,
-  Check,
-  AlertCircle,
-  Info,
-  BarChart3,
-  Pill,
-  Heart,
-  CreditCard,
-  Trash2,
-  Save,
-  DollarSign,
+  CalendarCheck,
+  X,
 } from "lucide-react";
-
-// ==================== TYPES ====================
 
 type Customer = {
   id: string;
-  name?: string;
+  name: string | null;
   phone: string;
-  email?: string;
-  company?: string;
+  email: string | null;
+  company: string | null;
   created_at: string;
 };
 
 type Appointment = {
   id: string;
-  contact_id: string;
-  patient_name: string;
-  gender?: string;
-  age?: number;
+  contact_id: string | null;
+  patient_name: string | null;
   appointment_date: string;
   appointment_time: string;
   status: string;
-  doctor_id?: string;
-  service_id?: string;
-  amount?: number;
-  payment_status?: string;
-  payment_method?: string;
+  doctor_id?: string | null;
+  service_id?: string | null;
+  amount?: number | null;
+  payment_status?: string | null;
 };
 
-type Note = {
-  id: string;
-  note_text: string;
-  created_at: string;
+const formatDate = (value?: string | null) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
-type Doctor = { id: string; doctor_name: string };
-type Service = {
-  id: string;
-  service_name: string;
-  duration_minutes?: number;
-  assigned_doctors?: string[];
+const initials = (name?: string | null) =>
+  (name || "Patient")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("");
+
+const statusClass = (status: string) => {
+  const value = status.toLowerCase();
+  if (value === "confirmed" || value === "completed")
+    return "bg-emerald-50 text-emerald-700";
+  if (value === "cancelled" || value === "no-show")
+    return "bg-red-50 text-red-600";
+  return "bg-amber-50 text-amber-700";
 };
-
-type MessageItem = {
-  id: string;
-  content_text?: string;
-  message_type?: string;
-  direction?: string;
-  created_at: string;
-  status?: string;
-};
-
-type DocumentItem = {
-  id: string;
-  file_name: string;
-  file_url?: string;
-  file_type?: string;
-  created_at: string;
-};
-
-type Prescription = {
-  id: string;
-  appointment_id?: string;
-  diagnosis?: string;
-  medicines?: string;
-  notes?: string;
-  created_at: string;
-};
-
-type MedicalInfo = {
-  allergies?: string[];
-  chronic_conditions?: string[];
-  blood_group?: string;
-  emergency_contact?: string;
-};
-
-type CustomerTab =
-  | "overview"
-  | "appointments"
-  | "notes"
-  | "prescriptions"
-  | "medical"
-  | "messages"
-  | "documents";
-
-type MainTab = "customers" | "calendar" | "analytics";
-type SortOption = "recent" | "name" | "appointments";
-
-type ToastType = "success" | "error" | "info";
-type Toast = { id: string; type: ToastType; message: string };
-
-type ConfirmState = {
-  open: boolean;
-  title: string;
-  message: string;
-  confirmText?: string;
-  destructive?: boolean;
-  onConfirm: () => void;
-};
-
-// ==================== MAIN COMPONENT ====================
 
 export default function CustomerManagementPage() {
   const supabase = useMemo(() => createClient(), []);
+  const { accountId } = useAuth();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [selected, setSelected] = useState<Customer | null>(null);
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "new" | "followup">("all");
   const [loading, setLoading] = useState(true);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
-  const [appointmentOpen, setAppointmentOpen] = useState(false);
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [customerNotes, setCustomerNotes] = useState<Note[]>([]);
-  const [newNote, setNewNote] = useState("");
-  const [savingNote, setSavingNote] = useState(false);
-  const [appointmentDoctor, setAppointmentDoctor] = useState("");
-  const [appointmentService, setAppointmentService] = useState("");
-  const [appointmentDate, setAppointmentDate] = useState("");
-  const [appointmentTime, setAppointmentTime] = useState("");
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
-  const [loadingSlots, setLoadingSlots] = useState(false);
-  const [appointmentPatientName, setAppointmentPatientName] = useState("");
-  const [appointmentGender, setAppointmentGender] = useState("");
-  const [appointmentAge, setAppointmentAge] = useState("");
-  const [appointmentAmount, setAppointmentAmount] = useState("");
-  const [calendarDate, setCalendarDate] = useState(new Date());
-  const [calendarView, setCalendarView] = useState<"day" | "week" | "month">("month");
-  const [savingAppointment, setSavingAppointment] = useState(false);
-  const [calendarDoctorFilter, setCalendarDoctorFilter] = useState("");
-  const [calendarStatusFilter, setCalendarStatusFilter] = useState("");
-  const [appointmentSearch, setAppointmentSearch] = useState("");
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [updatingAppointmentStatus, setUpdatingAppointmentStatus] = useState(false);
+  const [error, setError] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
 
-  // UI state
-  const [customerTab, setCustomerTab] = useState<CustomerTab>("overview");
-  const [mainTab, setMainTab] = useState<MainTab>("customers");
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const [confirmState, setConfirmState] = useState<ConfirmState>({
-    open: false,
-    title: "",
-    message: "",
-    onConfirm: () => {},
-  });
-
-  // Customer-specific data
-  const [customerMessages, setCustomerMessages] = useState<MessageItem[]>([]);
-  const [customerDocuments, setCustomerDocuments] = useState<DocumentItem[]>([]);
-  const [customerPrescriptions, setCustomerPrescriptions] = useState<Prescription[]>([]);
-  const [customerMedical, setCustomerMedical] = useState<MedicalInfo>({});
-  const [loadingMessages, setLoadingMessages] = useState(false);
-  const [loadingDocuments, setLoadingDocuments] = useState(false);
-  const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
-  const [loadingMedical, setLoadingMedical] = useState(false);
-  const [tags, setTags] = useState<Record<string, string[]>>({});
-  const [tagInput, setTagInput] = useState("");
-
-  // Medical editing
-  const [editingMedical, setEditingMedical] = useState(false);
-  const [medicalForm, setMedicalForm] = useState<MedicalInfo>({});
-  const [savingMedical, setSavingMedical] = useState(false);
-
-  // Prescription editing
-  const [prescriptionOpen, setPrescriptionOpen] = useState(false);
-  const [prescriptionDiagnosis, setPrescriptionDiagnosis] = useState("");
-  const [prescriptionMedicines, setPrescriptionMedicines] = useState("");
-  const [prescriptionNotes, setPrescriptionNotes] = useState("");
-  const [savingPrescription, setSavingPrescription] = useState(false);
-
-  // Payment editing
-  const [paymentOpen, setPaymentOpen] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentStatus, setPaymentStatus] = useState("pending");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [savingPayment, setSavingPayment] = useState(false);
-
-  // List filters
-  const [listStatusFilter, setListStatusFilter] = useState("");
-  const [listTagFilter, setListTagFilter] = useState("");
-  const [listSort, setListSort] = useState<SortOption>("recent");
-
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkWorking, setBulkWorking] = useState(false);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
-
-  const searchRef = useRef<HTMLInputElement | null>(null);
-
-  // ==================== THEME ====================
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem("cm_theme");
-      if (saved === "dark" || saved === "light") setTheme(saved);
-      else if (window.matchMedia("(prefers-color-scheme: dark)").matches)
-        setTheme("dark");
-    } catch {}
-  }, []);
-
-  const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    try {
-      window.localStorage.setItem("cm_theme", next);
-    } catch {}
-  };
-
-  // ==================== TOAST ====================
-
-  const showToast = useCallback((message: string, type: ToastType = "success") => {
-    const id = `${Date.now()}-${Math.random()}`;
-    setToasts((prev) => [...prev, { id, type, message }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3500);
-  }, []);
-
-  // ==================== CONFIRM ====================
-
-  const askConfirm = useCallback(
-    (opts: {
-      title: string;
-      message: string;
-      confirmText?: string;
-      destructive?: boolean;
-      onConfirm: () => void;
-    }) => {
-      setConfirmState({
-        open: true,
-        title: opts.title,
-        message: opts.message,
-        confirmText: opts.confirmText || "Confirm",
-        destructive: opts.destructive,
-        onConfirm: () => {
-          setConfirmState((s) => ({ ...s, open: false }));
-          opts.onConfirm();
-        },
-      });
-    },
-    []
-  );
-
-  // ==================== HELPERS ====================
-
-  const formatCalendarDate = (date: Date) => date.toLocaleDateString("en-CA");
-
-  const getDoctorName = (doctorId?: string) => {
-    if (!doctorId) return "Unassigned";
-    return doctors.find((doctor) => doctor.id === doctorId)?.doctor_name || "Doctor";
-  };
-
-  const getServiceName = (serviceId?: string) => {
-    if (!serviceId) return "Consultation";
-    return services.find((service) => service.id === serviceId)?.service_name || "Service";
-  };
-
-  const getAppointmentStatusClass = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "confirmed":
-        return "border-emerald-200 bg-emerald-50 text-emerald-700";
-      case "completed":
-        return "border-blue-200 bg-blue-50 text-blue-700";
-      case "cancelled":
-      case "canceled":
-        return "border-red-200 bg-red-50 text-red-700";
-      case "no-show":
-        return "border-slate-200 bg-slate-100 text-slate-600";
-      default:
-        return "border-amber-200 bg-amber-50 text-amber-700";
-    }
-  };
-
-  const getAppointmentStatusLabel = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "confirmed": return "Confirmed";
-      case "completed": return "Completed";
-      case "cancelled":
-      case "canceled": return "Cancelled";
-      case "no-show": return "No-show";
-      default: return "Pending";
-    }
-  };
-
-  const getClinicId = async (userId: string) => {
-    const { data: clinic, error: clinicError } = await supabase
-      .from("clinics")
-      .select("id")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (clinicError || !clinic) throw new Error("Clinic not found");
-    return clinic.id;
-  };
-
-  // ==================== TAGS ====================
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem("cm_customer_tags");
-      if (raw) setTags(JSON.parse(raw));
-    } catch {}
-  }, []);
-
-  const persistTags = (next: Record<string, string[]>) => {
-    setTags(next);
-    try {
-      window.localStorage.setItem("cm_customer_tags", JSON.stringify(next));
-    } catch {}
-  };
-
-  const addTagToCustomer = (customerId: string, tag: string) => {
-    const trimmed = tag.trim();
-    if (!trimmed) return;
-    const current = tags[customerId] || [];
-    if (current.includes(trimmed)) return;
-    persistTags({ ...tags, [customerId]: [...current, trimmed] });
-  };
-
-  const removeTagFromCustomer = (customerId: string, tag: string) => {
-    const current = tags[customerId] || [];
-    persistTags({ ...tags, [customerId]: current.filter((t) => t !== tag) });
-  };
-
-  // ==================== DATA LOADERS ====================
-
-  const loadAppointmentOptions = async () => {
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) return;
-      const clinicId = await getClinicId(user.id);
-      const [{ data: doctorData }, { data: serviceData }] = await Promise.all([
-        supabase.from("clinic_doctors").select("id, doctor_name").eq("clinic_id", clinicId).order("created_at", { ascending: false }),
-        supabase.from("clinic_services").select("id, service_name, duration_minutes, assigned_doctors").eq("clinic_id", clinicId).eq("is_active", true).order("created_at", { ascending: false }),
-      ]);
-      setDoctors((doctorData || []) as Doctor[]);
-      setServices((serviceData || []) as Service[]);
-    } catch (error) {
-      console.error("Appointment options error:", error);
-    }
-  };
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
+    setError("");
+
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) { setLoading(false); return; }
-      const clinicId = await getClinicId(user.id);
-      const [{ data: contacts, error: contactsError }, { data: appointmentData, error: appointmentsError }] = await Promise.all([
-        supabase.from("contacts").select("id, name, phone, email, company, created_at").eq("user_id", user.id).order("created_at", { ascending: false }),
-        supabase.from("appointments").select("id, contact_id, patient_name, gender, age, appointment_date, appointment_time, status, doctor_id, service_id, amount, payment_status, payment_method").eq("clinic_id", clinicId).order("appointment_date", { ascending: false }),
-      ]);
-      if (contactsError) console.error(contactsError);
-      if (appointmentsError) console.error(appointmentsError);
-      setCustomers((contacts || []) as Customer[]);
-      setAppointments((appointmentData || []) as Appointment[]);
-    } finally { setLoading(false); }
-  };
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
 
-  const loadCustomerNotes = async (contactId: string) => {
-    const { data, error } = await supabase.from("contact_notes").select("*").eq("contact_id", contactId).order("created_at", { ascending: false });
-    if (!error) setCustomerNotes((data || []) as Note[]);
-  };
-
-  const loadCustomerMessages = async (contactId: string) => {
-    setLoadingMessages(true);
-    try {
-      const { data, error } = await supabase.from("whatsapp_messages").select("id, content_text, message_type, direction, created_at, status").eq("contact_id", contactId).order("created_at", { ascending: false }).limit(100);
-      if (!error) setCustomerMessages((data || []) as MessageItem[]);
-      else setCustomerMessages([]);
-    } catch { setCustomerMessages([]); } finally { setLoadingMessages(false); }
-  };
-
-  const loadCustomerDocuments = async (contactId: string) => {
-    setLoadingDocuments(true);
-    try {
-      const { data, error } = await supabase.from("contact_documents").select("id, file_name, file_url, file_type, created_at").eq("contact_id", contactId).order("created_at", { ascending: false });
-      if (!error) setCustomerDocuments((data || []) as DocumentItem[]);
-      else setCustomerDocuments([]);
-    } catch { setCustomerDocuments([]); } finally { setLoadingDocuments(false); }
-  };
-
-  const loadCustomerPrescriptions = async (contactId: string) => {
-    setLoadingPrescriptions(true);
-    try {
-      const { data, error } = await supabase.from("prescriptions").select("id, appointment_id, diagnosis, medicines, notes, created_at").eq("contact_id", contactId).order("created_at", { ascending: false });
-      if (!error) setCustomerPrescriptions((data || []) as Prescription[]);
-      else setCustomerPrescriptions([]);
-    } catch { setCustomerPrescriptions([]); } finally { setLoadingPrescriptions(false); }
-  };
-
-  const loadCustomerMedical = async (contactId: string) => {
-    setLoadingMedical(true);
-    try {
-      const { data, error } = await supabase.from("contact_medical_info").select("*").eq("contact_id", contactId).maybeSingle();
-      if (!error && data) { setCustomerMedical(data as MedicalInfo); setMedicalForm(data as MedicalInfo); }
-      else { setCustomerMedical({}); setMedicalForm({}); }
-    } catch { setCustomerMedical({}); setMedicalForm({}); } finally { setLoadingMedical(false); }
-  };
-
-  useEffect(() => { loadData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (selectedCustomer) {
-      loadCustomerNotes(selectedCustomer.id);
-      loadCustomerMessages(selectedCustomer.id);
-      loadCustomerDocuments(selectedCustomer.id);
-      loadCustomerPrescriptions(selectedCustomer.id);
-      loadCustomerMedical(selectedCustomer.id);
-      setCustomerTab("overview");
-      setEditingMedical(false);
-    } else {
-      setCustomerNotes([]); setCustomerMessages([]); setCustomerDocuments([]); setCustomerPrescriptions([]); setCustomerMedical({});
-    }
-  }, [selectedCustomer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ==================== KEYBOARD SHORTCUTS ====================
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const inInput = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-      if (e.key === "Escape") {
-        if (confirmState.open) setConfirmState((s) => ({ ...s, open: false }));
-        else if (appointmentOpen) setAppointmentOpen(false);
-        else if (paymentOpen) setPaymentOpen(false);
-        else if (prescriptionOpen) setPrescriptionOpen(false);
-        else if (selectedAppointment) setSelectedAppointment(null);
-        else if (shortcutsOpen) setShortcutsOpen(false);
-        else if (selectedCustomer) setSelectedCustomer(null);
+      if (authError || !user) {
+        setError("Please sign in again to view your customers.");
+        setCustomers([]);
+        setAppointments([]);
         return;
       }
-      if (inInput) return;
-      if (e.key === "/") { e.preventDefault(); searchRef.current?.focus(); }
-      else if (e.key === "n" || e.key === "N") { if (selectedCustomer) { setAppointmentOpen(true); loadAppointmentOptions(); } }
-      else if (e.key === "?") setShortcutsOpen(true);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [appointmentOpen, selectedAppointment, shortcutsOpen, selectedCustomer, confirmState.open, paymentOpen, prescriptionOpen]);
 
-  // ==================== DERIVED ====================
+      if (!accountId) {
+        setCustomers([]);
+        setAppointments([]);
+        setError("Your workspace is still loading. Please refresh in a moment.");
+        return;
+      }
 
-  const filteredCustomers = useMemo(() => {
-    const term = search.toLowerCase().trim();
-    let list = customers;
-    if (term) {
-      list = list.filter((c) => c.name?.toLowerCase().includes(term) || c.phone?.toLowerCase().includes(term) || c.email?.toLowerCase().includes(term));
-    }
-    if (listTagFilter) list = list.filter((c) => (tags[c.id] || []).includes(listTagFilter));
-    if (listStatusFilter) {
-      list = list.filter((c) => {
-        const customerAppts = appointments.filter((a) => a.contact_id === c.id);
-        if (listStatusFilter === "has_upcoming") {
-          const today = formatCalendarDate(new Date());
-          return customerAppts.some((a) => a.appointment_date >= today && (a.status === "pending" || a.status === "confirmed"));
+      const { data: contactData, error: contactError } = await supabase
+        .from("contacts")
+        .select("id, name, phone, email, company, created_at")
+        .eq("account_id", accountId)
+        .order("created_at", { ascending: false });
+
+      if (contactError) throw contactError;
+
+      const { data: clinic, error: clinicError } = await supabase
+        .from("clinics")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let appointmentData: Appointment[] = [];
+
+      if (!clinicError && clinic?.id) {
+        const { data, error: appointmentError } = await supabase
+          .from("appointments")
+          .select(
+            "id, contact_id, patient_name, appointment_date, appointment_time, status, doctor_id, service_id, amount, payment_status"
+          )
+          .eq("clinic_id", clinic.id)
+          .order("appointment_date", { ascending: false });
+
+        if (appointmentError) {
+          console.error("Customer appointments could not be loaded:", appointmentError);
+        } else {
+          appointmentData = (data || []) as Appointment[];
         }
-        if (listStatusFilter === "no_appointments") return customerAppts.length === 0;
-        return customerAppts.some((a) => a.status.toLowerCase() === listStatusFilter);
+      }
+
+      const loadedCustomers = (contactData || []) as Customer[];
+      setCustomers(loadedCustomers);
+      setAppointments(appointmentData);
+      setSelected((current) =>
+        current
+          ? loadedCustomers.find((item) => item.id === current.id) || null
+          : loadedCustomers[0] || null
+      );
+    } catch (err) {
+      console.error("Customer Management load error:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Customers could not be loaded. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase, accountId]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const recentBoundary = new Date(today);
+  recentBoundary.setDate(recentBoundary.getDate() - 30);
+
+  const customerAppointments = (customerId: string) =>
+    appointments
+      .filter(
+        (appointment) =>
+          appointment.contact_id === customerId ||
+          (!appointment.contact_id &&
+            appointments.filter(
+              (item) => item.patient_name === appointment.patient_name
+            ).length === 1 &&
+            appointment.patient_name?.trim().toLowerCase() ===
+              customers
+                .find((customer) => customer.id === customerId)
+                ?.name?.trim()
+                .toLowerCase())
+      )
+      .sort((a, b) => {
+        const first = `${a.appointment_date} ${a.appointment_time || ""}`;
+        const second = `${b.appointment_date} ${b.appointment_time || ""}`;
+        return second.localeCompare(first);
       });
-    }
-    if (listSort === "name") list = [...list].sort((a, b) => (a.name || a.phone || "").localeCompare(b.name || b.phone || ""));
-    else if (listSort === "appointments") list = [...list].sort((a, b) => appointments.filter((x) => x.contact_id === b.id).length - appointments.filter((x) => x.contact_id === a.id).length);
-    return list;
-  }, [customers, search, tags, listTagFilter, listStatusFilter, listSort, appointments]);
 
-  const allTags = useMemo(() => {
-    const set = new Set<string>();
-    Object.values(tags).forEach((arr) => arr.forEach((t) => set.add(t)));
-    return Array.from(set).sort();
-  }, [tags]);
+  const filteredCustomers = customers.filter((customer) => {
+    const term = search.trim().toLowerCase();
+    const matchesSearch =
+      !term ||
+      (customer.name || "").toLowerCase().includes(term) ||
+      customer.phone.toLowerCase().includes(term) ||
+      (customer.email || "").toLowerCase().includes(term);
 
-  const getCustomerAppointments = (customerId: string) => appointments.filter((a) => a.contact_id === customerId);
-
-  const pendingAppointments = appointments.filter((a) => a.status === "pending").length;
-  const cancelledAppointments = appointments.filter((a) => a.status === "cancelled" || a.status === "canceled").length;
-
-  const getUpcomingAppointment = (customerId: string) => {
-    const today = formatCalendarDate(new Date());
-    return appointments.filter((a) => a.contact_id === customerId && a.appointment_date >= today && (a.status === "pending" || a.status === "confirmed")).sort((a, b) => `${a.appointment_date}${a.appointment_time}`.localeCompare(`${b.appointment_date}${b.appointment_time}`))[0];
-  };
-
-  const getLifetimeStats = (customerId: string) => {
-    const list = getCustomerAppointments(customerId);
-    const paid = list.filter((a) => a.payment_status === "paid" || a.status === "completed");
-    const total = paid.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
-    const lastVisit = list[0]?.appointment_date || null;
-    return { totalVisits: list.filter((a) => a.status === "completed").length, totalRevenue: total, lastVisit, totalAppointments: list.length };
-  };
-
-  // ==================== ANALYTICS ====================
-
-  const analytics = useMemo(() => {
-    const now = new Date();
-    const totalRevenue = appointments.filter((a) => a.payment_status === "paid").reduce((s, a) => s + (Number(a.amount) || 0), 0);
-    const pendingRevenue = appointments.filter((a) => a.status !== "cancelled" && a.status !== "no-show" && a.payment_status !== "paid").reduce((s, a) => s + (Number(a.amount) || 0), 0);
-    const noShowCount = appointments.filter((a) => a.status === "no-show").length;
-    const totalReal = appointments.filter((a) => a.status !== "cancelled").length;
-    const noShowRate = totalReal > 0 ? (noShowCount / totalReal) * 100 : 0;
-    const completed = appointments.filter((a) => a.status === "completed").length;
-    const completionRate = totalReal > 0 ? (completed / totalReal) * 100 : 0;
-    const doctorCount: Record<string, number> = {};
-    appointments.forEach((a) => { if (a.doctor_id) doctorCount[a.doctor_id] = (doctorCount[a.doctor_id] || 0) + 1; });
-    const topDoctors = Object.entries(doctorCount).map(([id, count]) => ({ id, name: getDoctorName(id), count })).sort((a, b) => b.count - a.count).slice(0, 5);
-    const weeklyTrend: { date: string; count: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now); d.setDate(d.getDate() - i);
-      const key = formatCalendarDate(d);
-      const count = appointments.filter((a) => a.appointment_date === key).length;
-      weeklyTrend.push({ date: d.toLocaleDateString("en-US", { weekday: "short" }), count });
-    }
-    const maxWeekly = Math.max(...weeklyTrend.map((w) => w.count), 1);
-    const hourCount: Record<string, number> = {};
-    appointments.forEach((a) => { const h = (a.appointment_time || "").slice(0, 2); if (h) hourCount[h] = (hourCount[h] || 0) + 1; });
-    const peakHours = Object.entries(hourCount).map(([hour, count]) => ({ hour: `${hour}:00`, count })).sort((a, b) => b.count - a.count).slice(0, 5);
-    return { totalRevenue, pendingRevenue, noShowRate, completionRate, topDoctors, weeklyTrend, maxWeekly, peakHours, totalAppointments: appointments.length, totalCustomers: customers.length };
-  }, [appointments, customers, doctors]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ==================== ACTIONS ====================
-
-  const addCustomerNote = async () => {
-    if (!selectedCustomer || !newNote.trim()) return;
-    setSavingNote(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase.from("contacts").select("account_id").eq("id", selectedCustomer.id).single();
-      if (!profile?.account_id) return;
-      const { error } = await supabase.from("contact_notes").insert({ contact_id: selectedCustomer.id, account_id: profile.account_id, user_id: user.id, note_text: newNote.trim() });
-      if (!error) { setNewNote(""); await loadCustomerNotes(selectedCustomer.id); showToast("Note added"); }
-      else { showToast("Failed to add note", "error"); }
-    } finally { setSavingNote(false); }
-  };
-
-  const saveMedicalInfo = async () => {
-    if (!selectedCustomer) return;
-    setSavingMedical(true);
-    try {
-      const payload = { contact_id: selectedCustomer.id, allergies: medicalForm.allergies || [], chronic_conditions: medicalForm.chronic_conditions || [], blood_group: medicalForm.blood_group || null, emergency_contact: medicalForm.emergency_contact || null };
-      const { error } = await supabase.from("contact_medical_info").upsert(payload, { onConflict: "contact_id" });
-      if (error) { showToast("Failed to save medical info", "error"); return; }
-      setCustomerMedical(payload as MedicalInfo); setEditingMedical(false); showToast("Medical info saved");
-    } finally { setSavingMedical(false); }
-  };
-
-  const savePrescription = async () => {
-    if (!selectedCustomer || !prescriptionDiagnosis.trim()) { showToast("Diagnosis required", "error"); return; }
-    setSavingPrescription(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { showToast("Please login", "error"); return; }
-      const clinicId = await getClinicId(user.id);
-      const { error } = await supabase.from("prescriptions").insert({ contact_id: selectedCustomer.id, clinic_id: clinicId, user_id: user.id, diagnosis: prescriptionDiagnosis.trim(), medicines: prescriptionMedicines.trim(), notes: prescriptionNotes.trim() });
-      if (error) { showToast("Failed to save prescription", "error"); return; }
-      setPrescriptionDiagnosis(""); setPrescriptionMedicines(""); setPrescriptionNotes(""); setPrescriptionOpen(false);
-      await loadCustomerPrescriptions(selectedCustomer.id); showToast("Prescription saved");
-    } finally { setSavingPrescription(false); }
-  };
-
-  const printPrescription = (p: Prescription) => {
-    const customer = selectedCustomer;
-    const html = `
-      <html><head><title>Prescription</title>
-      <style>
-        body{font-family:Arial;padding:40px;color:#111;line-height:1.6}
-        h1{margin:0 0 6px} .muted{color:#666;font-size:12px}
-        .box{border:1px solid #ddd;border-radius:8px;padding:16px;margin-top:16px}
-        .label{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.05em}
-        pre{white-space:pre-wrap;font-family:inherit;margin:4px 0 0}
-      </style></head><body>
-      <h1>Prescription</h1>
-      <p class="muted">${new Date(p.created_at).toLocaleString()}</p>
-      <div class="box"><p class="label">Patient</p><p>${customer?.name || "-"} · ${customer?.phone || ""}</p></div>
-      <div class="box"><p class="label">Diagnosis</p><p>${p.diagnosis || "-"}</p></div>
-      <div class="box"><p class="label">Medicines</p><pre>${p.medicines || "-"}</pre></div>
-      ${p.notes ? `<div class="box"><p class="label">Notes</p><pre>${p.notes}</pre></div>` : ""}
-      </body></html>`;
-    const win = window.open("", "_blank"); if (!win) return;
-    win.document.write(html); win.document.close(); setTimeout(() => win.print(), 300);
-  };
-
-  const updatePayment = async () => {
-    if (!selectedAppointment) return;
-    setSavingPayment(true);
-    try {
-      const { error } = await supabase.from("appointments").update({ amount: paymentAmount ? Number(paymentAmount) : null, payment_status: paymentStatus, payment_method: paymentMethod }).eq("id", selectedAppointment.id);
-      if (error) { showToast("Failed to save payment", "error"); return; }
-      setSelectedAppointment((s) => s ? { ...s, amount: paymentAmount ? Number(paymentAmount) : undefined, payment_status: paymentStatus, payment_method: paymentMethod } : s);
-      setPaymentOpen(false); await loadData(); showToast("Payment updated");
-    } finally { setSavingPayment(false); }
-  };
-
-  const rescheduleAppointment = async (appointmentId: string, newDate: string, newTime: string) => {
-    const { error } = await supabase.from("appointments").update({ appointment_date: newDate, appointment_time: newTime }).eq("id", appointmentId);
-    if (error) { showToast("Reschedule failed", "error"); return false; }
-    await loadData(); showToast("Appointment rescheduled"); return true;
-  };
-
-  const loadAvailableSlots = async (doctorId: string, date: string) => {
-    if (!doctorId || !date) return [];
-    const { data: settings } = await supabase.from("clinic_appointment_settings").select("slot_duration").limit(1).single();
-    const duration = settings?.slot_duration || 30;
-    const selectedDate = new Date(`${date}T00:00:00`);
-    const weekday = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
-    const { data: workingHour } = await supabase.from("clinic_working_hours").select("day_name, open_time, close_time, is_closed").eq("day_name", weekday).limit(1).maybeSingle();
-    if (!workingHour || workingHour.is_closed) return [];
-    const { data: doctor } = await supabase.from("clinic_doctors").select("available_days, start_time, end_time").eq("id", doctorId).maybeSingle();
-    if (doctor?.available_days?.length) {
-      const doctorDays = doctor.available_days.map((d: string) => d.toLowerCase());
-      if (!doctorDays.includes(weekday.toLowerCase())) return [];
-    }
-    const { data: booked } = await supabase.from("appointments").select("appointment_time").eq("doctor_id", doctorId).eq("appointment_date", date).in("status", ["pending", "confirmed"]);
-    const bookedTimes = new Set((booked || []).map((item) => item.appointment_time));
-    const slots: string[] = [];
-    const doctorStart = String(doctor?.start_time || workingHour.open_time || "09:00").slice(0, 5);
-    const doctorEnd = String(doctor?.end_time || workingHour.close_time || "18:00").slice(0, 5);
-    const [openHour, openMinute] = doctorStart.split(":").map(Number);
-    const [closeHour, closeMinute] = doctorEnd.split(":").map(Number);
-    let currentMinutes = openHour * 60 + openMinute;
-    const closingMinutes = closeHour * 60 + closeMinute;
-    while (currentMinutes < closingMinutes) {
-      const hour = Math.floor(currentMinutes / 60);
-      const minute = currentMinutes % 60;
-      const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-      if (currentMinutes + duration <= closingMinutes && !bookedTimes.has(time)) slots.push(time);
-      currentMinutes += duration;
-    }
-    return slots;
-  };
-
-  const refreshAvailableSlots = async (doctorId: string, date: string) => {
-    setAppointmentTime(""); setAvailableSlots([]);
-    if (!doctorId || !date) return;
-    setLoadingSlots(true);
-    try { const slots = await loadAvailableSlots(doctorId, date); setAvailableSlots(slots); }
-    finally { setLoadingSlots(false); }
-  };
-
-  const createAppointment = async () => {
-    if (!selectedCustomer || !appointmentDoctor || !appointmentService || !appointmentDate || !appointmentTime) { showToast("Please fill Doctor, Service, Date and Time", "error"); return; }
-    setSavingAppointment(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { showToast("Please login again", "error"); return; }
-      const clinicId = await getClinicId(user.id);
-      const selectedService = services.find((s) => s.id === appointmentService);
-      if (selectedService?.assigned_doctors?.length && !selectedService.assigned_doctors.includes(appointmentDoctor)) { showToast("Selected doctor is not assigned to this service", "error"); return; }
-      const { data: existingAppointment } = await supabase.from("appointments").select("id").eq("clinic_id", clinicId).eq("doctor_id", appointmentDoctor).eq("appointment_date", appointmentDate).eq("appointment_time", appointmentTime).in("status", ["pending", "confirmed"]).limit(1).maybeSingle();
-      if (existingAppointment) { showToast("This slot is already booked", "error"); await refreshAvailableSlots(appointmentDoctor, appointmentDate); return; }
-      const { error } = await supabase.from("appointments").insert({ clinic_id: clinicId, user_id: user.id, contact_id: selectedCustomer.id, doctor_id: appointmentDoctor, service_id: appointmentService, appointment_date: appointmentDate, appointment_time: appointmentTime, patient_name: appointmentPatientName.trim() || selectedCustomer.name || "", gender: appointmentGender || null, age: appointmentAge ? Number(appointmentAge) : null, amount: appointmentAmount ? Number(appointmentAmount) : null, status: "pending", payment_status: "pending" }).select("id").single();
-      if (error) { showToast(`Failed: ${error.message}`, "error"); return; }
-      try {
-        const doctorName = getDoctorName(appointmentDoctor);
-        const serviceName = getServiceName(appointmentService);
-        const patientName = appointmentPatientName.trim() || selectedCustomer.name || "Patient";
-        const formattedDate = new Date(`${appointmentDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
-        const msg = [`Hello ${patientName},`, ``, `Your appointment has been booked successfully.`, ``, `👨‍⚕️ Doctor: ${doctorName}`, `🩺 Service: ${serviceName}`, `📅 Date: ${formattedDate}`, `🕐 Time: ${appointmentTime}`, `📌 Status: Pending Confirmation`, ``, `Thank you.`].join("\n");
-        await fetch("/api/whatsapp/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contact_id: selectedCustomer.id, message_type: "text", content_text: msg }) });
-      } catch (e) { console.error("WhatsApp error:", e); }
-      setAppointmentDoctor(""); setAppointmentService(""); setAppointmentDate(""); setAppointmentTime(""); setAppointmentPatientName(""); setAppointmentGender(""); setAppointmentAge(""); setAppointmentAmount(""); setAppointmentOpen(false);
-      await loadData(); showToast("Appointment created");
-    } finally { setSavingAppointment(false); }
-  };
-
-  const updateAppointmentStatus = async (appointmentId: string, status: "pending" | "confirmed" | "completed" | "cancelled" | "no-show") => {
-    setUpdatingAppointmentStatus(true);
-    try {
-      const { error } = await supabase.from("appointments").update({ status }).eq("id", appointmentId);
-      if (error) { showToast("Failed to update status", "error"); return; }
-      setSelectedAppointment((current) => current?.id === appointmentId ? { ...current, status } : current);
-      try {
-        const appointment = appointments.find((a) => a.id === appointmentId);
-        if (appointment?.contact_id) {
-          const customer = customers.find((c) => c.id === appointment.contact_id);
-          const statusMessages: Record<string, string> = { pending: "Your appointment is pending confirmation.", confirmed: "Your appointment has been confirmed.", cancelled: "Your appointment has been cancelled.", completed: "Your appointment has been marked completed. Thank you.", "no-show": "Our records show the appointment was marked no-show." };
-          const msg = [`Hello ${appointment.patient_name || customer?.name || "Patient"},`, ``, statusMessages[status], ``, `📅 ${appointment.appointment_date} 🕐 ${appointment.appointment_time}`].join("\n");
-          await fetch("/api/whatsapp/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contact_id: appointment.contact_id, message_type: "text", content_text: msg }) });
-        }
-      } catch (e) { console.error("WhatsApp error:", e); }
-      await loadData(); showToast("Status updated");
-    } finally { setUpdatingAppointmentStatus(false); }
-  };
-
-  const cancelAppointment = async (appointmentId: string) => {
-    askConfirm({
-      title: "Cancel appointment?", message: "This will cancel the appointment and notify the patient.", confirmText: "Cancel Appointment", destructive: true,
-      onConfirm: async () => {
-        const { error } = await supabase.from("appointments").update({ status: "cancelled" }).eq("id", appointmentId);
-        if (error) { showToast("Failed to cancel", "error"); return; }
-        await loadData(); showToast("Appointment cancelled");
-      },
+    const isNew = new Date(customer.created_at) >= recentBoundary;
+    const history = customerAppointments(customer.id);
+    const hasFollowup = history.some((appointment) => {
+      const date = new Date(appointment.appointment_date);
+      return (
+        date < today &&
+        !["cancelled", "no-show"].includes(appointment.status.toLowerCase())
+      );
     });
-  };
 
-  // ==================== CALENDAR ENGINE ====================
+    return (
+      matchesSearch &&
+      (filter === "all" ||
+        (filter === "new" && isNew) ||
+        (filter === "followup" && hasFollowup))
+    );
+  });
 
-  const calendarMonthLabel = calendarDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  const calendarWeekStart = new Date(calendarDate); calendarWeekStart.setHours(0, 0, 0, 0); calendarWeekStart.setDate(calendarWeekStart.getDate() - calendarWeekStart.getDay());
-  const calendarWeekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(calendarWeekStart); d.setDate(calendarWeekStart.getDate() + i); return d; });
-  const calendarMonthStart = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
-  const calendarMonthEnd = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 0);
-  const calendarGridStart = new Date(calendarMonthStart); calendarGridStart.setDate(calendarMonthStart.getDate() - calendarMonthStart.getDay());
-  const calendarGridEnd = new Date(calendarMonthEnd); calendarGridEnd.setDate(calendarMonthEnd.getDate() + (6 - calendarMonthEnd.getDay()));
-  const calendarMonthDays: Date[] = []; const monthCursor = new Date(calendarGridStart);
-  while (monthCursor <= calendarGridEnd) { calendarMonthDays.push(new Date(monthCursor)); monthCursor.setDate(monthCursor.getDate() + 1); }
+  const newCustomers = customers.filter(
+    (customer) => new Date(customer.created_at) >= recentBoundary
+  ).length;
 
-  const appointmentsForDate = (date: Date) => {
-    const dateKey = formatCalendarDate(date);
-    const query = appointmentSearch.trim().toLowerCase();
-    return appointments.filter((a) => a.appointment_date === dateKey).filter((a) => {
-      if (!query) return true;
-      const customer = customers.find((c) => c.id === a.contact_id);
-      return [a.patient_name, customer?.name, customer?.phone, getDoctorName(a.doctor_id), getServiceName(a.service_id), a.status, a.appointment_time].filter(Boolean).some((v) => String(v).toLowerCase().includes(query));
-    }).filter((a) => !calendarDoctorFilter || a.doctor_id === calendarDoctorFilter).filter((a) => !calendarStatusFilter || a.status.toLowerCase() === calendarStatusFilter).sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
-  };
+  const followups = customers.filter((customer) =>
+    customerAppointments(customer.id).some((appointment) => {
+      const date = new Date(appointment.appointment_date);
+      return (
+        date < today &&
+        !["cancelled", "no-show"].includes(appointment.status.toLowerCase())
+      );
+    })
+  ).length;
 
-  const changeCalendarDate = (direction: number) => {
-    setCalendarDate((current) => {
-      const next = new Date(current);
-      if (calendarView === "day") next.setDate(next.getDate() + direction);
-      else if (calendarView === "week") next.setDate(next.getDate() + direction * 7);
-      else next.setMonth(next.getMonth() + direction);
-      return next;
-    });
-  };
+  const selectedAppointments = selected
+    ? customerAppointments(selected.id)
+    : [];
 
-  const isCalendarToday = (date: Date) => { const today = new Date(); return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate(); };
-
-  // ==================== EXPORT ====================
-
-  const exportCustomersCSV = (onlySelected = false) => {
-    const source = onlySelected ? customers.filter((c) => selectedIds.has(c.id)) : filteredCustomers;
-    const rows = [["Name", "Phone", "Email", "Company", "Tags", "Appointments", "Created"], ...source.map((c) => [c.name || "", c.phone || "", c.email || "", c.company || "", (tags[c.id] || []).join(" | "), String(getCustomerAppointments(c.id).length), c.created_at])];
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" }); const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `customers-${formatCalendarDate(new Date())}.csv`; a.click(); URL.revokeObjectURL(url);
-    showToast("Exported CSV");
-  };
-
-  const exportAppointmentsCSV = () => {
-    const rows = [["Patient", "Phone", "Doctor", "Service", "Date", "Time", "Status", "Amount", "Payment"], ...appointments.map((a) => { const c = customers.find((x) => x.id === a.contact_id); return [a.patient_name || c?.name || "", c?.phone || "", getDoctorName(a.doctor_id), getServiceName(a.service_id), a.appointment_date, a.appointment_time, a.status, a.amount ? String(a.amount) : "", a.payment_status || ""]; })];
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" }); const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `appointments-${formatCalendarDate(new Date())}.csv`; a.click(); URL.revokeObjectURL(url);
-    showToast("Exported appointments");
-  };
-
-  const toggleSelected = (id: string) => { setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }); };
-  const toggleSelectAll = () => { if (selectedIds.size === filteredCustomers.length) setSelectedIds(new Set()); else setSelectedIds(new Set(filteredCustomers.map((c) => c.id))); };
-
-  const bulkSendWhatsApp = () => {
-    if (selectedIds.size === 0) return;
-    const message = window.prompt(`Send WhatsApp to ${selectedIds.size} customer(s):`);
-    if (!message?.trim()) return;
-    askConfirm({
-      title: `Send to ${selectedIds.size} customers?`, message: "Messages will be delivered via WhatsApp.", confirmText: "Send",
-      onConfirm: async () => {
-        setBulkWorking(true); let sent = 0; let failed = 0;
-        for (const id of Array.from(selectedIds)) {
-          try { const res = await fetch("/api/whatsapp/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contact_id: id, message_type: "text", content_text: message }) }); if (res.ok) sent++; else failed++; } catch { failed++; }
-        }
-        setBulkWorking(false); setSelectedIds(new Set()); showToast(`Sent: ${sent}, Failed: ${failed}`);
-      },
-    });
-  };
-
-  const bulkAddTag = () => {
-    if (selectedIds.size === 0) return;
-    const tag = window.prompt("Enter tag:"); if (!tag?.trim()) return;
-    const next = { ...tags };
-    Array.from(selectedIds).forEach((id) => { const existing = next[id] || []; if (!existing.includes(tag.trim())) next[id] = [...existing, tag.trim()]; });
-    persistTags(next); setSelectedIds(new Set()); showToast("Tag added");
-  };
-
-  const printReceipt = (appointment: Appointment) => {
-    const customer = customers.find((c) => c.id === appointment.contact_id);
-    const html = `
-      <html><head><title>Receipt</title>
-      <style>
-        body{font-family:Arial;padding:40px;color:#111} h1{margin:0 0 4px;font-size:22px}
-        .muted{color:#666;font-size:12px} .box{border:1px solid #ddd;border-radius:8px;padding:16px;margin-top:16px}
-        table{width:100%;border-collapse:collapse;margin-top:16px} td{padding:8px 0;border-bottom:1px solid #eee;font-size:14px}
-        td:first-child{color:#666;width:160px}
-      </style></head><body>
-      <h1>Appointment Receipt</h1><p class="muted">Generated ${new Date().toLocaleString()}</p>
-      <div class="box"><table>
-        <tr><td>Patient</td><td>${appointment.patient_name || customer?.name || "-"}</td></tr>
-        <tr><td>Phone</td><td>${customer?.phone || "-"}</td></tr>
-        <tr><td>Doctor</td><td>${getDoctorName(appointment.doctor_id)}</td></tr>
-        <tr><td>Service</td><td>${getServiceName(appointment.service_id)}</td></tr>
-        <tr><td>Date</td><td>${appointment.appointment_date}</td></tr>
-        <tr><td>Time</td><td>${appointment.appointment_time}</td></tr>
-        <tr><td>Status</td><td>${appointment.status}</td></tr>
-        <tr><td>Amount</td><td>₹${appointment.amount || 0}</td></tr>
-        <tr><td>Payment</td><td>${appointment.payment_status || "pending"}</td></tr>
-      </table></div><p class="muted" style="margin-top:24px;">Thank you.</p>
-    </body></html>`;
-    const win = window.open("", "_blank"); if (!win) return;
-    win.document.write(html); win.document.close(); setTimeout(() => win.print(), 300);
-  };
-
-  // ==================== SHARED MODALS ====================
-
-  const appointmentModal = appointmentOpen && selectedCustomer ? (
-    <ModalShell onClose={() => setAppointmentOpen(false)}>
-      <div className="mb-5 flex items-start justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">New Appointment</h2>
-          <p className="mt-1 text-sm text-slate-500">For {selectedCustomer.name || selectedCustomer.phone}</p>
-        </div>
-        <IconBtn onClick={() => setAppointmentOpen(false)}><XCircle className="h-5 w-5" /></IconBtn>
-      </div>
-      <div className="space-y-4">
-        <SelectBox value={appointmentDoctor} onChange={(v) => { setAppointmentDoctor(v); refreshAvailableSlots(v, appointmentDate); }}>
-          <option value="">Select Doctor</option>
-          {doctors.map((d) => <option key={d.id} value={d.id}>{d.doctor_name}</option>)}
-        </SelectBox>
-        <SelectBox value={appointmentService} onChange={setAppointmentService}>
-          <option value="">Select Service</option>
-          {services.map((s) => <option key={s.id} value={s.id}>{s.service_name}</option>)}
-        </SelectBox>
-        <InputBox type="date" value={appointmentDate} onChange={(v) => { setAppointmentDate(v); setAppointmentTime(""); if (!appointmentDoctor || !v) { setAvailableSlots([]); return; } refreshAvailableSlots(appointmentDoctor, v); }} />
-        <div>
-          <label className="mb-2 block text-sm font-medium text-slate-700">Available Time</label>
-          {!appointmentDoctor || !appointmentDate ? (
-            <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">Select Doctor and Date first.</p>
-          ) : loadingSlots ? (
-            <p className="flex items-center gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading slots...</p>
-          ) : availableSlots.length === 0 ? (
-            <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">No available slots.</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {availableSlots.map((slot) => (
-                <button key={slot} type="button" onClick={() => setAppointmentTime(slot)} className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${appointmentTime === slot ? "border-blue-600 bg-blue-600 text-white shadow-sm" : "border-slate-200 bg-white text-slate-900 hover:border-blue-400 hover:bg-blue-50"}`}>{slot}</button>
-              ))}
-            </div>
-          )}
-        </div>
-        <InputBox value={appointmentPatientName} onChange={setAppointmentPatientName} placeholder="Patient Name" />
-        <div className="grid grid-cols-2 gap-3">
-          <SelectBox value={appointmentGender} onChange={setAppointmentGender}>
-            <option value="">Gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
-          </SelectBox>
-          <InputBox type="number" value={appointmentAge} onChange={setAppointmentAge} placeholder="Age" />
-        </div>
-        <InputBox type="number" value={appointmentAmount} onChange={setAppointmentAmount} placeholder="Amount (₹) — optional" />
-        <button onClick={createAppointment} disabled={savingAppointment} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
-          {savingAppointment && <Loader2 className="h-4 w-4 animate-spin" />}
-          {savingAppointment ? "Creating..." : "Create Appointment"}
-        </button>
-      </div>
-    </ModalShell>
-  ) : null;
-
-  const appointmentDetailsModal = selectedAppointment ? (
-    <ModalShell onClose={() => setSelectedAppointment(null)} size="lg">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50/40 px-6 py-5">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-blue-600">Appointment Details</p>
-          <h2 className="mt-1 text-xl font-bold text-slate-900">{selectedAppointment.patient_name || "Patient"}</h2>
-        </div>
-        <div className="flex items-center gap-1">
-          <IconBtn onClick={() => printReceipt(selectedAppointment)}><Printer className="h-5 w-5" /></IconBtn>
-          <IconBtn onClick={() => setSelectedAppointment(null)}><XCircle className="h-6 w-6" /></IconBtn>
-        </div>
-      </div>
-      <div className="grid gap-4 p-6 sm:grid-cols-2">
-        {(() => {
-          const customer = customers.find((c) => c.id === selectedAppointment.contact_id);
-          const phone = customer?.phone || "";
-          return (
-            <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-4 sm:col-span-2">
-              {phone && (
-                <>
-                  <a href={`tel:${phone}`} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"><Phone className="h-4 w-4" /> Call</a>
-                  <a href={`https://wa.me/${phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-green-600"><MessageCircle className="h-4 w-4" /> WhatsApp</a>
-                </>
-              )}
-              {customer && <button type="button" onClick={() => { setSelectedAppointment(null); setSelectedCustomer(customer); }} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><User className="h-4 w-4" /> Profile</button>}
-              <button type="button" onClick={() => { setPaymentAmount(selectedAppointment.amount ? String(selectedAppointment.amount) : ""); setPaymentStatus(selectedAppointment.payment_status || "pending"); setPaymentMethod(selectedAppointment.payment_method || "cash"); setPaymentOpen(true); }} className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600"><CreditCard className="h-4 w-4" /> Payment</button>
-            </div>
-          );
-        })()}
-        <DetailBox label="Date" value={selectedAppointment.appointment_date} />
-        <DetailBox label="Time" value={selectedAppointment.appointment_time} />
-        <DetailBox label="Doctor" value={getDoctorName(selectedAppointment.doctor_id)} />
-        <DetailBox label="Service" value={getServiceName(selectedAppointment.service_id)} />
-        <div className="rounded-xl border border-slate-200 p-4">
-          <p className="text-xs font-semibold uppercase text-slate-400">Payment</p>
-          <div className="mt-2 space-y-1 text-sm">
-            <p className="font-semibold text-slate-900">₹{selectedAppointment.amount || 0}</p>
-            <p className="text-xs text-slate-500">Status: <span className={selectedAppointment.payment_status === "paid" ? "font-semibold text-emerald-600" : "font-semibold text-amber-600"}>{selectedAppointment.payment_status || "pending"}</span></p>
-            {selectedAppointment.payment_method && <p className="text-xs text-slate-500">Method: {selectedAppointment.payment_method}</p>}
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 p-4">
-          <p className="text-xs font-semibold uppercase text-slate-400">Patient</p>
-          <p className="mt-1 font-semibold text-slate-900">{selectedAppointment.patient_name || "Not available"}</p>
-          {(() => { const c = customers.find((x) => x.id === selectedAppointment.contact_id); return (<div className="mt-2 space-y-1 text-xs text-slate-500"><p>📞 {c?.phone || "-"}</p><p>✉️ {c?.email || "-"}</p></div>); })()}
-        </div>
-        <DetailBox label="Details" value={`${selectedAppointment.gender || "—"}${selectedAppointment.age ? ` • ${selectedAppointment.age} yrs` : ""}`} />
-      </div>
-      <div className="border-t border-slate-200 px-6 py-5">
-        <p className="mb-3 text-sm font-semibold text-slate-700">Status</p>
-        <div className="mb-5 flex flex-wrap gap-2">
-          {(["pending", "confirmed", "completed", "no-show", "cancelled"] as const).map((status) => (
-            <button key={status} type="button" disabled={updatingAppointmentStatus} onClick={() => updateAppointmentStatus(selectedAppointment.id, status)} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold capitalize transition ${selectedAppointment.status === status ? "border-blue-600 bg-blue-600 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"} disabled:opacity-50`}>
-              {updatingAppointmentStatus && selectedAppointment.status !== status && <Loader2 className="h-3 w-3 animate-spin" />}
-              {status}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button onClick={() => printReceipt(selectedAppointment)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><Printer className="h-4 w-4" /> Print</button>
-          <button onClick={() => setSelectedAppointment(null)} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">Close</button>
-        </div>
-      </div>
-    </ModalShell>
-  ) : null;
-
-  const paymentModal = paymentOpen && selectedAppointment ? (
-    <ModalShell onClose={() => setPaymentOpen(false)}>
-      <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-xl font-bold text-slate-900">Payment</h2>
-        <IconBtn onClick={() => setPaymentOpen(false)}><XCircle className="h-5 w-5" /></IconBtn>
-      </div>
-      <div className="space-y-4">
-        <div><label className="mb-1 block text-sm font-medium text-slate-700">Amount (₹)</label><InputBox type="number" value={paymentAmount} onChange={setPaymentAmount} placeholder="0" /></div>
-        <div><label className="mb-1 block text-sm font-medium text-slate-700">Status</label><SelectBox value={paymentStatus} onChange={setPaymentStatus}><option value="pending">Pending</option><option value="paid">Paid</option><option value="partial">Partial</option><option value="refunded">Refunded</option></SelectBox></div>
-        <div><label className="mb-1 block text-sm font-medium text-slate-700">Method</label><SelectBox value={paymentMethod} onChange={setPaymentMethod}><option value="cash">Cash</option><option value="upi">UPI</option><option value="card">Card</option><option value="netbanking">Net Banking</option><option value="other">Other</option></SelectBox></div>
-        <button onClick={updatePayment} disabled={savingPayment} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50">
-          {savingPayment && <Loader2 className="h-4 w-4 animate-spin" />}
-          {savingPayment ? "Saving..." : "Save Payment"}
-        </button>
-      </div>
-    </ModalShell>
-  ) : null;
-
-  const prescriptionModal = prescriptionOpen ? (
-    <ModalShell onClose={() => setPrescriptionOpen(false)}>
-      <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-xl font-bold text-slate-900">New Prescription</h2>
-        <IconBtn onClick={() => setPrescriptionOpen(false)}><XCircle className="h-5 w-5" /></IconBtn>
-      </div>
-      <div className="space-y-4">
-        <div><label className="mb-1 block text-sm font-medium text-slate-700">Diagnosis *</label><InputBox value={prescriptionDiagnosis} onChange={setPrescriptionDiagnosis} placeholder="e.g. Viral fever" /></div>
-        <div><label className="mb-1 block text-sm font-medium text-slate-700">Medicines</label><textarea value={prescriptionMedicines} onChange={(e) => setPrescriptionMedicines(e.target.value)} rows={5} placeholder={"Paracetamol 500mg — 1-0-1 — 5 days\nVitamin C — 0-1-0 — 7 days"} className="w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500" /></div>
-        <div><label className="mb-1 block text-sm font-medium text-slate-700">Notes</label><textarea value={prescriptionNotes} onChange={(e) => setPrescriptionNotes(e.target.value)} rows={3} placeholder="Additional advice..." className="w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500" /></div>
-        <button onClick={savePrescription} disabled={savingPrescription} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-700 disabled:opacity-50">
-          {savingPrescription && <Loader2 className="h-4 w-4 animate-spin" />}
-          {savingPrescription ? "Saving..." : "Save Prescription"}
-        </button>
-      </div>
-    </ModalShell>
-  ) : null;
-
-  // ==================== MAIN RENDER ====================
+  const upcomingAppointments = selectedAppointments.filter((appointment) => {
+    const date = new Date(appointment.appointment_date);
+    return (
+      date >= today &&
+      !["cancelled", "no-show"].includes(appointment.status.toLowerCase())
+    );
+  });
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto max-w-7xl p-4 md:p-6 lg:p-8">
-        
-        {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md">
-              <Users className="h-5 w-5" />
+    <main className="min-h-full bg-[#f5f8fc] p-4 text-slate-800 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-[1600px] space-y-6">
+        <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-blue-600">
+              <Users size={16} />
+              <span>CRM / Customer Management</span>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Customer Management</h1>
-              <p className="text-sm text-slate-500">Manage your customers, appointments, and build lasting relationships.</p>
-            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              Customer Management
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Manage your patients, appointments and customer relationships.
+            </p>
           </div>
+
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={() => setShortcutsOpen(true)} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
-              <Keyboard className="h-4 w-4" />
+            <button
+              type="button"
+              onClick={() => void loadData()}
+              disabled={loading}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              Refresh
             </button>
-            <button onClick={() => exportCustomersCSV(false)} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
-              <Download className="h-4 w-4" /> CSV
-            </button>
-            <button onClick={loadData} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">
-              <RefreshCw className="h-4 w-4" />
-            </button>
-            <button onClick={() => setAddCustomerOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
-              <Plus className="h-4 w-4" /> Add Customer
+            <button
+              type="button"
+              onClick={() => setFormOpen(true)}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700"
+            >
+              <Plus size={18} />
+              Add Customer
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* Stats Cards */}
-        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard title="Total Customers" value={customers.length} icon={<Users className="h-5 w-5" />} variant="blue" trend="+12%" />
-          <StatCard title="Active Customers" value={customers.filter(c => appointments.some(a => a.contact_id === c.id && a.status === "confirmed")).length} icon={<Activity className="h-5 w-5" />} variant="green" trend="+10%" />
-          <StatCard title="New Customers" value={customers.filter(c => new Date(c.created_at).getMonth() === new Date().getMonth()).length} icon={<User className="h-5 w-5" />} variant="purple" trend="+18%" />
-          <StatCard title="Follow-ups" value={pendingAppointments} icon={<Clock className="h-5 w-5" />} variant="orange" trend="+25%" />
-        </div>
-
-        {/* Main Tabs */}
-        <div className="mb-6 flex gap-2 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-          {([ { id: "customers", label: "Customers", icon: <Users className="h-4 w-4" /> }, { id: "calendar", label: "Calendar", icon: <CalendarDays className="h-4 w-4" /> }, { id: "analytics", label: "Analytics", icon: <BarChart3 className="h-4 w-4" /> } ] as const).map((tab) => (
-            <button key={tab.id} onClick={() => setMainTab(tab.id)} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${mainTab === tab.id ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}>
-              {tab.icon} {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Calendar View */}
-        {mainTab === "calendar" && (
-          <CalendarView
-            {...{ calendarDate, calendarView, setCalendarView, changeCalendarDate, setCalendarDate, calendarMonthLabel, calendarMonthDays, calendarWeekDays, appointmentsForDate, isCalendarToday, formatCalendarDate, getAppointmentStatusClass, getAppointmentStatusLabel, getDoctorName, getServiceName, setSelectedAppointment, appointmentSearch, setAppointmentSearch, doctors, calendarDoctorFilter, setCalendarDoctorFilter, calendarStatusFilter, setCalendarStatusFilter, appointments }}
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard
+            label="Total Customers"
+            value={customers.length}
+            detail="All saved contacts"
+            icon={<Users size={20} />}
+            iconClass="bg-blue-50 text-blue-600"
           />
+          <SummaryCard
+            label="New Customers"
+            value={newCustomers}
+            detail="Added in the last 30 days"
+            icon={<UserPlus size={20} />}
+            iconClass="bg-violet-50 text-violet-600"
+          />
+          <SummaryCard
+            label="Appointments"
+            value={appointments.length}
+            detail="Available clinic records"
+            icon={<CalendarCheck size={20} />}
+            iconClass="bg-emerald-50 text-emerald-600"
+          />
+          <SummaryCard
+            label="Follow-ups Due"
+            value={followups}
+            detail="Past appointments to review"
+            icon={<Activity size={20} />}
+            iconClass="bg-amber-50 text-amber-600"
+          />
+        </section>
+
+        {error && (
+          <div className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => void loadData()}
+              className="font-semibold underline"
+            >
+              Try again
+            </button>
+          </div>
         )}
 
-        {/* Analytics View */}
-        {mainTab === "analytics" && <AnalyticsView analytics={analytics} exportAppointments={exportAppointmentsCSV} />}
+        <section className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(380px,0.95fr)]">
+          <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+            <div className="border-b border-slate-100 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">
+                    Your Customers
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {filteredCustomers.length} records found
+                  </p>
+                </div>
+                <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
+                  Contact directory
+                </span>
+              </div>
 
-        {/* Customers View */}
-        {mainTab === "customers" && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            
-            {/* Left Column: Customer List */}
-            <div className={`lg:col-span-5 ${selectedCustomer ? 'hidden lg:block' : 'block'}`}>
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="border-b border-slate-100 p-4">
-                  <div className="relative mb-3">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, phone, or ID..." className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:bg-white" />
+              <div className="relative mt-4">
+                <Search
+                  size={18}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search name, phone or email..."
+                  aria-label="Search customers"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    aria-label="Clear search"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(
+                  [
+                    ["all", "All customers"],
+                    ["new", "New"],
+                    ["followup", "Follow-ups due"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    type="button"
+                    key={value}
+                    onClick={() => setFilter(value)}
+                    className={`rounded-lg px-3.5 py-2 text-xs font-semibold transition ${
+                      filter === value
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="max-h-[680px] overflow-y-auto">
+              {loading ? (
+                <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-sm text-slate-500">
+                  <Loader2 size={26} className="animate-spin text-blue-600" />
+                  Loading customers...
+                </div>
+              ) : filteredCustomers.length === 0 ? (
+                <div className="flex min-h-72 flex-col items-center justify-center px-6 text-center">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                    <Users size={25} />
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <select value={listStatusFilter} onChange={(e) => setListStatusFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 outline-none focus:border-blue-500">
-                      <option value="">All Status</option>
-                      <option value="has_upcoming">Has upcoming</option>
-                      <option value="no_appointments">No appointments</option>
-                      <option value="pending">Pending</option>
-                      <option value="confirmed">Confirmed</option>
-                      <option value="completed">Completed</option>
-                    </select>
-                    <select value={listTagFilter} onChange={(e) => setListTagFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 outline-none focus:border-blue-500">
-                      <option value="">All Tags</option>
-                      {allTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
-                    </select>
-                    <select value={listSort} onChange={(e) => setListSort(e.target.value as SortOption)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 outline-none focus:border-blue-500">
-                      <option value="recent">Recent</option>
-                      <option value="name">Name A-Z</option>
-                      <option value="appointments">Most appointments</option>
-                    </select>
+                  <h3 className="font-semibold text-slate-900">
+                    {search || filter !== "all"
+                      ? "No matching customers"
+                      : "No customers yet"}
+                  </h3>
+                  <p className="mt-2 max-w-xs text-sm leading-6 text-slate-500">
+                    {search || filter !== "all"
+                      ? "Try another search or choose a different filter."
+                      : "Add your first customer to start building your clinic directory."}
+                  </p>
+                  {!search && filter === "all" && (
+                    <button
+                      type="button"
+                      onClick={() => setFormOpen(true)}
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                    >
+                      <Plus size={16} /> Add first customer
+                    </button>
+                  )}
+                </div>
+              ) : (
+                filteredCustomers.map((customer) => {
+                  const history = customerAppointments(customer.id);
+                  const active = selected?.id === customer.id;
+
+                  return (
+                    <button
+                      type="button"
+                      key={customer.id}
+                      onClick={() => setSelected(customer)}
+                      className={`flex w-full items-center gap-3 border-b border-slate-100 p-4 text-left transition hover:bg-blue-50/60 sm:px-5 ${
+                        active
+                          ? "bg-blue-50/80 ring-inset ring-2 ring-blue-100"
+                          : "bg-white"
+                      }`}
+                    >
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 text-sm font-bold text-blue-700">
+                        {initials(customer.name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-sm font-semibold text-slate-900">
+                            {customer.name || "Unnamed customer"}
+                          </span>
+                          {new Date(customer.created_at) >= recentBoundary && (
+                            <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                              New
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                          <Phone size={12} />
+                          <span>{customer.phone}</span>
+                        </div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          Added {formatDate(customer.created_at)}
+                          {" · "}
+                          {history.length} appointment
+                          {history.length === 1 ? "" : "s"}
+                        </div>
+                      </div>
+                      <ChevronRight
+                        size={18}
+                        className={`shrink-0 ${
+                          active ? "text-blue-600" : "text-slate-300"
+                        }`}
+                      />
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="min-w-0 space-y-5">
+            {selected ? (
+              <>
+                <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                  <div className="h-24 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500" />
+                  <div className="px-5 pb-5">
+                    <div className="-mt-10 flex items-end justify-between gap-3">
+                      <div className="flex h-20 w-20 items-center justify-center rounded-2xl border-4 border-white bg-blue-50 text-2xl font-bold text-blue-700 shadow-sm">
+                        {initials(selected.name)}
+                      </div>
+                      <span className="mb-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                        Customer profile
+                      </span>
+                    </div>
+
+                    <h2 className="mt-4 text-xl font-bold text-slate-900">
+                      {selected.name || "Unnamed customer"}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Customer since {formatDate(selected.created_at)}
+                    </p>
+
+                    <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <InfoItem
+                        icon={<Phone size={17} />}
+                        label="Phone number"
+                        value={selected.phone}
+                      />
+                      <InfoItem
+                        icon={<Mail size={17} />}
+                        label="Email address"
+                        value={selected.email || "Not provided"}
+                      />
+                    </div>
+
+                    {selected.company && (
+                      <InfoItem
+                        icon={<UserRound size={17} />}
+                        label="Company / Notes"
+                        value={selected.company}
+                      />
+                    )}
+
+                    <div className="mt-5 grid grid-cols-2 gap-3">
+                      <a
+                        href={`tel:${selected.phone}`}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <Phone size={16} /> Call
+                      </a>
+                      <a
+                        href={`https://wa.me/${selected.phone.replace(/\D/g, "")}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                      >
+                        <MessageCircle size={16} /> WhatsApp
+                      </a>
+                    </div>
                   </div>
                 </div>
 
-                <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
-                  {loading ? (
-                    <SkeletonList rows={5} />
-                  ) : filteredCustomers.length === 0 ? (
-                    <EmptyState icon={<Users className="h-10 w-10" />} title="No customers" description="Adjust filters or add a new customer." />
+                <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-slate-100 p-5">
+                    <div>
+                      <h3 className="font-bold text-slate-900">
+                        Appointment History
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {selectedAppointments.length} linked appointment records
+                      </p>
+                    </div>
+                    <CalendarDays size={20} className="text-blue-600" />
+                  </div>
+
+                  {selectedAppointments.length === 0 ? (
+                    <div className="px-5 py-9 text-center">
+                      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                        <CalendarDays size={20} />
+                      </div>
+                      <p className="text-sm font-semibold text-slate-700">
+                        No linked appointments
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Appointments will appear here when linked to this customer.
+                      </p>
+                    </div>
                   ) : (
                     <div className="divide-y divide-slate-100">
-                      {filteredCustomers.map((customer) => {
-                        const cAppts = getCustomerAppointments(customer.id);
-                        const up = getUpcomingAppointment(customer.id);
-                        return (
-                          <div key={customer.id} onClick={() => setSelectedCustomer(customer)} className={`group cursor-pointer p-4 transition hover:bg-blue-50/50 ${selectedCustomer?.id === customer.id ? 'bg-blue-50/80 border-l-4 border-blue-600' : ''}`}>
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-base font-bold text-white shadow-md">
-                                {(customer.name || customer.phone || "?").charAt(0).toUpperCase()}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <h3 className="truncate text-sm font-bold text-slate-900 group-hover:text-blue-700">{customer.name || "Unnamed"}</h3>
-                                <p className="text-xs text-slate-500">{customer.phone}</p>
-                                {up && <p className="mt-1 text-[10px] font-semibold text-emerald-600">🟢 {up.appointment_date} {up.appointment_time}</p>}
-                              </div>
-                              <div className="flex flex-col items-end gap-2">
-                                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${up ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                                  {up ? 'Active' : 'Follow-up'}
-                                </span>
-                                <ChevronRight className="h-4 w-4 text-slate-400" />
-                              </div>
+                      {selectedAppointments.slice(0, 6).map((appointment) => (
+                        <div
+                          key={appointment.id}
+                          className="flex items-start justify-between gap-3 p-4 sm:px-5"
+                        >
+                          <div className="flex min-w-0 gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                              <CalendarDays size={18} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-800">
+                                {formatDate(appointment.appointment_date)}
+                              </p>
+                              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                                <Clock size={12} />
+                                {appointment.appointment_time || "Time not set"}
+                              </p>
+                              {appointment.amount != null && (
+                                <p className="mt-1 text-xs font-medium text-slate-600">
+                                  ₹{Number(appointment.amount).toLocaleString("en-IN")}
+                                  {appointment.payment_status
+                                    ? ` · ${appointment.payment_status}`
+                                    : ""}
+                                </p>
+                              )}
                             </div>
                           </div>
-                        );
-                      })}
+                          <span
+                            className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold ${statusClass(
+                              appointment.status
+                            )}`}
+                          >
+                            {appointment.status || "Pending"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {upcomingAppointments.length > 0 && (
+                    <div className="border-t border-slate-100 bg-blue-50/60 px-5 py-3 text-xs font-medium text-blue-700">
+                      {upcomingAppointments.length} upcoming appointment
+                      {upcomingAppointments.length === 1 ? "" : "s"}
                     </div>
                   )}
                 </div>
+              </>
+            ) : (
+              <div className="flex min-h-80 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                  <UserRound size={26} />
+                </div>
+                <h3 className="font-semibold text-slate-900">
+                  Select a customer
+                </h3>
+                <p className="mt-2 max-w-xs text-sm leading-6 text-slate-500">
+                  Choose a customer from the directory to view contact details and appointment history.
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-5">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
+                  <Activity size={19} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Your clinic, better organised
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    Keep customer contacts and appointment records together in one workspace.
+                  </p>
+                </div>
               </div>
             </div>
-
-            {/* Right Column: Customer Profile */}
-            <div className={`lg:col-span-7 ${selectedCustomer ? 'block' : 'hidden lg:block'}`}>
-              {selectedCustomer ? (
-                <div className="space-y-6">
-                  {/* Profile Header */}
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-2xl font-extrabold text-white shadow-lg ring-4 ring-white">
-                            {(selectedCustomer.name || selectedCustomer.phone || "?").charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <h2 className="text-xl font-bold text-slate-900">{selectedCustomer.name || "Unnamed Customer"}</h2>
-                            <p className="text-sm text-slate-500">{selectedCustomer.phone}</p>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {selectedCustomer.email && <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm"><Mail className="h-3 w-3" /> {selectedCustomer.email}</span>}
-                              {selectedCustomer.company && <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm"><Building2 className="h-3 w-3" /> {selectedCustomer.company}</span>}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => setSelectedCustomer(null)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 lg:hidden">
-                            <ArrowLeft className="h-4 w-4" /> Back
-                          </button>
-                          <a href={`tel:${selectedCustomer.phone}`} className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm transition hover:bg-emerald-700" title="Call"><Phone className="h-4 w-4" /></a>
-                          <a href={`https://wa.me/${selectedCustomer.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noreferrer" className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-green-600 text-white shadow-sm transition hover:bg-green-700" title="WhatsApp"><MessageCircle className="h-4 w-4" /></a>
-                          <button onClick={() => { setAppointmentPatientName(selectedCustomer.name || ""); setAppointmentOpen(true); loadAppointmentOptions(); }} className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"><Plus className="h-4 w-4" /> Book</button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Tabs */}
-                    <div className="border-b border-slate-100">
-                      <div className="flex overflow-x-auto">
-                        {([ { id: "overview", label: "Overview", icon: <Activity className="h-4 w-4" /> }, { id: "appointments", label: `Appointments (${getCustomerAppointments(selectedCustomer.id).length})`, icon: <CalendarDays className="h-4 w-4" /> }, { id: "prescriptions", label: `Rx (${customerPrescriptions.length})`, icon: <Pill className="h-4 w-4" /> }, { id: "documents", label: `Docs (${customerDocuments.length})`, icon: <Paperclip className="h-4 w-4" /> }, { id: "notes", label: `Notes (${customerNotes.length})`, icon: <FileText className="h-4 w-4" /> } ] as const).map((tab) => (
-                          <button key={tab.id} onClick={() => setCustomerTab(tab.id)} className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3.5 text-sm font-semibold transition ${customerTab === tab.id ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
-                            {tab.icon} {tab.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Tab Content */}
-                    <div className="p-6">
-                      {customerTab === "overview" && (
-                        <div className="space-y-6">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                              <p className="text-xs font-semibold uppercase text-slate-400">Contact Information</p>
-                              <div className="mt-3 space-y-2 text-sm">
-                                <p className="flex items-center gap-2 text-slate-700"><Phone className="h-4 w-4 text-blue-500" /> {selectedCustomer.phone || "—"}</p>
-                                <p className="flex items-center gap-2 text-slate-700"><Mail className="h-4 w-4 text-blue-500" /> {selectedCustomer.email || "—"}</p>
-                                <p className="flex items-center gap-2 text-slate-700"><Building2 className="h-4 w-4 text-blue-500" /> {selectedCustomer.company || "—"}</p>
-                              </div>
-                            </div>
-                            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                              <p className="text-xs font-semibold uppercase text-slate-400">Customer Status</p>
-                              <div className="mt-3 space-y-2 text-sm">
-                                <p className="flex justify-between text-slate-700"><span>Total Appointments</span> <span className="font-bold">{getCustomerAppointments(selectedCustomer.id).length}</span></p>
-                                <p className="flex justify-between text-slate-700"><span>Last Visit</span> <span className="font-bold">{getCustomerAppointments(selectedCustomer.id)[0]?.appointment_date || "—"}</span></p>
-                                <p className="flex justify-between text-slate-700"><span>Next Appointment</span> <span className="font-bold text-emerald-600">{getUpcomingAppointment(selectedCustomer.id)?.appointment_date || "—"}</span></p>
-                              </div>
-                            </div>
-                          </div>
-                          <ActivityTimeline customer={selectedCustomer} appointments={getCustomerAppointments(selectedCustomer.id)} notes={customerNotes} messages={customerMessages} onSelectAppointment={setSelectedAppointment} />
-                        </div>
-                      )}
-
-                      {customerTab === "appointments" && (
-                        <AppointmentsTab appointments={getCustomerAppointments(selectedCustomer.id)} customerName={selectedCustomer.name || ""} getDoctorName={getDoctorName} getServiceName={getServiceName} onSelect={setSelectedAppointment} onCancel={cancelAppointment} onReschedule={rescheduleAppointment} />
-                      )}
-
-                      {customerTab === "prescriptions" && (
-                        <PrescriptionsTab prescriptions={customerPrescriptions} loading={loadingPrescriptions} onPrint={printPrescription} onCreate={() => setPrescriptionOpen(true)} />
-                      )}
-
-                      {customerTab === "documents" && (
-                        <div>
-                          {loadingDocuments ? <SkeletonList /> : customerDocuments.length === 0 ? <EmptyState icon={<Paperclip className="h-10 w-10" />} title="No documents" description="Uploaded files will appear here." /> : (
-                            <div className="grid gap-4 sm:grid-cols-2">
-                              {customerDocuments.map((doc) => (
-                                <a key={doc.id} href={doc.file_url || "#"} target="_blank" rel="noreferrer" className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md">
-                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><FileText className="h-5 w-5" /></div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold text-slate-800">{doc.file_name}</p>
-                                    <p className="text-xs text-slate-500">{new Date(doc.created_at).toLocaleDateString()}</p>
-                                  </div>
-                                </a>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {customerTab === "notes" && (
-                        <div>
-                          <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Write a note..." rows={3} className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-blue-500 focus:bg-white" />
-                          <button onClick={addCustomerNote} disabled={savingNote || !newNote.trim()} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
-                            {savingNote && <Loader2 className="h-4 w-4 animate-spin" />}
-                            {savingNote ? "Saving..." : "Add Note"}
-                          </button>
-                          <div className="mt-5 space-y-3">
-                            {customerNotes.length === 0 ? <p className="text-sm text-slate-400">No notes yet.</p> : customerNotes.map((note) => (
-                              <div key={note.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                                <p className="text-sm text-slate-700">{note.note_text}</p>
-                                <p className="mt-2 text-xs text-slate-400">{new Date(note.created_at).toLocaleString()}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-full min-h-[400px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                    <User className="h-8 w-8" />
-                  </div>
-                  <h3 className="mt-4 text-lg font-semibold text-slate-700">No Customer Selected</h3>
-                  <p className="mt-1 text-sm text-slate-500">Select a customer from the list to view their profile and details.</p>
-                </div>
-              )}
-            </div>
           </div>
-        )}
+        </section>
+
+        <footer className="pb-2 text-center text-xs text-slate-400">
+          ZIVEXO CRM · Customer Management
+        </footer>
       </div>
 
-      {/* Modals & Overlays */}
-      {appointmentModal}
-      {appointmentDetailsModal}
-      {paymentModal}
-      {prescriptionModal}
-
-      {shortcutsOpen && (
-        <ModalShell onClose={() => setShortcutsOpen(false)} size="sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-900">Keyboard Shortcuts</h2>
-            <IconBtn onClick={() => setShortcutsOpen(false)}><XCircle className="h-5 w-5" /></IconBtn>
-          </div>
-          <div className="space-y-3 text-sm">
-            {[ { keys: ["/"], label: "Focus search" }, { keys: ["N"], label: "New appointment" }, { keys: ["Esc"], label: "Close / Back" }, { keys: ["?"], label: "This dialog" } ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between border-b border-slate-100 pb-2 last:border-0">
-                <span className="text-slate-600">{item.label}</span>
-                <div className="flex gap-1">
-                  {item.keys.map((k) => <kbd key={k} className="rounded border border-slate-300 bg-slate-100 px-2 py-1 font-mono text-xs text-slate-700">{k}</kbd>)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </ModalShell>
-      )}
-
-      <ContactForm open={addCustomerOpen} onOpenChange={setAddCustomerOpen} onSaved={() => { setAddCustomerOpen(false); loadData(); showToast("Customer added"); }} />
-      <ToastContainer toasts={toasts} />
-      <ConfirmDialog state={confirmState} onCancel={() => setConfirmState((s) => ({ ...s, open: false }))} />
-    </div>
+      <ContactForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onSaved={() => void loadData()}
+      />
+    </main>
   );
 }
 
-// ==================== REUSABLE UI COMPONENTS ====================
-
-function ModalShell({ children, onClose, size = "md" }: { children: React.ReactNode; onClose: () => void; size?: "sm" | "md" | "lg" }) {
-  const maxW = size === "sm" ? "max-w-md" : size === "lg" ? "max-w-2xl" : "max-w-lg";
+function SummaryCard({
+  label,
+  value,
+  detail,
+  icon,
+  iconClass,
+}: {
+  label: string;
+  value: number;
+  detail: string;
+  icon: React.ReactNode;
+  iconClass: string;
+}) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className={`max-h-[90vh] w-full ${maxW} overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl`}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function IconBtn({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
-  return (
-    <button onClick={onClick} className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100">
-      {children}
-    </button>
-  );
-}
-
-function InputBox({ value, onChange, placeholder, type = "text" }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
-  return (
-    <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
-  );
-}
-
-function SelectBox({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-      {children}
-    </select>
-  );
-}
-
-function SkeletonList({ rows = 3 }: { rows?: number }) {
-  return (
-    <div className="space-y-3 p-5">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex animate-pulse items-center gap-4 rounded-xl border border-slate-100 p-4">
-          <div className="h-11 w-11 rounded-full bg-slate-200" />
-          <div className="flex-1 space-y-2">
-            <div className="h-3 w-1/3 rounded bg-slate-200" />
-            <div className="h-3 w-1/2 rounded bg-slate-200" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ToastContainer({ toasts }: { toasts: Toast[] }) {
-  return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[80] flex w-full max-w-xs flex-col gap-2">
-      {toasts.map((t) => {
-        const bg = t.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : t.type === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-blue-200 bg-blue-50 text-blue-800";
-        const icon = t.type === "success" ? <Check className="h-4 w-4" /> : t.type === "error" ? <AlertCircle className="h-4 w-4" /> : <Info className="h-4 w-4" />;
-        return (
-          <div key={t.id} className={`pointer-events-auto flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${bg}`}>
-            {icon} <span className="flex-1">{t.message}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ConfirmDialog({ state, onCancel }: { state: ConfirmState; onCancel: () => void }) {
-  if (!state.open) return null;
-  return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="flex items-start gap-3">
-          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${state.destructive ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"}`}>
-            <AlertCircle className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-bold text-slate-900">{state.title}</h3>
-            <p className="mt-1 text-sm text-slate-600">{state.message}</p>
-          </div>
-        </div>
-        <div className="mt-6 flex justify-end gap-2">
-          <button onClick={onCancel} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancel</button>
-          <button onClick={state.onConfirm} className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition ${state.destructive ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"}`}>{state.confirmText || "Confirm"}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ title, value, icon, variant = "blue", trend, prefix = "" }: { title: string; value: number; icon: React.ReactNode; variant?: "blue" | "green" | "purple" | "orange" | "indigo" | "amber" | "red"; trend?: string; prefix?: string }) {
-  const variantClasses: Record<string, string> = {
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-emerald-50 text-emerald-600",
-    purple: "bg-purple-50 text-purple-600",
-    orange: "bg-orange-50 text-orange-600",
-    indigo: "bg-indigo-50 text-indigo-600",
-    amber: "bg-amber-50 text-amber-600",
-    red: "bg-red-50 text-red-600",
-  };
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-      <div className="flex items-start justify-between">
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-slate-500">{title}</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{prefix}{typeof value === "number" && !Number.isInteger(value) ? value.toFixed(1) : value}</p>
-          {trend && <p className="mt-1 text-xs font-semibold text-emerald-600">{trend} <span className="text-slate-400 font-normal">vs last month</span></p>}
+          <p className="text-sm font-medium text-slate-500">{label}</p>
+          <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
+            {value.toLocaleString("en-IN")}
+          </p>
+          <p className="mt-1.5 text-xs text-slate-400">{detail}</p>
         </div>
-        <div className={`rounded-xl p-2.5 ${variantClasses[variant] || variantClasses.blue}`}>{icon}</div>
-      </div>
-    </div>
-  );
-}
-
-function DetailBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-slate-200 p-4">
-      <p className="text-xs font-semibold uppercase text-slate-400">{label}</p>
-      <p className="mt-1 font-semibold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function EmptyState({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="text-slate-300">{icon}</div>
-      <p className="mt-3 text-sm font-medium text-slate-600">{title}</p>
-      <p className="mt-1 max-w-xs text-xs text-slate-400">{description}</p>
-    </div>
-  );
-}
-
-function ActivityTimeline({ customer, appointments, notes, messages, onSelectAppointment }: { customer: Customer; appointments: Appointment[]; notes: Note[]; messages: MessageItem[]; onSelectAppointment: (a: Appointment) => void }) {
-  type Item = { id: string; date: string; icon: React.ReactNode; color: string; title: string; subtitle?: string; onClick?: () => void; };
-  const items: Item[] = [];
-  items.push({ id: `created-${customer.id}`, date: customer.created_at, icon: <User className="h-4 w-4" />, color: "bg-blue-100 text-blue-600", title: "Customer created", subtitle: customer.name || customer.phone });
-  appointments.forEach((a) => items.push({ id: `appt-${a.id}`, date: `${a.appointment_date}T${a.appointment_time || "00:00"}:00`, icon: <CalendarDays className="h-4 w-4" />, color: a.status === "completed" ? "bg-indigo-100 text-indigo-600" : a.status === "cancelled" ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600", title: `Appointment ${a.status}`, subtitle: `${a.appointment_date} ${a.appointment_time}`, onClick: () => onSelectAppointment(a) }));
-  notes.forEach((n) => items.push({ id: `note-${n.id}`, date: n.created_at, icon: <FileText className="h-4 w-4" />, color: "bg-amber-100 text-amber-600", title: "Note added", subtitle: n.note_text.length > 60 ? `${n.note_text.slice(0, 60)}...` : n.note_text }));
-  messages.slice(0, 10).forEach((m) => items.push({ id: `msg-${m.id}`, date: m.created_at, icon: <MessageCircle className="h-4 w-4" />, color: "bg-green-100 text-green-600", title: "WhatsApp message", subtitle: (m.content_text || "").length > 60 ? `${(m.content_text || "").slice(0, 60)}...` : m.content_text || "(media)" }));
-  items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  if (items.length === 0) return <EmptyState icon={<Activity className="h-10 w-10" />} title="No activity" description="Timeline will appear here." />;
-  return (
-    <div className="relative">
-      <div className="absolute left-[19px] top-3 bottom-3 w-px bg-slate-200" />
-      <div className="space-y-4">
-        {items.map((item) => (
-          <div key={item.id} className="relative flex gap-4">
-            <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${item.color}`}>{item.icon}</div>
-            <div className={`flex-1 rounded-xl border border-slate-100 bg-white p-3 transition ${item.onClick ? "cursor-pointer hover:border-blue-200 hover:shadow-sm" : ""}`} onClick={item.onClick}>
-              <p className="text-sm font-semibold text-slate-800">{item.title}</p>
-              {item.subtitle && <p className="mt-0.5 text-xs text-slate-500">{item.subtitle}</p>}
-              <p className="mt-1 text-[10px] text-slate-400">{new Date(item.date).toLocaleString()}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AppointmentsTab({ appointments, customerName, getDoctorName, getServiceName, onSelect, onCancel, onReschedule }: { appointments: Appointment[]; customerName: string; getDoctorName: (id?: string) => string; getServiceName: (id?: string) => string; onSelect: (a: Appointment) => void; onCancel: (id: string) => void; onReschedule: (id: string, date: string, time: string) => void; }) {
-  if (appointments.length === 0) return <EmptyState icon={<CalendarDays className="h-10 w-10" />} title="No appointments" description="Appointment history will appear here." />;
-  return (
-    <div className="space-y-3">
-      {appointments.map((a) => (
-        <div key={a.id} className="rounded-xl border border-slate-200 p-4 transition hover:border-blue-200 hover:shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <button onClick={() => onSelect(a)} className="flex-1 text-left">
-              <div className="flex items-center gap-2"><User className="h-4 w-4 text-blue-600" /><span className="font-semibold text-slate-800">{a.patient_name || customerName || "Patient"}</span></div>
-              <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-500">
-                <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" /> {a.appointment_date}</span>
-                <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {a.appointment_time}</span>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <span className="rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-600"><Stethoscope className="mr-1 inline h-3 w-3" />{getDoctorName(a.doctor_id)}</span>
-                <span className="rounded-md bg-blue-50 px-2 py-1 font-medium text-blue-600">{getServiceName(a.service_id)}</span>
-                {a.amount ? <span className="rounded-md bg-emerald-50 px-2 py-1 font-medium text-emerald-700">₹{a.amount} · {a.payment_status || "pending"}</span> : null}
-              </div>
-            </button>
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={a.status} />
-              {(a.status === "pending" || a.status === "confirmed") && (
-                <>
-                  <button onClick={() => { const d = window.prompt("New date (YYYY-MM-DD):"); if (!d) return; const t = window.prompt("New time (HH:MM):"); if (!t) return; onReschedule(a.id, d, t); }} className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-50">Reschedule</button>
-                  <button onClick={() => onCancel(a.id)} className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50">Cancel</button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PrescriptionsTab({ prescriptions, loading, onPrint, onCreate }: { prescriptions: Prescription[]; loading: boolean; onPrint: (p: Prescription) => void; onCreate: () => void; }) {
-  return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-slate-500">{prescriptions.length} prescription{prescriptions.length === 1 ? "" : "s"}</p>
-        <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"><Plus className="h-4 w-4" /> New Prescription</button>
-      </div>
-      {loading ? <SkeletonList /> : prescriptions.length === 0 ? <EmptyState icon={<Pill className="h-10 w-10" />} title="No prescriptions" description="Create a prescription for this customer." /> : (
-        <div className="space-y-3">
-          {prescriptions.map((p) => (
-            <div key={p.id} className="rounded-xl border border-slate-200 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2"><Pill className="h-4 w-4 text-purple-600" /><span className="font-semibold text-slate-800">{p.diagnosis || "Diagnosis"}</span></div>
-                  {p.medicines && <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs text-slate-700">{p.medicines}</pre>}
-                  {p.notes && <p className="mt-2 text-xs text-slate-500">Note: {p.notes}</p>}
-                  <p className="mt-2 text-[10px] text-slate-400">{new Date(p.created_at).toLocaleString()}</p>
-                </div>
-                <button onClick={() => onPrint(p)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50"><Printer className="h-4 w-4" /></button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const normalized = status.toLowerCase();
-  const label = normalized === "confirmed" ? "Confirmed" : normalized === "pending" ? "Pending" : normalized === "cancelled" || normalized === "canceled" ? "Cancelled" : normalized === "completed" ? "Completed" : normalized === "no-show" ? "No-show" : status;
-  const className = normalized === "confirmed" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : normalized === "pending" ? "bg-amber-50 text-amber-700 border-amber-200" : normalized === "cancelled" || normalized === "canceled" ? "bg-red-50 text-red-700 border-red-200" : normalized === "completed" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-slate-100 text-slate-700 border-slate-200";
-  return <span className={`rounded-full border px-3 py-1.5 text-xs font-semibold capitalize ${className}`}>{label}</span>;
-}
-
-function AnalyticsView({ analytics, exportAppointments }: { analytics: any; exportAppointments: () => void; }) {
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div><h2 className="text-xl font-bold text-slate-900">Analytics Dashboard</h2><p className="mt-1 text-sm text-slate-500">Business insights and performance metrics</p></div>
-        <button onClick={exportAppointments} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><Download className="h-4 w-4" /> Export</button>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Revenue" value={analytics.totalRevenue} icon={<IndianRupee className="h-5 w-5" />} variant="amber" prefix="₹" />
-        <StatCard title="Pending" value={analytics.pendingRevenue} icon={<Clock className="h-5 w-5" />} variant="blue" prefix="₹" />
-        <StatCard title="No-show Rate" value={analytics.noShowRate} icon={<XCircle className="h-5 w-5" />} variant="red" />
-        <StatCard title="Completion" value={analytics.completionRate} icon={<TrendingUp className="h-5 w-5" />} variant="indigo" />
-      </div>
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Last 7 days</h3>
-        <div className="mt-5 flex h-40 items-end gap-2">
-          {analytics.weeklyTrend.map((w: any, i: number) => (
-            <div key={i} className="flex flex-1 flex-col items-center gap-2">
-              <div className="text-xs font-semibold text-slate-700">{w.count}</div>
-              <div className="w-full rounded-t-md bg-gradient-to-t from-blue-600 to-blue-400 transition-all" style={{ height: `${(w.count / analytics.maxWeekly) * 100 || 2}%`, minHeight: "4px" }} />
-              <div className="text-xs text-slate-500">{w.date}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Top Doctors</h3>
-          {analytics.topDoctors.length === 0 ? <p className="mt-4 text-sm text-slate-400">No data yet</p> : (
-            <div className="mt-4 space-y-3">
-              {analytics.topDoctors.map((d: any, i: number) => (
-                <div key={d.id} className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">{i + 1}</div>
-                  <div className="flex-1"><p className="text-sm font-semibold text-slate-800">{d.name}</p><div className="mt-1 h-1.5 w-full rounded-full bg-slate-100"><div className="h-1.5 rounded-full bg-blue-600" style={{ width: `${(d.count / (analytics.topDoctors[0]?.count || 1)) * 100}%` }} /></div></div>
-                  <div className="text-sm font-bold text-slate-700">{d.count}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Peak Hours</h3>
-          {analytics.peakHours.length === 0 ? <p className="mt-4 text-sm text-slate-400">No data yet</p> : (
-            <div className="mt-4 space-y-3">
-              {analytics.peakHours.map((h: any) => {
-                const max = analytics.peakHours[0]?.count || 1;
-                return (
-                  <div key={h.hour} className="flex items-center gap-3">
-                    <div className="w-14 text-sm font-semibold text-slate-700">{h.hour}</div>
-                    <div className="flex-1"><div className="h-2 w-full rounded-full bg-slate-100"><div className="h-2 rounded-full bg-emerald-500" style={{ width: `${(h.count / max) * 100}%` }} /></div></div>
-                    <div className="text-sm font-bold text-slate-700">{h.count}</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClass}`}>
+          {icon}
         </div>
       </div>
     </div>
   );
 }
 
-function CalendarView(props: any) {
-  const { calendarDate, calendarView, setCalendarView, changeCalendarDate, setCalendarDate, calendarMonthLabel, calendarMonthDays, calendarWeekDays, appointmentsForDate, isCalendarToday, formatCalendarDate, getAppointmentStatusClass, getAppointmentStatusLabel, getDoctorName, getServiceName, setSelectedAppointment, appointmentSearch, setAppointmentSearch, doctors, calendarDoctorFilter, setCalendarDoctorFilter, calendarStatusFilter, setCalendarStatusFilter, appointments } = props;
+function InfoItem({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50/40 p-5 md:p-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md"><CalendarDays className="h-6 w-6" /></div>
-            <div><h2 className="text-xl font-bold text-slate-900">Calendar</h2><p className="mt-1 text-sm text-slate-500">View and manage appointments</p></div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button onClick={() => setCalendarDate(new Date())} className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Today</button>
-            <div className="flex items-center rounded-lg border border-slate-200 bg-white p-1">
-              <button onClick={() => changeCalendarDate(-1)} className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100"><ChevronLeft className="h-5 w-5" /></button>
-              <button onClick={() => changeCalendarDate(1)} className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100"><ChevronRight className="h-5 w-5" /></button>
-            </div>
-            <div className="flex rounded-lg border border-slate-200 bg-white p-1">
-              {(["day", "week", "month"] as const).map((v) => (
-                <button key={v} onClick={() => setCalendarView(v)} className={`rounded-md px-3 py-2 text-sm font-semibold capitalize ${calendarView === v ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}>{v}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="relative mt-5">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input type="search" value={appointmentSearch} onChange={(e) => setAppointmentSearch(e.target.value)} placeholder="Search appointments..." className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500" />
-        </div>
-        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
-          {[
-            { label: "Today", value: appointments.filter((a: Appointment) => a.appointment_date === formatCalendarDate(new Date())).length, className: "border-blue-200 bg-blue-50 text-blue-700" },
-            { label: "Pending", value: appointments.filter((a: Appointment) => a.status.toLowerCase() === "pending").length, className: "border-amber-200 bg-amber-50 text-amber-700" },
-            { label: "Confirmed", value: appointments.filter((a: Appointment) => a.status.toLowerCase() === "confirmed").length, className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
-            { label: "Completed", value: appointments.filter((a: Appointment) => a.status.toLowerCase() === "completed").length, className: "border-indigo-200 bg-indigo-50 text-indigo-700" },
-            { label: "Cancelled / No-show", value: appointments.filter((a: Appointment) => ["cancelled", "canceled", "no-show"].includes(a.status.toLowerCase())).length, className: "border-red-200 bg-red-50 text-red-700" },
-          ].map((s) => (
-            <div key={s.label} className={`rounded-xl border px-4 py-3 ${s.className}`}><p className="text-xs font-semibold uppercase tracking-wide">{s.label}</p><p className="mt-1 text-2xl font-bold">{s.value}</p></div>
-          ))}
-        </div>
-        <div className="mt-5 grid gap-3 border-t border-slate-200 pt-4 md:grid-cols-2">
-          <select value={calendarDoctorFilter} onChange={(e) => setCalendarDoctorFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"><option value="">All Doctors</option>{doctors.map((d: Doctor) => <option key={d.id} value={d.id}>{d.doctor_name}</option>)}</select>
-          <select value={calendarStatusFilter} onChange={(e) => setCalendarStatusFilter(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"><option value="">All Statuses</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="completed">Completed</option><option value="no-show">No-show</option><option value="cancelled">Cancelled</option></select>
-        </div>
-        <div className="mt-5 border-t border-slate-200 pt-4">
-          <h3 className="text-lg font-bold text-slate-900">{calendarView === "month" ? calendarMonthLabel : calendarView === "week" ? `${calendarWeekDays[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${calendarWeekDays[6].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : calendarDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</h3>
-        </div>
+    <div className="flex min-w-0 items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 p-3">
+      <div className="mt-0.5 shrink-0 text-blue-600">{icon}</div>
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+          {label}
+        </p>
+        <p className="mt-1 break-words text-sm font-semibold text-slate-700">
+          {value}
+        </p>
       </div>
-      {calendarView === "month" && (
-        <div className="overflow-x-auto">
-          <div className="min-w-[900px]">
-            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
-              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div key={d} className="border-r border-slate-200 px-3 py-3 text-center text-xs font-bold uppercase text-slate-500 last:border-r-0">{d}</div>)}
-            </div>
-            <div className="grid grid-cols-7">
-              {calendarMonthDays.map((date: Date) => {
-                const appts = appointmentsForDate(date);
-                const isCurrentMonth = date.getMonth() === calendarDate.getMonth();
-                return (
-                  <div key={formatCalendarDate(date)} className={`min-h-[155px] border-b border-r border-slate-200 p-2 ${!isCurrentMonth ? "bg-slate-50/60" : "bg-white"}`}>
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${isCalendarToday(date) ? "bg-blue-600 text-white" : isCurrentMonth ? "text-slate-700" : "text-slate-400"}`}>{date.getDate()}</span>
-                      {appts.length > 0 && <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">{appts.length}</span>}
-                    </div>
-                    <div className="space-y-1.5">
-                      {appts.slice(0, 4).map((a: Appointment) => (
-                        <button key={a.id} onClick={() => setSelectedAppointment(a)} className={`w-full rounded-lg border p-2 text-left transition hover:shadow-sm ${getAppointmentStatusClass(a.status)}`}>
-                          <div className="flex items-center justify-between gap-2"><span className="text-[11px] font-bold">{a.appointment_time}</span><span className="truncate text-[9px] font-semibold uppercase">{getAppointmentStatusLabel(a.status)}</span></div>
-                          <p className="mt-1 truncate text-xs font-bold">{a.patient_name || "Patient"}</p>
-                          <p className="truncate text-[10px] opacity-80">{getDoctorName(a.doctor_id)}</p>
-                        </button>
-                      ))}
-                      {appts.length > 4 && <p className="w-full rounded-md px-2 py-1 text-[11px] font-semibold text-blue-600">+{appts.length - 4} more</p>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-      {calendarView === "week" && (
-        <div className="overflow-x-auto">
-          <div className="min-w-[900px]">
-            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
-              {calendarWeekDays.map((date: Date) => (
-                <div key={formatCalendarDate(date)} className={`border-r border-slate-200 p-4 text-center last:border-r-0 ${isCalendarToday(date) ? "bg-blue-50" : ""}`}>
-                  <p className="text-xs font-semibold uppercase text-slate-500">{date.toLocaleDateString("en-US", { weekday: "short" })}</p>
-                  <p className={`mt-1 text-xl font-bold ${isCalendarToday(date) ? "text-blue-600" : "text-slate-800"}`}>{date.getDate()}</p>
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7">
-              {calendarWeekDays.map((date: Date) => {
-                const appts = appointmentsForDate(date);
-                return (
-                  <div key={formatCalendarDate(date)} className="min-h-[420px] border-r border-slate-200 p-3 last:border-r-0">
-                    <div className="space-y-2">
-                      {appts.length === 0 ? <p className="py-10 text-center text-xs text-slate-400">No appointments</p> : appts.map((a: Appointment) => (
-                        <button key={a.id} onClick={() => setSelectedAppointment(a)} className={`w-full rounded-xl border p-3 text-left transition hover:shadow-sm ${getAppointmentStatusClass(a.status)}`}>
-                          <p className="text-sm font-bold">{a.appointment_time}</p>
-                          <p className="mt-1 truncate text-sm font-semibold">{a.patient_name || "Patient"}</p>
-                          <p className="mt-1 truncate text-xs">{getDoctorName(a.doctor_id)}</p>
-                          <p className="mt-1 truncate text-[11px] opacity-75">{getServiceName(a.service_id)}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-      {calendarView === "day" && (
-        <div className="p-5 md:p-6">
-          <div className="rounded-xl border border-slate-200">
-            <div className="border-b border-slate-200 bg-slate-50 px-5 py-4"><p className="font-semibold text-slate-800">{calendarDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p></div>
-            <div className="divide-y divide-slate-100">
-              {appointmentsForDate(calendarDate).length === 0 ? <div className="py-16 text-center text-sm text-slate-500">No appointments scheduled.</div> : appointmentsForDate(calendarDate).map((a: Appointment) => (
-                <button key={a.id} onClick={() => setSelectedAppointment(a)} className="flex w-full flex-col gap-4 p-5 text-left transition hover:bg-slate-50 md:flex-row md:items-center">
-                  <div className="w-24 shrink-0"><p className="text-lg font-bold text-slate-800">{a.appointment_time}</p></div>
-                  <div className={`flex-1 rounded-xl border p-4 ${getAppointmentStatusClass(a.status)}`}>
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                      <div><p className="font-bold">{a.patient_name || "Patient"}</p><p className="mt-1 text-sm">{getDoctorName(a.doctor_id)} • {getServiceName(a.service_id)}</p></div>
-                      <span className="w-fit rounded-full border bg-white/70 px-3 py-1 text-xs font-bold">{getAppointmentStatusLabel(a.status)}</span>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </section>
+    </div>
   );
 }
