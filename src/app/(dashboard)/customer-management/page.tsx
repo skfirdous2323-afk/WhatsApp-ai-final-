@@ -92,6 +92,10 @@ export default function CustomerManagementPage() {
   const [appointmentActionLoading, setAppointmentActionLoading] = useState(false);
   const [appointmentActionError, setAppointmentActionError] = useState("");
   const [appointmentActionMessage, setAppointmentActionMessage] = useState("");
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [customerActionLoading, setCustomerActionLoading] = useState(false);
+  const [customerActionError, setCustomerActionError] = useState("");
+  const [customerActionMessage, setCustomerActionMessage] = useState("");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -174,6 +178,56 @@ export default function CustomerManagementPage() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  const handleCustomerDelete = useCallback(
+    async (ids: string[]) => {
+      if (!ids.length || customerActionLoading) return;
+
+      const confirmed = window.confirm(
+        ids.length === 1
+          ? "Delete this customer? This cannot be undone. Associated WhatsApp conversations and messages will also be permanently deleted."
+          : `Delete ${ids.length} selected customers? This cannot be undone. Associated WhatsApp conversations and messages will also be permanently deleted.`
+      );
+
+      if (!confirmed) return;
+
+      setCustomerActionLoading(true);
+      setCustomerActionError("");
+      setCustomerActionMessage("");
+
+      try {
+        const response = await fetch("/api/customers/manage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "delete", ids }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result?.error || "Customers could not be deleted.");
+        }
+
+        setSelectedCustomerIds((current) =>
+          current.filter((id) => !ids.includes(id))
+        );
+
+        await loadData();
+        setCustomerActionMessage(
+          `${result.deletedCount ?? ids.length} customer(s) deleted successfully.`
+        );
+      } catch (err) {
+        setCustomerActionError(
+          err instanceof Error
+            ? err.message
+            : "Customers could not be deleted. Please try again."
+        );
+      } finally {
+        setCustomerActionLoading(false);
+      }
+    },
+    [customerActionLoading, loadData]
+  );
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -682,7 +736,69 @@ export default function CustomerManagementPage() {
               </div>
             </div>
 
-            <div className="max-h-[680px] overflow-y-auto">
+            {filteredCustomers.length > 0 && !loading && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-5">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  aria-label="Select all visible customers"
+                  checked={
+                    filteredCustomers.length > 0 &&
+                    filteredCustomers.every((customer) =>
+                      selectedCustomerIds.includes(customer.id)
+                    )
+                  }
+                  onChange={(event) => {
+                    const visibleIds = filteredCustomers.map((customer) => customer.id);
+                    setSelectedCustomerIds((current) =>
+                      event.target.checked
+                        ? Array.from(new Set([...current, ...visibleIds]))
+                        : current.filter((id) => !visibleIds.includes(id))
+                    );
+                  }}
+                  disabled={customerActionLoading}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Select visible ({filteredCustomers.length})
+              </label>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {selectedCustomerIds.length > 0 && (
+                  <span className="text-xs font-medium text-slate-500">
+                    {selectedCustomerIds.length} selected
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void handleCustomerDelete(selectedCustomerIds)}
+                  disabled={!selectedCustomerIds.length || customerActionLoading}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {customerActionLoading ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={14} />
+                  )}
+                  Delete selected
+                </button>
+              </div>
+            </div>
+          )}
+
+          {(customerActionError || customerActionMessage) && (
+            <div
+              role={customerActionError ? "alert" : "status"}
+              className={`mx-4 mt-3 rounded-xl border px-3 py-2.5 text-sm sm:mx-5 ${
+                customerActionError
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
+              }`}
+            >
+              {customerActionError || customerActionMessage}
+            </div>
+          )}
+
+          <div className="max-h-[680px] overflow-y-auto">
               {loading ? (
                 <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-sm text-slate-500">
                   <Loader2 size={26} className="animate-spin text-blue-600" />
@@ -719,48 +835,84 @@ export default function CustomerManagementPage() {
                   const active = selected?.id === customer.id;
 
                   return (
-                    <button
-                      type="button"
+                    <div
                       key={customer.id}
-                      onClick={() => setSelected(customer)}
-                      className={`flex w-full items-center gap-3 border-b border-slate-100 p-4 text-left transition hover:bg-blue-50/60 sm:px-5 ${
-                        active
-                          ? "bg-blue-50/80 ring-inset ring-2 ring-blue-100"
-                          : "bg-white"
+                      className={`flex items-center gap-2 border-b border-slate-100 p-3 transition sm:px-4 ${
+                        active ? "bg-blue-50/80" : "bg-white"
                       }`}
                     >
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 text-sm font-bold text-blue-700">
-                        {initials(customer.name)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="truncate text-sm font-semibold text-slate-900">
-                            {customer.name || "Unnamed customer"}
-                          </span>
-                          {new Date(customer.created_at) >= recentBoundary && (
-                            <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-                              New
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                          <Phone size={12} />
-                          <span>{customer.phone}</span>
-                        </div>
-                        <div className="mt-1 text-xs text-slate-400">
-                          Added {formatDate(customer.created_at)}
-                          {" · "}
-                          {history.length} appointment
-                          {history.length === 1 ? "" : "s"}
-                        </div>
-                      </div>
-                      <ChevronRight
-                        size={18}
-                        className={`shrink-0 ${
-                          active ? "text-blue-600" : "text-slate-300"
-                        }`}
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${customer.name || "customer"}`}
+                        checked={selectedCustomerIds.includes(customer.id)}
+                        onChange={(event) => {
+                          setSelectedCustomerIds((current) =>
+                            event.target.checked
+                              ? [...current, customer.id]
+                              : current.filter((id) => id !== customer.id)
+                          );
+                        }}
+                        disabled={customerActionLoading}
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       />
-                    </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelected(customer)}
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1 text-left transition hover:bg-blue-50/60"
+                      >
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 text-sm font-bold text-blue-700">
+                          {initials(customer.name)}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="break-words text-sm font-semibold text-slate-900">
+                              {customer.name || "Unnamed customer"}
+                            </span>
+                            {new Date(customer.created_at) >= recentBoundary && (
+                              <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                                New
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                            <Phone size={12} />
+                            <span className="break-all">{customer.phone}</span>
+                          </div>
+
+                          <div className="mt-1 text-xs text-slate-400">
+                            Added {formatDate(customer.created_at)}
+                            {" · "}
+                            {history.length} appointment
+                            {history.length === 1 ? "" : "s"}
+                          </div>
+                        </div>
+
+                        <ChevronRight
+                          size={18}
+                          className={`shrink-0 ${
+                            active ? "text-blue-600" : "text-slate-300"
+                          }`}
+                        />
+                      </button>
+
+                      <button
+                        type="button"
+                        aria-label={`Delete ${customer.name || "customer"}`}
+                        title="Delete customer"
+                        onClick={() => void handleCustomerDelete([customer.id])}
+                        disabled={customerActionLoading}
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-100 text-red-500 transition hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {customerActionLoading ? (
+                          <Loader2 size={15} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={15} />
+                        )}
+                      </button>
+                    </div>
                   );
                 })
               )}
