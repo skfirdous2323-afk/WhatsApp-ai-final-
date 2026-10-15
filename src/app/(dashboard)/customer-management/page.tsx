@@ -85,6 +85,7 @@ export default function CustomerManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [appointmentRange, setAppointmentRange] = useState<"upcoming" | "last7" | "month">("upcoming");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -246,6 +247,43 @@ export default function CustomerManagementPage() {
     );
   });
 
+  // Calendar-based appointment ranges use local dates to avoid UTC boundary shifts.
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const last7DaysBoundary = new Date(today);
+  last7DaysBoundary.setDate(last7DaysBoundary.getDate() - 6);
+
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+
+  const activeAppointment = (appointment: Appointment) =>
+    !["cancelled", "no-show"].includes(
+      appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-")
+    );
+
+  const appointmentDate = (appointment: Appointment) => {
+    const [year, month, day] = appointment.appointment_date
+      .slice(0, 10)
+      .split("-")
+      .map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const rangeAppointments = appointments.filter((appointment) => {
+    const date = appointmentDate(appointment);
+
+    if (appointmentRange === "upcoming") {
+      return date >= today && activeAppointment(appointment);
+    }
+
+    if (appointmentRange === "last7") {
+      return date >= last7DaysBoundary && date < tomorrow;
+    }
+
+    return date >= monthStart && date < nextMonthStart;
+  });
+
   return (
     <main className="min-h-full bg-[#f5f8fc] p-4 text-slate-800 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-[1600px] space-y-6">
@@ -327,6 +365,125 @@ export default function CustomerManagementPage() {
             </button>
           </div>
         )}
+
+        <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="border-b border-slate-100 p-5">
+            <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Appointment Overview
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Review clinic appointments by date range.
+                </p>
+              </div>
+              <span className="text-sm font-medium text-slate-500">
+                {rangeAppointments.length} appointments
+              </span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {([
+                {
+                  id: "upcoming",
+                  label: "Upcoming Appointments",
+                  count: appointments.filter((appointment) => {
+                    const date = appointmentDate(appointment);
+                    return date >= today && activeAppointment(appointment);
+                  }).length,
+                  detail: "Today and future",
+                },
+                {
+                  id: "last7",
+                  label: "Last 7 Days",
+                  count: appointments.filter((appointment) => {
+                    const date = appointmentDate(appointment);
+                    return date >= last7DaysBoundary && date < tomorrow;
+                  }).length,
+                  detail: "Including today",
+                },
+                {
+                  id: "month",
+                  label: "This Month",
+                  count: appointments.filter((appointment) => {
+                    const date = appointmentDate(appointment);
+                    return date >= monthStart && date < nextMonthStart;
+                  }).length,
+                  detail: "Current calendar month",
+                },
+              ] as const).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setAppointmentRange(item.id)}
+                  aria-pressed={appointmentRange === item.id}
+                  className={`rounded-xl border p-4 text-left transition ${
+                    appointmentRange === item.id
+                      ? "border-blue-300 bg-blue-50 ring-2 ring-blue-100"
+                      : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="text-sm font-semibold text-slate-700">
+                      {item.label}
+                    </span>
+                    <CalendarDays size={17} className="shrink-0 text-blue-600" />
+                  </span>
+                  <span className="mt-3 block text-2xl font-bold text-slate-900">
+                    {item.count.toLocaleString("en-IN")}
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    {item.detail}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="divide-y divide-slate-100">
+            {rangeAppointments.length > 0 ? (
+              rangeAppointments.map((appointment) => (
+                <div
+                  key={appointment.id}
+                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                >
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                      <UserRound size={19} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-semibold text-slate-900">
+                        {appointment.patient_name?.trim() || "Patient"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {formatDate(appointment.appointment_date)}
+                      </p>
+                      <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                        <Clock size={13} />
+                        {appointment.appointment_time || "Time not set"}
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`inline-flex w-fit rounded-lg px-3 py-1.5 text-xs font-semibold ${statusClass(appointment.status)}`}
+                  >
+                    {appointment.status.replace(/[-_]/g, " ")}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="px-5 py-10 text-center">
+                <CalendarCheck size={28} className="mx-auto text-slate-300" />
+                <p className="mt-3 text-sm font-semibold text-slate-700">
+                  No appointments in this period
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Appointments will appear here when available.
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
 
         <section className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(380px,0.95fr)]">
           <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
