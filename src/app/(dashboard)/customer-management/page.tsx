@@ -21,6 +21,8 @@ import {
   Activity,
   CalendarCheck,
   X,
+  Ban,
+  Trash2,
 } from "lucide-react";
 
 type Customer = {
@@ -86,6 +88,10 @@ export default function CustomerManagementPage() {
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [appointmentRange, setAppointmentRange] = useState<"upcoming" | "last7" | "month">("upcoming");
+  const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>([]);
+  const [appointmentActionLoading, setAppointmentActionLoading] = useState(false);
+  const [appointmentActionError, setAppointmentActionError] = useState("");
+  const [appointmentActionMessage, setAppointmentActionMessage] = useState("");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -284,6 +290,64 @@ export default function CustomerManagementPage() {
     return date >= monthStart && date < nextMonthStart;
   });
 
+  const allVisibleAppointmentsSelected =
+    rangeAppointments.length > 0 &&
+    rangeAppointments.every((appointment) => selectedAppointmentIds.includes(appointment.id));
+
+  const toggleAppointmentSelection = (id: string) => {
+    setSelectedAppointmentIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    );
+    setAppointmentActionError("");
+    setAppointmentActionMessage("");
+  };
+
+  const toggleSelectAllAppointments = () => {
+    setSelectedAppointmentIds((current) =>
+      allVisibleAppointmentsSelected
+        ? current.filter((id) => !rangeAppointments.some((appointment) => appointment.id === id))
+        : Array.from(new Set([...current, ...rangeAppointments.map((appointment) => appointment.id)]))
+    );
+    setAppointmentActionError("");
+    setAppointmentActionMessage("");
+  };
+
+  const handleAppointmentAction = async (action: "cancel" | "delete", ids: string[]) => {
+    if (appointmentActionLoading || ids.length === 0) return;
+    const confirmed = window.confirm(
+      action === "delete"
+        ? `Permanently delete ${ids.length} appointment(s)? This cannot be undone.`
+        : `Cancel ${ids.length} appointment(s)? Their records will remain in history.`
+    );
+    if (!confirmed) return;
+
+    setAppointmentActionLoading(true);
+    setAppointmentActionError("");
+    setAppointmentActionMessage("");
+    try {
+      const response = await fetch("/api/appointments/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ids }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Could not update appointments.");
+      }
+      setSelectedAppointmentIds((current) => current.filter((id) => !ids.includes(id)));
+      setAppointmentActionMessage(
+        `${result.count} appointment(s) ${action === "cancel" ? "cancelled" : "deleted"}.`
+      );
+      await loadData();
+    } catch (error) {
+      setAppointmentActionError(
+        error instanceof Error ? error.message : "Something went wrong. Please try again."
+      );
+    } finally {
+      setAppointmentActionLoading(false);
+    }
+  };
+
   return (
     <main className="min-h-full bg-[#f5f8fc] p-4 text-slate-800 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-[1600px] space-y-6">
@@ -415,7 +479,12 @@ export default function CustomerManagementPage() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setAppointmentRange(item.id)}
+                  onClick={() => {
+                    setAppointmentRange(item.id);
+                    setSelectedAppointmentIds([]);
+                    setAppointmentActionError("");
+                    setAppointmentActionMessage("");
+                  }}
                   aria-pressed={appointmentRange === item.id}
                   className={`rounded-xl border p-4 text-left transition ${
                     appointmentRange === item.id
@@ -440,6 +509,43 @@ export default function CustomerManagementPage() {
             </div>
           </div>
 
+          <div className="border-t border-slate-100 bg-slate-50/70 p-4 sm:px-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={allVisibleAppointmentsSelected}
+                  onChange={toggleSelectAllAppointments}
+                  disabled={rangeAppointments.length === 0 || appointmentActionLoading}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Select all appointments in this view
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-slate-500">{selectedAppointmentIds.length} selected</span>
+                <button
+                  type="button"
+                  onClick={() => void handleAppointmentAction("cancel", selectedAppointmentIds)}
+                  disabled={selectedAppointmentIds.length === 0 || appointmentActionLoading}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                >
+                  <Ban size={14} /> Cancel Selected
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleAppointmentAction("delete", selectedAppointmentIds)}
+                  disabled={selectedAppointmentIds.length === 0 || appointmentActionLoading}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {appointmentActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  Delete Selected
+                </button>
+              </div>
+            </div>
+            {appointmentActionError && <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{appointmentActionError}</p>}
+            {appointmentActionMessage && <p role="status" className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{appointmentActionMessage}</p>}
+          </div>
+
           <div className="divide-y divide-slate-100">
             {rangeAppointments.length > 0 ? (
               rangeAppointments.map((appointment) => (
@@ -448,6 +554,14 @@ export default function CustomerManagementPage() {
                   className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
                 >
                   <div className="flex min-w-0 items-start gap-3">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select appointment for ${appointment.patient_name?.trim() || "Patient"}`}
+                      checked={selectedAppointmentIds.includes(appointment.id)}
+                      onChange={() => toggleAppointmentSelection(appointment.id)}
+                      disabled={appointmentActionLoading}
+                      className="mt-3 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                       <UserRound size={19} />
                     </div>
@@ -464,11 +578,29 @@ export default function CustomerManagementPage() {
                       </p>
                     </div>
                   </div>
-                  <span
-                    className={`inline-flex w-fit rounded-lg px-3 py-1.5 text-xs font-semibold ${statusClass(appointment.status)}`}
-                  >
-                    {appointment.status.replace(/[-_]/g, " ")}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    <span
+                      className={`inline-flex w-fit rounded-lg px-3 py-1.5 text-xs font-semibold ${statusClass(appointment.status)}`}
+                    >
+                      {appointment.status.replace(/[-_]/g, " ")}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void handleAppointmentAction("cancel", [appointment.id])}
+                      disabled={appointmentActionLoading || ["cancelled", "no-show", "completed"].includes(appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-"))}
+                      className="inline-flex items-center gap-1 rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Ban size={13} /> Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleAppointmentAction("delete", [appointment.id])}
+                      disabled={appointmentActionLoading}
+                      className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Trash2 size={13} /> Delete
+                    </button>
+                  </div>
                 </div>
               ))
             ) : (
