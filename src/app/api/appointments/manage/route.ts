@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const ids = body?.ids;
 
     if (
-      !["cancel", "delete"].includes(action) ||
+      !["cancel", "delete", "approve", "reject"].includes(action) ||
       !Array.isArray(ids) ||
       ids.length === 0 ||
       ids.length > 100 ||
@@ -71,13 +71,14 @@ export async function POST(request: Request) {
       );
     }
 
+    const normalizedStatus = (status: string) =>
+      String(status || "").toLowerCase().replace(/[\\s_]+/g, "-");
+
     if (
       action === "cancel" &&
       ownedAppointments.some((appointment) =>
         ["cancelled", "canceled", "completed", "no-show"].includes(
-          String(appointment.status || "")
-            .toLowerCase()
-            .replace(/[\\s_]+/g, "-")
+          normalizedStatus(appointment.status)
         )
       )
     ) {
@@ -87,16 +88,33 @@ export async function POST(request: Request) {
       );
     }
 
+    if (
+      ["approve", "reject"].includes(action) &&
+      ownedAppointments.some((appointment) => normalizedStatus(appointment.status) !== "pending")
+    ) {
+      return NextResponse.json(
+        { error: "Only pending appointments can be approved or rejected. Refresh and try again." },
+        { status: 409 }
+      );
+    }
+
     const query =
-      action === "cancel"
+      action === "delete"
         ? supabase
             .from("appointments")
-            .update({ status: "cancelled" })
+            .delete()
             .eq("clinic_id", clinic.id)
             .in("id", ids)
         : supabase
             .from("appointments")
-            .delete()
+            .update({
+              status:
+                action === "approve"
+                  ? "confirmed"
+                  : action === "reject" || action === "cancel"
+                    ? "cancelled"
+                    : "pending",
+            })
             .eq("clinic_id", clinic.id)
             .in("id", ids);
 
