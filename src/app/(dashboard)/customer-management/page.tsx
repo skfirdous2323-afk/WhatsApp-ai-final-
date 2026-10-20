@@ -456,13 +456,6 @@ export default function CustomerManagementPage() {
             iconClass="bg-violet-50 text-violet-600"
           />
           <SummaryCard
-            label="Appointments"
-            value={appointments.length}
-            detail="Available clinic records"
-            icon={<CalendarCheck size={20} />}
-            iconClass="bg-emerald-50 text-emerald-600"
-          />
-          <SummaryCard
             label="Follow-ups Due"
             value={followups}
             detail="Past appointments to review"
