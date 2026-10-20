@@ -440,29 +440,7 @@ export default function CustomerManagementPage() {
           </div>
         </header>
 
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard
-            label="Total Customers"
-            value={customers.length}
-            detail="All saved contacts"
-            icon={<Users size={20} />}
-            iconClass="bg-blue-50 text-blue-600"
-          />
-          <SummaryCard
-            label="New Customers"
-            value={newCustomers}
-            detail="Added in the last 30 days"
-            icon={<UserPlus size={20} />}
-            iconClass="bg-violet-50 text-violet-600"
-          />
-          <SummaryCard
-            label="Follow-ups Due"
-            value={followups}
-            detail="Past appointments to review"
-            icon={<Activity size={20} />}
-            iconClass="bg-amber-50 text-amber-600"
-          />
-        </section>
+
 
         {error && (
           <div className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
