@@ -431,11 +431,11 @@ export default function CustomerManagementPage() {
             </button>
             <button
               type="button"
-              onClick={() => setFormOpen(true)}
+              onClick={() => { window.location.href = "/appointments/book"; }}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700"
             >
-              <Plus size={18} />
-              Add Customer
+              <CalendarDays size={18} />
+              Book Appointment
             </button>
           </div>
         </header>
