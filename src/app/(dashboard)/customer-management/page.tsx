@@ -87,7 +87,7 @@ export default function CustomerManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
-  const [appointmentRange, setAppointmentRange] = useState<"today" | "last7" | "month">("today");
+  const [appointmentRange, setAppointmentRange] = useState<"pending" | "today" | "last7" | "month">("pending");
   const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>([]);
   const [appointmentActionLoading, setAppointmentActionLoading] = useState(false);
   const [appointmentActionError, setAppointmentActionError] = useState("");
@@ -332,6 +332,11 @@ export default function CustomerManagementPage() {
 
   const rangeAppointments = appointments.filter((appointment) => {
     const date = appointmentDate(appointment);
+    const status = appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-");
+
+    if (appointmentRange === "pending") {
+      return status === "pending";
+    }
 
     if (appointmentRange === "today") {
       return date >= today && date < tomorrow && activeAppointment(appointment);
@@ -366,12 +371,17 @@ export default function CustomerManagementPage() {
     setAppointmentActionMessage("");
   };
 
-  const handleAppointmentAction = async (action: "cancel" | "delete", ids: string[]) => {
+  const handleAppointmentAction = async (
+    action: "approve" | "cancel" | "delete",
+    ids: string[]
+  ) => {
     if (appointmentActionLoading || ids.length === 0) return;
     const confirmed = window.confirm(
       action === "delete"
         ? `Permanently delete ${ids.length} appointment(s)? This cannot be undone.`
-        : `Cancel ${ids.length} appointment(s)? Their records will remain in history.`
+        : action === "approve"
+          ? `Confirm ${ids.length} appointment(s)?`
+          : `Cancel ${ids.length} appointment(s)? Their records will remain in history.`
     );
     if (!confirmed) return;
 
@@ -390,7 +400,9 @@ export default function CustomerManagementPage() {
       }
       setSelectedAppointmentIds((current) => current.filter((id) => !ids.includes(id)));
       setAppointmentActionMessage(
-        `${result.count} appointment(s) ${action === "cancel" ? "cancelled" : "deleted"}.`
+        `${result.count} appointment(s) ${
+          action === "approve" ? "confirmed" : action === "cancel" ? "cancelled" : "deleted"
+        }.`
       );
       await loadData();
     } catch (error) {
@@ -471,8 +483,17 @@ export default function CustomerManagementPage() {
               </span>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {([
+                {
+                  id: "pending",
+                  label: "Pending Appointments",
+                  count: appointments.filter(
+                    (appointment) =>
+                      appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "pending"
+                  ).length,
+                  detail: "Awaiting confirmation",
+                },
                 {
                   id: "today",
                   label: "Today's Appointments",
@@ -609,6 +630,16 @@ export default function CustomerManagementPage() {
                     >
                       {appointment.status.replace(/[-_]/g, " ")}
                     </span>
+                    {appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "pending" && (
+                      <button
+                        type="button"
+                        onClick={() => void handleAppointmentAction("approve", [appointment.id])}
+                        disabled={appointmentActionLoading}
+                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Confirm
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => void handleAppointmentAction("cancel", [appointment.id])}
