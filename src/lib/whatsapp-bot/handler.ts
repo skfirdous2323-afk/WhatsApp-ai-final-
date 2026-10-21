@@ -823,7 +823,7 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
         sections: [
           {
             title: "Available Dates",
-            rows: dates.map((date: any) => ({
+            rows: dates.slice(0, 7).map((date: any) => ({
               id: date.id,
               title: date.title,
               description: date.description,
@@ -905,7 +905,7 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
         sections: [
           {
             title: "Available Dates",
-            rows: dates.map((d) => ({
+            rows: dates.slice(0, 7).map((d) => ({
               id: d.id,
               title: d.title,
               description: d.description,
@@ -1507,7 +1507,7 @@ Thank you for choosing us. 🏥`,
           sections: [
             {
               title: "Available Dates",
-              rows: dates.map((d) => ({
+              rows: dates.slice(0, 7).map((d) => ({
                 id: d.id,
                 title: d.title,
                 description: d.description,
