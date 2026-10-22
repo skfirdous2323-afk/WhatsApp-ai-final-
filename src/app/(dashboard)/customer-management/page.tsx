@@ -87,7 +87,7 @@ export default function CustomerManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
-  const [appointmentRange, setAppointmentRange] = useState<"pending" | "today" | "last7" | "month">("pending");
+  const [appointmentRange, setAppointmentRange] = useState<"all" | "pending" | "today" | "last7" | "month">("all");
   const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>([]);
   const [appointmentActionLoading, setAppointmentActionLoading] = useState(false);
   const [appointmentActionError, setAppointmentActionError] = useState("");
@@ -331,6 +331,7 @@ export default function CustomerManagementPage() {
   };
 
   const rangeAppointments = appointments.filter((appointment) => {
+    if (appointmentRange === "all") return true;
     const date = appointmentDate(appointment);
     const status = appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-");
 
@@ -483,76 +484,7 @@ export default function CustomerManagementPage() {
               </span>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {([
-                {
-                  id: "pending",
-                  label: "Pending Appointments",
-                  count: appointments.filter(
-                    (appointment) =>
-                      appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "pending"
-                  ).length,
-                  detail: "Awaiting confirmation",
-                },
-                {
-                  id: "today",
-                  label: "Today's Appointments",
-                  count: appointments.filter((appointment) => {
-                    const date = appointmentDate(appointment);
-                    return date >= today && date < tomorrow && activeAppointment(appointment);
-                  }).length,
-                  detail: "Scheduled for today",
-                },
-                {
-                  id: "last7",
-                  label: "Last 7 Days",
-                  count: appointments.filter((appointment) => {
-                    const date = appointmentDate(appointment);
-                    return date >= last7DaysBoundary && date < tomorrow;
-                  }).length,
-                  detail: "Including today",
-                },
-                {
-                  id: "month",
-                  label: "This Month",
-                  count: appointments.filter((appointment) => {
-                    const date = appointmentDate(appointment);
-                    return date >= monthStart && date < nextMonthStart;
-                  }).length,
-                  detail: "Current calendar month",
-                },
-              ] as const).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setAppointmentRange(item.id);
-                    setSelectedAppointmentIds([]);
-                    setAppointmentActionError("");
-                    setAppointmentActionMessage("");
-                  }}
-                  aria-pressed={appointmentRange === item.id}
-                  className={`rounded-xl border p-4 text-left transition ${
-                    appointmentRange === item.id
-                      ? "border-blue-300 bg-blue-50 ring-2 ring-blue-100"
-                      : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="flex items-start justify-between gap-2">
-                    <span className="text-sm font-semibold text-slate-700">
-                      {item.label}
-                    </span>
-                    <CalendarDays size={17} className="shrink-0 text-blue-600" />
-                  </span>
-                  <span className="mt-3 block text-2xl font-bold text-slate-900">
-                    {item.count.toLocaleString("en-IN")}
-                  </span>
-                  <span className="mt-1 block text-xs text-slate-500">
-                    {item.detail}
-                  </span>
-                </button>
-              ))}
-            </div>
+
           </div>
 
           <div className="border-t border-slate-100 bg-slate-50/70 p-4 sm:px-5">
