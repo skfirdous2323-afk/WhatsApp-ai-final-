@@ -34,6 +34,12 @@ type Customer = {
   created_at: string;
 };
 
+type Doctor = {
+  id: string;
+  doctor_name: string | null;
+  specialization?: string | null;
+};
+
 type Appointment = {
   id: string;
   contact_id: string | null;
@@ -81,6 +87,8 @@ export default function CustomerManagementPage() {
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState("all");
   const [selected, setSelected] = useState<Customer | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "new" | "followup">("all");
@@ -138,8 +146,21 @@ export default function CustomerManagementPage() {
         .maybeSingle();
 
       let appointmentData: Appointment[] = [];
+      let doctorData: Doctor[] = [];
 
       if (!clinicError && clinic?.id) {
+        const { data: clinicDoctors, error: doctorError } = await supabase
+          .from("clinic_doctors")
+          .select("id, doctor_name, specialization")
+          .eq("clinic_id", clinic.id)
+          .order("created_at", { ascending: false });
+
+        if (doctorError) {
+          console.error("Clinic doctors could not be loaded:", doctorError);
+        } else {
+          doctorData = (clinicDoctors || []) as Doctor[];
+        }
+
         const { data, error: appointmentError } = await supabase
           .from("appointments")
           .select(
@@ -158,6 +179,7 @@ export default function CustomerManagementPage() {
       const loadedCustomers = (contactData || []) as Customer[];
       setCustomers(loadedCustomers);
       setAppointments(appointmentData);
+      setDoctors(doctorData);
       setSelected((current) =>
         current
           ? loadedCustomers.find((item) => item.id === current.id) || null
@@ -331,6 +353,9 @@ export default function CustomerManagementPage() {
   };
 
   const rangeAppointments = appointments.filter((appointment) => {
+    if (selectedDoctorId !== "all" && appointment.doctor_id !== selectedDoctorId) {
+      return false;
+    }
     if (appointmentRange === "all") return true;
     const date = appointmentDate(appointment);
     const status = appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-");
@@ -484,7 +509,92 @@ export default function CustomerManagementPage() {
               </span>
             </div>
 
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {([
+                {
+                  id: "today",
+                  label: "Today's Appointments",
+                  count: appointments.filter((appointment) => {
+                    const date = appointmentDate(appointment);
+                    return date >= today && date < tomorrow && activeAppointment(appointment);
+                  }).length,
+                  detail: "Scheduled for today",
+                },
+                {
+                  id: "last7",
+                  label: "Last 7 Days",
+                  count: appointments.filter((appointment) => {
+                    const date = appointmentDate(appointment);
+                    return date >= last7DaysBoundary && date < tomorrow;
+                  }).length,
+                  detail: "Including today",
+                },
+                {
+                  id: "month",
+                  label: "This Month",
+                  count: appointments.filter((appointment) => {
+                    const date = appointmentDate(appointment);
+                    return date >= monthStart && date < nextMonthStart;
+                  }).length,
+                  detail: "Current calendar month",
+                },
+              ] as const).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setAppointmentRange(item.id);
+                    setSelectedAppointmentIds([]);
+                    setAppointmentActionError("");
+                    setAppointmentActionMessage("");
+                  }}
+                  aria-pressed={appointmentRange === item.id}
+                  className={`rounded-xl border p-4 text-left transition ${
+                    appointmentRange === item.id
+                      ? "border-blue-300 bg-blue-50 ring-2 ring-blue-100"
+                      : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="text-sm font-semibold text-slate-700">
+                      {item.label}
+                    </span>
+                    <CalendarDays size={17} className="shrink-0 text-blue-600" />
+                  </span>
+                  <span className="mt-3 block text-2xl font-bold text-slate-900">
+                    {item.count.toLocaleString("en-IN")}
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    {item.detail}
+                  </span>
+                </button>
+              ))}
+            </div>
 
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <label htmlFor="appointment-doctor-filter" className="text-sm font-semibold text-slate-700">
+                Select Doctor
+              </label>
+              <select
+                id="appointment-doctor-filter"
+                value={selectedDoctorId}
+                onChange={(event) => {
+                  setSelectedDoctorId(event.target.value);
+                  setSelectedAppointmentIds([]);
+                  setAppointmentActionError("");
+                  setAppointmentActionMessage("");
+                }}
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 sm:max-w-xs"
+              >
+                <option value="all">All Doctors</option>
+                {doctors.map((doctor) => (
+                  <option key={doctor.id} value={doctor.id}>
+                    {doctor.doctor_name || "Unnamed Doctor"}
+                    {doctor.specialization ? ` · ${doctor.specialization}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="border-t border-slate-100 bg-slate-50/70 p-4 sm:px-5">
