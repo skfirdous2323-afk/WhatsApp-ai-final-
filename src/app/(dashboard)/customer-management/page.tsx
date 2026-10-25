@@ -95,7 +95,7 @@ export default function CustomerManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
-  const [appointmentRange, setAppointmentRange] = useState<"all" | "pending" | "upcoming" | "today" | "last7" | "month">("all");
+  const [appointmentRange, setAppointmentRange] = useState<"all" | "pending" | "upcoming" | "today" | "last7" | "month" | "completed" | "no-show" | "cancelled">("all");
   const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>([]);
   const [appointmentActionLoading, setAppointmentActionLoading] = useState(false);
   const [appointmentActionError, setAppointmentActionError] = useState("");
@@ -372,6 +372,18 @@ export default function CustomerManagementPage() {
       return date >= today && date < tomorrow && activeAppointment(appointment);
     }
 
+    if (appointmentRange === "completed") {
+      return status === "completed";
+    }
+
+    if (appointmentRange === "no-show") {
+      return status === "no-show";
+    }
+
+    if (appointmentRange === "cancelled") {
+      return status === "cancelled" || status === "canceled";
+    }
+
     if (appointmentRange === "last7") {
       return date >= last7DaysBoundary && date < tomorrow;
     }
@@ -402,7 +414,7 @@ export default function CustomerManagementPage() {
   };
 
   const handleAppointmentAction = async (
-    action: "approve" | "cancel" | "delete",
+    action: "approve" | "cancel" | "delete" | "complete" | "no-show",
     ids: string[]
   ) => {
     if (appointmentActionLoading || ids.length === 0) return;
@@ -411,7 +423,11 @@ export default function CustomerManagementPage() {
         ? `Permanently delete ${ids.length} appointment(s)? This cannot be undone.`
         : action === "approve"
           ? `Confirm ${ids.length} appointment(s)?`
-          : `Cancel ${ids.length} appointment(s)? Their records will remain in history.`
+          : action === "complete"
+            ? `Mark ${ids.length} appointment(s) as completed?`
+            : action === "no-show"
+              ? `Mark ${ids.length} appointment(s) as not visited?`
+              : `Cancel ${ids.length} appointment(s)? Their records will remain in history.`
     );
     if (!confirmed) return;
 
@@ -431,8 +447,12 @@ export default function CustomerManagementPage() {
       setSelectedAppointmentIds((current) => current.filter((id) => !ids.includes(id)));
       setAppointmentActionMessage(
         `${result.count} appointment(s) ${
-          action === "approve" ? "confirmed" : action === "cancel" ? "cancelled" : "deleted"
-        }.`
+          action === "approve" ? "confirmed"
+            : action === "cancel" ? "cancelled"
+            : action === "complete" ? "marked completed"
+            : action === "no-show" ? "marked not visited"
+            : "deleted"
+        }. `
       );
       await loadData();
     } catch (error) {
@@ -550,6 +570,32 @@ export default function CustomerManagementPage() {
                     return date >= monthStart && date < nextMonthStart;
                   }).length,
                   detail: "Current calendar month",
+                },
+                {
+                  id: "completed",
+                  label: "Completed",
+                  count: appointments.filter((appointment) =>
+                    appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "completed"
+                  ).length,
+                  detail: "Consultation completed",
+                },
+                {
+                  id: "no-show",
+                  label: "Not Visited",
+                  count: appointments.filter((appointment) =>
+                    appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "no-show"
+                  ).length,
+                  detail: "Patient did not attend",
+                },
+                {
+                  id: "cancelled",
+                  label: "Cancelled",
+                  count: appointments.filter((appointment) =>
+                    ["cancelled", "canceled"].includes(
+                      appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-")
+                    )
+                  ).length,
+                  detail: "Cancelled appointments",
                 },
               ] as const).map((item) => (
                 <button
@@ -694,6 +740,26 @@ export default function CustomerManagementPage() {
                       >
                         Confirm
                       </button>
+                    )}
+                    {appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "confirmed" && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleAppointmentAction("complete", [appointment.id])}
+                          disabled={appointmentActionLoading}
+                          className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Mark Completed
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleAppointmentAction("no-show", [appointment.id])}
+                          disabled={appointmentActionLoading}
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Mark Not Visited
+                        </button>
+                      </>
                     )}
                     <button
                       type="button"

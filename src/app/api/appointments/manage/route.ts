@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const ids = body?.ids;
 
     if (
-      !["cancel", "delete", "approve", "reject"].includes(action) ||
+      !["cancel", "delete", "approve", "reject", "complete", "no-show"].includes(action) ||
       !Array.isArray(ids) ||
       ids.length === 0 ||
       ids.length > 100 ||
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     }
 
     const normalizedStatus = (status: string) =>
-      String(status || "").toLowerCase().replace(/[\\s_]+/g, "-");
+      String(status || "").toLowerCase().replace(/[_\s]+/g, "-");
 
     if (
       action === "cancel" &&
@@ -98,6 +98,18 @@ export async function POST(request: Request) {
       );
     }
 
+    if (
+      ["complete", "no-show"].includes(action) &&
+      ownedAppointments.some(
+        (appointment) => normalizedStatus(appointment.status) !== "confirmed"
+      )
+    ) {
+      return NextResponse.json(
+        { error: "Only confirmed appointments can be marked completed or not visited." },
+        { status: 409 }
+      );
+    }
+
     const query =
       action === "delete"
         ? supabase
@@ -111,9 +123,13 @@ export async function POST(request: Request) {
               status:
                 action === "approve"
                   ? "confirmed"
-                  : action === "reject" || action === "cancel"
-                    ? "cancelled"
-                    : "pending",
+                  : action === "complete"
+                    ? "completed"
+                    : action === "no-show"
+                      ? "no-show"
+                      : action === "reject" || action === "cancel"
+                        ? "cancelled"
+                        : "pending",
             })
             .eq("clinic_id", clinic.id)
             .in("id", ids);
