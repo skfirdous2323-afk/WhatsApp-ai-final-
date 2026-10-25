@@ -352,6 +352,11 @@ export default function CustomerManagementPage() {
     return new Date(year, month - 1, day);
   };
 
+  const upcomingAppointmentsCount = appointments.filter((appointment) => {
+    const date = appointmentDate(appointment);
+    return date >= tomorrow && activeAppointment(appointment);
+  }).length;
+
   const rangeAppointments = appointments.filter((appointment) => {
     if (selectedDoctorId !== "all" && appointment.doctor_id !== selectedDoctorId) {
       return false;
@@ -465,13 +470,16 @@ export default function CustomerManagementPage() {
   };
 
   return (
-    <main className="min-h-full bg-[#f5f8fc] p-4 text-slate-800 sm:p-6 lg:p-8">
+    <main className="min-h-full bg-slate-50 p-4 text-slate-800 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-[1600px] space-y-6">
-        <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-blue-600">
-              <Users size={16} />
-              <span>CRM / Customer Management</span>
+        {/* ---------- Header ---------- */}
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-600">
+              <Users size={14} />
+              <span>CRM</span>
+              <ChevronRight size={12} className="text-slate-300" />
+              <span className="text-slate-500">Customer Management</span>
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
               Customer Management
@@ -486,26 +494,24 @@ export default function CustomerManagementPage() {
               type="button"
               onClick={() => void loadData()}
               disabled={loading}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
             >
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
               Refresh
             </button>
             <button
               type="button"
               onClick={() => { window.location.href = "/appointments/book"; }}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
             >
-              <CalendarDays size={18} />
+              <CalendarDays size={16} />
               Book Appointment
             </button>
           </div>
         </header>
 
-
-
         {error && (
-          <div className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
             <span>{error}</span>
             <button
               type="button"
@@ -517,41 +523,71 @@ export default function CustomerManagementPage() {
           </div>
         )}
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        {/* ---------- Summary Strip ---------- */}
+        <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <SummaryCard
+            label="Total Customers"
+            value={customers.length}
+            detail="All registered customers"
+            icon={<Users size={18} />}
+            iconClass="bg-blue-50 text-blue-600"
+          />
+          <SummaryCard
+            label="New Customers"
+            value={newCustomers}
+            detail="Joined in the last 30 days"
+            icon={<UserPlus size={18} />}
+            iconClass="bg-emerald-50 text-emerald-600"
+          />
+          <SummaryCard
+            label="Upcoming Appointments"
+            value={upcomingAppointmentsCount}
+            detail="Scheduled ahead"
+            icon={<CalendarDays size={18} />}
+            iconClass="bg-indigo-50 text-indigo-600"
+          />
+          <SummaryCard
+            label="Follow-ups Due"
+            value={followups}
+            detail="Past visits to follow up"
+            icon={<Activity size={18} />}
+            iconClass="bg-amber-50 text-amber-600"
+          />
+        </section>
+
+        {/* ---------- Appointment Overview ---------- */}
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 p-5">
             <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">
+                <h2 className="text-base font-semibold text-slate-900">
                   Appointment Overview
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
                   Review clinic appointments by date range.
                 </p>
               </div>
-              <span className="text-sm font-medium text-slate-500">
+              <span className="inline-flex items-center self-start rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 sm:self-auto">
                 {rangeAppointments.length} appointments
               </span>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
               {([
                 {
                   id: "upcoming",
-                  label: "Upcoming Appointments",
-                  count: appointments.filter((appointment) => {
-                    const date = appointmentDate(appointment);
-                    return date >= tomorrow && activeAppointment(appointment);
-                  }).length,
-                  detail: "Scheduled for future dates",
+                  label: "Upcoming",
+                  count: upcomingAppointmentsCount,
+                  detail: "Future dates",
                 },
                 {
                   id: "today",
-                  label: "Today's Appointments",
+                  label: "Today",
                   count: appointments.filter((appointment) => {
                     const date = appointmentDate(appointment);
                     return date >= today && date < tomorrow && activeAppointment(appointment);
                   }).length,
-                  detail: "Scheduled for today",
+                  detail: "Scheduled today",
                 },
                 {
                   id: "last7",
@@ -569,7 +605,7 @@ export default function CustomerManagementPage() {
                     const date = appointmentDate(appointment);
                     return date >= monthStart && date < nextMonthStart;
                   }).length,
-                  detail: "Current calendar month",
+                  detail: "Current month",
                 },
                 {
                   id: "completed",
@@ -577,7 +613,7 @@ export default function CustomerManagementPage() {
                   count: appointments.filter((appointment) =>
                     appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "completed"
                   ).length,
-                  detail: "Consultation completed",
+                  detail: "Consultations done",
                 },
                 {
                   id: "no-show",
@@ -585,7 +621,7 @@ export default function CustomerManagementPage() {
                   count: appointments.filter((appointment) =>
                     appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "no-show"
                   ).length,
-                  detail: "Patient did not attend",
+                  detail: "Patient no-show",
                 },
                 {
                   id: "cancelled",
@@ -595,43 +631,56 @@ export default function CustomerManagementPage() {
                       appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-")
                     )
                   ).length,
-                  detail: "Cancelled appointments",
+                  detail: "Cancelled visits",
                 },
-              ] as const).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setAppointmentRange(item.id);
-                    setSelectedAppointmentIds([]);
-                    setAppointmentActionError("");
-                    setAppointmentActionMessage("");
-                  }}
-                  aria-pressed={appointmentRange === item.id}
-                  className={`rounded-xl border p-4 text-left transition ${
-                    appointmentRange === item.id
-                      ? "border-blue-300 bg-blue-50 ring-2 ring-blue-100"
-                      : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="flex items-start justify-between gap-2">
-                    <span className="text-sm font-semibold text-slate-700">
-                      {item.label}
-                    </span>
-                    <CalendarDays size={17} className="shrink-0 text-blue-600" />
-                  </span>
-                  <span className="mt-3 block text-2xl font-bold text-slate-900">
-                    {item.count.toLocaleString("en-IN")}
-                  </span>
-                  <span className="mt-1 block text-xs text-slate-500">
-                    {item.detail}
-                  </span>
-                </button>
-              ))}
+              ] as const).map((item) => {
+                const isActive = appointmentRange === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setAppointmentRange(item.id);
+                      setSelectedAppointmentIds([]);
+                      setAppointmentActionError("");
+                      setAppointmentActionMessage("");
+                    }}
+                    aria-pressed={isActive}
+                    className={`rounded-lg border p-3 text-left transition ${
+                      isActive
+                        ? "border-blue-300 bg-blue-50 ring-2 ring-blue-100"
+                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span
+                        className={`truncate text-xs font-semibold ${
+                          isActive ? "text-blue-700" : "text-slate-600"
+                        }`}
+                      >
+                        {item.label}
+                      </span>
+                      <CalendarDays
+                        size={14}
+                        className={isActive ? "text-blue-600" : "text-slate-400"}
+                      />
+                    </div>
+                    <div className="mt-2 text-xl font-bold tracking-tight text-slate-900">
+                      {item.count.toLocaleString("en-IN")}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">
+                      {item.detail}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <label htmlFor="appointment-doctor-filter" className="text-sm font-semibold text-slate-700">
+              <label
+                htmlFor="appointment-doctor-filter"
+                className="text-sm font-medium text-slate-700"
+              >
                 Select Doctor
               </label>
               <select
@@ -643,7 +692,7 @@ export default function CustomerManagementPage() {
                   setAppointmentActionError("");
                   setAppointmentActionMessage("");
                 }}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 sm:max-w-xs"
+                className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 sm:max-w-xs"
               >
                 <option value="all">All Doctors</option>
                 {doctors.map((doctor) => (
@@ -656,9 +705,10 @@ export default function CustomerManagementPage() {
             </div>
           </div>
 
-          <div className="border-t border-slate-100 bg-slate-50/70 p-4 sm:px-5">
+          {/* Bulk bar */}
+          <div className="border-t border-slate-100 bg-slate-50/70 p-3 sm:px-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+              <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-600">
                 <input
                   type="checkbox"
                   checked={allVisibleAppointmentsSelected}
@@ -666,122 +716,152 @@ export default function CustomerManagementPage() {
                   disabled={rangeAppointments.length === 0 || appointmentActionLoading}
                   className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
-                Select all appointments in this view
+                Select all in this view
               </label>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-slate-500">{selectedAppointmentIds.length} selected</span>
+                <span className="text-xs font-medium text-slate-500">
+                  {selectedAppointmentIds.length} selected
+                </span>
                 <button
                   type="button"
                   onClick={() => void handleAppointmentAction("cancel", selectedAppointmentIds)}
                   disabled={selectedAppointmentIds.length === 0 || appointmentActionLoading}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Ban size={14} /> Cancel Selected
+                  <Ban size={13} /> Cancel Selected
                 </button>
                 <button
                   type="button"
                   onClick={() => void handleAppointmentAction("delete", selectedAppointmentIds)}
                   disabled={selectedAppointmentIds.length === 0 || appointmentActionLoading}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {appointmentActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  {appointmentActionLoading ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={13} />
+                  )}
                   Delete Selected
                 </button>
               </div>
             </div>
-            {appointmentActionError && <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{appointmentActionError}</p>}
-            {appointmentActionMessage && <p role="status" className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{appointmentActionMessage}</p>}
+            {appointmentActionError && (
+              <p
+                role="alert"
+                className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"
+              >
+                {appointmentActionError}
+              </p>
+            )}
+            {appointmentActionMessage && (
+              <p
+                role="status"
+                className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+              >
+                {appointmentActionMessage}
+              </p>
+            )}
           </div>
 
+          {/* Appointment list */}
           <div className="divide-y divide-slate-100">
             {rangeAppointments.length > 0 ? (
-              rangeAppointments.map((appointment) => (
-                <div
-                  key={appointment.id}
-                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
-                >
-                  <div className="flex min-w-0 items-start gap-3">
-                    <input
-                      type="checkbox"
-                      aria-label={`Select appointment for ${appointment.patient_name?.trim() || "Patient"}`}
-                      checked={selectedAppointmentIds.includes(appointment.id)}
-                      onChange={() => toggleAppointmentSelection(appointment.id)}
-                      disabled={appointmentActionLoading}
-                      className="mt-3 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                      <UserRound size={19} />
+              rangeAppointments.map((appointment) => {
+                const normalizedStatus = appointment.status
+                  .trim()
+                  .toLowerCase()
+                  .replace(/[_\s]+/g, "-");
+                return (
+                  <div
+                    key={appointment.id}
+                    className="flex flex-col gap-3 p-4 transition hover:bg-slate-50/40 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                  >
+                    <div className="flex min-w-0 items-start gap-3">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select appointment for ${appointment.patient_name?.trim() || "Patient"}`}
+                        checked={selectedAppointmentIds.includes(appointment.id)}
+                        onChange={() => toggleAppointmentSelection(appointment.id)}
+                        disabled={appointmentActionLoading}
+                        className="mt-3 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                        <UserRound size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">
+                          {appointment.patient_name?.trim() || "Patient"}
+                        </p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {formatDate(appointment.appointment_date)}
+                        </p>
+                        <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                          <Clock size={12} />
+                          {appointment.appointment_time || "Time not set"}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="break-words text-sm font-semibold text-slate-900">
-                        {appointment.patient_name?.trim() || "Patient"}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {formatDate(appointment.appointment_date)}
-                      </p>
-                      <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                        <Clock size={13} />
-                        {appointment.appointment_time || "Time not set"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                    <span
-                      className={`inline-flex w-fit rounded-lg px-3 py-1.5 text-xs font-semibold ${statusClass(appointment.status)}`}
-                    >
-                      {appointment.status.replace(/[-_]/g, " ")}
-                    </span>
-                    {appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "pending" && (
+                    <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+                      <span
+                        className={`inline-flex w-fit rounded-md px-2 py-1 text-[11px] font-semibold capitalize ${statusClass(appointment.status)}`}
+                      >
+                        {appointment.status.replace(/[-_]/g, " ")}
+                      </span>
+                      {normalizedStatus === "pending" && (
+                        <button
+                          type="button"
+                          onClick={() => void handleAppointmentAction("approve", [appointment.id])}
+                          disabled={appointmentActionLoading}
+                          className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Confirm
+                        </button>
+                      )}
+                      {normalizedStatus === "confirmed" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => void handleAppointmentAction("complete", [appointment.id])}
+                            disabled={appointmentActionLoading}
+                            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Mark Completed
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleAppointmentAction("no-show", [appointment.id])}
+                            disabled={appointmentActionLoading}
+                            className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2 py-1 text-[11px] font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Mark Not Visited
+                          </button>
+                        </>
+                      )}
                       <button
                         type="button"
-                        onClick={() => void handleAppointmentAction("approve", [appointment.id])}
-                        disabled={appointmentActionLoading}
-                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => void handleAppointmentAction("cancel", [appointment.id])}
+                        disabled={
+                          appointmentActionLoading ||
+                          ["cancelled", "no-show", "completed"].includes(normalizedStatus)
+                        }
+                        className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-white px-2 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        Confirm
+                        <Ban size={12} /> Cancel
                       </button>
-                    )}
-                    {appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "confirmed" && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => void handleAppointmentAction("complete", [appointment.id])}
-                          disabled={appointmentActionLoading}
-                          className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Mark Completed
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleAppointmentAction("no-show", [appointment.id])}
-                          disabled={appointmentActionLoading}
-                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Mark Not Visited
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void handleAppointmentAction("cancel", [appointment.id])}
-                      disabled={appointmentActionLoading || ["cancelled", "no-show", "completed"].includes(appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-"))}
-                      className="inline-flex items-center gap-1 rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Ban size={13} /> Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleAppointmentAction("delete", [appointment.id])}
-                      disabled={appointmentActionLoading}
-                      className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Trash2 size={13} /> Delete
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleAppointmentAction("delete", [appointment.id])}
+                        disabled={appointmentActionLoading}
+                        className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2 py-1 text-[11px] font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Trash2 size={12} /> Delete
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
-              <div className="px-5 py-10 text-center">
+              <div className="px-5 py-12 text-center">
                 <CalendarCheck size={28} className="mx-auto text-slate-300" />
                 <p className="mt-3 text-sm font-semibold text-slate-700">
                   No appointments in this period
@@ -794,145 +874,154 @@ export default function CustomerManagementPage() {
           </div>
         </section>
 
+        {/* ---------- Customers + Profile ---------- */}
         <section className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(380px,0.95fr)]">
-          <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          {/* Customer list */}
+          <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-slate-900">
                     Your Customers
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
                     {filteredCustomers.length} records found
                   </p>
                 </div>
-                <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-                  Contact directory
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setFormOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                >
+                  <Plus size={13} /> Add Customer
+                </button>
               </div>
 
               <div className="relative mt-4">
                 <Search
-                  size={18}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                 />
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search name, phone or email..."
                   aria-label="Search customers"
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-9 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
                 />
                 {search && (
                   <button
                     type="button"
                     onClick={() => setSearch("")}
                     aria-label="Clear search"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                    className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                   >
-                    <X size={16} />
+                    <X size={14} />
                   </button>
                 )}
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-1.5">
                 {(
                   [
                     ["all", "All customers"],
                     ["new", "New"],
                     ["followup", "Follow-ups due"],
                   ] as const
-                ).map(([value, label]) => (
-                  <button
-                    type="button"
-                    key={value}
-                    onClick={() => setFilter(value)}
-                    className={`rounded-lg px-3.5 py-2 text-xs font-semibold transition ${
-                      filter === value
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+                ).map(([value, label]) => {
+                  const isActive = filter === value;
+                  return (
+                    <button
+                      type="button"
+                      key={value}
+                      onClick={() => setFilter(value)}
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                        isActive
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             {filteredCustomers.length > 0 && !loading && (
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-5">
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
-                <input
-                  type="checkbox"
-                  aria-label="Select all visible customers"
-                  checked={
-                    filteredCustomers.length > 0 &&
-                    filteredCustomers.every((customer) =>
-                      selectedCustomerIds.includes(customer.id)
-                    )
-                  }
-                  onChange={(event) => {
-                    const visibleIds = filteredCustomers.map((customer) => customer.id);
-                    setSelectedCustomerIds((current) =>
-                      event.target.checked
-                        ? Array.from(new Set([...current, ...visibleIds]))
-                        : current.filter((id) => !visibleIds.includes(id))
-                    );
-                  }}
-                  disabled={customerActionLoading}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                Select visible ({filteredCustomers.length})
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5 sm:px-5">
+                <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-600">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all visible customers"
+                    checked={
+                      filteredCustomers.length > 0 &&
+                      filteredCustomers.every((customer) =>
+                        selectedCustomerIds.includes(customer.id)
+                      )
+                    }
+                    onChange={(event) => {
+                      const visibleIds = filteredCustomers.map((customer) => customer.id);
+                      setSelectedCustomerIds((current) =>
+                        event.target.checked
+                          ? Array.from(new Set([...current, ...visibleIds]))
+                          : current.filter((id) => !visibleIds.includes(id))
+                      );
+                    }}
+                    disabled={customerActionLoading}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Select visible ({filteredCustomers.length})
+                </label>
 
-              <div className="flex flex-wrap items-center gap-2">
-                {selectedCustomerIds.length > 0 && (
-                  <span className="text-xs font-medium text-slate-500">
-                    {selectedCustomerIds.length} selected
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => void handleCustomerDelete(selectedCustomerIds)}
-                  disabled={!selectedCustomerIds.length || customerActionLoading}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {customerActionLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={14} />
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedCustomerIds.length > 0 && (
+                    <span className="text-xs font-medium text-slate-500">
+                      {selectedCustomerIds.length} selected
+                    </span>
                   )}
-                  Delete selected
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCustomerDelete(selectedCustomerIds)}
+                    disabled={!selectedCustomerIds.length || customerActionLoading}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {customerActionLoading ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={12} />
+                    )}
+                    Delete selected
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {(customerActionError || customerActionMessage) && (
-            <div
-              role={customerActionError ? "alert" : "status"}
-              className={`mx-4 mt-3 rounded-xl border px-3 py-2.5 text-sm sm:mx-5 ${
-                customerActionError
-                  ? "border-red-200 bg-red-50 text-red-700"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
-              }`}
-            >
-              {customerActionError || customerActionMessage}
-            </div>
-          )}
+            {(customerActionError || customerActionMessage) && (
+              <div
+                role={customerActionError ? "alert" : "status"}
+                className={`mx-4 mt-3 rounded-lg border px-3 py-2 text-sm sm:mx-5 ${
+                  customerActionError
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                }`}
+              >
+                {customerActionError || customerActionMessage}
+              </div>
+            )}
 
-          <div className="max-h-[680px] overflow-y-auto">
+            <div className="max-h-[680px] overflow-y-auto">
               {loading ? (
                 <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-sm text-slate-500">
-                  <Loader2 size={26} className="animate-spin text-blue-600" />
+                  <Loader2 size={24} className="animate-spin text-blue-600" />
                   Loading customers...
                 </div>
               ) : filteredCustomers.length === 0 ? (
                 <div className="flex min-h-72 flex-col items-center justify-center px-6 text-center">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                    <Users size={25} />
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                    <Users size={24} />
                   </div>
-                  <h3 className="font-semibold text-slate-900">
+                  <h3 className="text-sm font-semibold text-slate-900">
                     {search || filter !== "all"
                       ? "No matching customers"
                       : "No customers yet"}
@@ -946,9 +1035,9 @@ export default function CustomerManagementPage() {
                     <button
                       type="button"
                       onClick={() => setFormOpen(true)}
-                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                      className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
                     >
-                      <Plus size={16} /> Add first customer
+                      <Plus size={15} /> Add first customer
                     </button>
                   )}
                 </div>
@@ -960,8 +1049,8 @@ export default function CustomerManagementPage() {
                   return (
                     <div
                       key={customer.id}
-                      className={`flex items-center gap-2 border-b border-slate-100 p-3 transition sm:px-4 ${
-                        active ? "bg-blue-50/80" : "bg-white"
+                      className={`flex items-center gap-2 border-b border-slate-100 px-3 py-2.5 transition sm:px-4 ${
+                        active ? "bg-blue-50/60" : "bg-white hover:bg-slate-50/60"
                       }`}
                     >
                       <input
@@ -982,39 +1071,38 @@ export default function CustomerManagementPage() {
                       <button
                         type="button"
                         onClick={() => setSelected(customer)}
-                        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1 text-left transition hover:bg-blue-50/60"
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left"
                       >
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 text-sm font-bold text-blue-700">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-xs font-bold text-blue-700">
                           {initials(customer.name)}
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="break-words text-sm font-semibold text-slate-900">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="truncate text-sm font-semibold text-slate-900">
                               {customer.name || "Unnamed customer"}
                             </span>
                             {new Date(customer.created_at) >= recentBoundary && (
-                              <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                              <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
                                 New
                               </span>
                             )}
                           </div>
 
-                          <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                            <Phone size={12} />
+                          <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                            <Phone size={11} />
                             <span className="break-all">{customer.phone}</span>
                           </div>
 
-                          <div className="mt-1 text-xs text-slate-400">
-                            Added {formatDate(customer.created_at)}
-                            {" · "}
+                          <div className="mt-0.5 text-[11px] text-slate-400">
+                            Added {formatDate(customer.created_at)} ·{" "}
                             {history.length} appointment
                             {history.length === 1 ? "" : "s"}
                           </div>
                         </div>
 
                         <ChevronRight
-                          size={18}
+                          size={16}
                           className={`shrink-0 ${
                             active ? "text-blue-600" : "text-slate-300"
                           }`}
@@ -1027,12 +1115,12 @@ export default function CustomerManagementPage() {
                         title="Delete customer"
                         onClick={() => void handleCustomerDelete([customer.id])}
                         disabled={customerActionLoading}
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-100 text-red-500 transition hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {customerActionLoading ? (
-                          <Loader2 size={15} className="animate-spin" />
+                          <Loader2 size={14} className="animate-spin" />
                         ) : (
-                          <Trash2 size={15} />
+                          <Trash2 size={14} />
                         )}
                       </button>
                     </div>
@@ -1042,17 +1130,18 @@ export default function CustomerManagementPage() {
             </div>
           </div>
 
+          {/* Profile column */}
           <div className="min-w-0 space-y-5">
             {selected ? (
               <>
-                <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-                  <div className="h-24 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500" />
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <div className="h-20 bg-gradient-to-br from-blue-600 to-indigo-600" />
                   <div className="px-5 pb-5">
                     <div className="-mt-10 flex items-end justify-between gap-3">
-                      <div className="flex h-20 w-20 items-center justify-center rounded-2xl border-4 border-white bg-blue-50 text-2xl font-bold text-blue-700 shadow-sm">
+                      <div className="flex h-20 w-20 items-center justify-center rounded-2xl border-4 border-white bg-white text-2xl font-bold text-blue-700 shadow-sm">
                         {initials(selected.name)}
                       </div>
-                      <span className="mb-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                      <span className="mb-1 inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
                         Customer profile
                       </span>
                     </div>
@@ -1064,63 +1153,65 @@ export default function CustomerManagementPage() {
                       Customer since {formatDate(selected.created_at)}
                     </p>
 
-                    <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                       <InfoItem
-                        icon={<Phone size={17} />}
+                        icon={<Phone size={16} />}
                         label="Phone number"
                         value={selected.phone}
                       />
                       <InfoItem
-                        icon={<Mail size={17} />}
+                        icon={<Mail size={16} />}
                         label="Email address"
                         value={selected.email || "Not provided"}
                       />
                     </div>
 
                     {selected.company && (
-                      <InfoItem
-                        icon={<UserRound size={17} />}
-                        label="Company / Notes"
-                        value={selected.company}
-                      />
+                      <div className="mt-2.5">
+                        <InfoItem
+                          icon={<UserRound size={16} />}
+                          label="Company / Notes"
+                          value={selected.company}
+                        />
+                      </div>
                     )}
 
-                    <div className="mt-5 grid grid-cols-2 gap-3">
+                    <div className="mt-5 grid grid-cols-2 gap-2.5">
                       <a
                         href={`tel:${selected.phone}`}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
-                        <Phone size={16} /> Call
+                        <Phone size={15} /> Call
                       </a>
                       <a
                         href={`https://wa.me/${selected.phone.replace(/\D/g, "")}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
                       >
-                        <MessageCircle size={16} /> WhatsApp
+                        <MessageCircle size={15} /> WhatsApp
                       </a>
                     </div>
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                   <div className="flex items-center justify-between border-b border-slate-100 p-5">
                     <div>
-                      <h3 className="font-bold text-slate-900">
+                      <h3 className="text-sm font-semibold text-slate-900">
                         Appointment History
                       </h3>
                       <p className="mt-1 text-xs text-slate-500">
                         {selectedAppointments.length} linked appointment records
                       </p>
                     </div>
-                    <CalendarDays size={20} className="text-blue-600" />
+                    <CalendarDays size={18} className="text-blue-600" />
                   </div>
 
                   {selectedAppointments.length === 0 ? (
                     <div className="px-5 py-9 text-center">
-                      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-                        <CalendarDays size={20} />
+                      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                        <CalendarDays size={18} />
                       </div>
                       <p className="text-sm font-semibold text-slate-700">
                         No linked appointments
@@ -1137,19 +1228,19 @@ export default function CustomerManagementPage() {
                           className="flex items-start justify-between gap-3 p-4 sm:px-5"
                         >
                           <div className="flex min-w-0 gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                              <CalendarDays size={18} />
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                              <CalendarDays size={16} />
                             </div>
                             <div className="min-w-0">
                               <p className="text-sm font-semibold text-slate-800">
                                 {formatDate(appointment.appointment_date)}
                               </p>
-                              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                                <Clock size={12} />
+                              <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                                <Clock size={11} />
                                 {appointment.appointment_time || "Time not set"}
                               </p>
                               {appointment.amount != null && (
-                                <p className="mt-1 text-xs font-medium text-slate-600">
+                                <p className="mt-0.5 text-xs font-medium text-slate-600">
                                   ₹{Number(appointment.amount).toLocaleString("en-IN")}
                                   {appointment.payment_status
                                     ? ` · ${appointment.payment_status}`
@@ -1159,7 +1250,7 @@ export default function CustomerManagementPage() {
                             </div>
                           </div>
                           <span
-                            className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold ${statusClass(
+                            className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold capitalize ${statusClass(
                               appointment.status
                             )}`}
                           >
@@ -1171,7 +1262,7 @@ export default function CustomerManagementPage() {
                   )}
 
                   {upcomingAppointments.length > 0 && (
-                    <div className="border-t border-slate-100 bg-blue-50/60 px-5 py-3 text-xs font-medium text-blue-700">
+                    <div className="border-t border-slate-100 bg-blue-50/60 px-5 py-2.5 text-xs font-medium text-blue-700">
                       {upcomingAppointments.length} upcoming appointment
                       {upcomingAppointments.length === 1 ? "" : "s"}
                     </div>
@@ -1179,11 +1270,11 @@ export default function CustomerManagementPage() {
                 </div>
               </>
             ) : (
-              <div className="flex min-h-80 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                  <UserRound size={26} />
+              <div className="flex min-h-80 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <UserRound size={24} />
                 </div>
-                <h3 className="font-semibold text-slate-900">
+                <h3 className="text-sm font-semibold text-slate-900">
                   Select a customer
                 </h3>
                 <p className="mt-2 max-w-xs text-sm leading-6 text-slate-500">
@@ -1192,13 +1283,13 @@ export default function CustomerManagementPage() {
               </div>
             )}
 
-            <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-5">
+            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-5">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
-                  <Activity size={19} />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-blue-600 shadow-sm">
+                  <Activity size={17} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">
+                  <h3 className="text-sm font-semibold text-slate-900">
                     Your clinic, better organised
                   </h3>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -1238,16 +1329,18 @@ function SummaryCard({
   iconClass: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-slate-500">{label}</p>
-          <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
+          <p className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             {value.toLocaleString("en-IN")}
           </p>
-          <p className="mt-1.5 text-xs text-slate-400">{detail}</p>
+          <p className="mt-1 text-[11px] text-slate-400 sm:text-xs">{detail}</p>
         </div>
-        <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClass}`}>
+        <div
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 ${iconClass}`}
+        >
           {icon}
         </div>
       </div>
@@ -1265,13 +1358,13 @@ function InfoItem({
   value: string;
 }) {
   return (
-    <div className="flex min-w-0 items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 p-3">
+    <div className="flex min-w-0 items-start gap-2.5 rounded-lg border border-slate-100 bg-slate-50/60 p-3">
       <div className="mt-0.5 shrink-0 text-blue-600">{icon}</div>
       <div className="min-w-0">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
           {label}
         </p>
-        <p className="mt-1 break-words text-sm font-semibold text-slate-700">
+        <p className="mt-0.5 break-words text-sm font-medium text-slate-800">
           {value}
         </p>
       </div>
