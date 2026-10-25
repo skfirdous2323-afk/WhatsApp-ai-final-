@@ -95,7 +95,7 @@ export default function CustomerManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
-  const [appointmentRange, setAppointmentRange] = useState<"all" | "pending" | "today" | "last7" | "month">("all");
+  const [appointmentRange, setAppointmentRange] = useState<"all" | "pending" | "upcoming" | "today" | "last7" | "month">("all");
   const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>([]);
   const [appointmentActionLoading, setAppointmentActionLoading] = useState(false);
   const [appointmentActionError, setAppointmentActionError] = useState("");
@@ -364,6 +364,10 @@ export default function CustomerManagementPage() {
       return status === "pending";
     }
 
+    if (appointmentRange === "upcoming") {
+      return date >= tomorrow && activeAppointment(appointment);
+    }
+
     if (appointmentRange === "today") {
       return date >= today && date < tomorrow && activeAppointment(appointment);
     }
@@ -509,8 +513,17 @@ export default function CustomerManagementPage() {
               </span>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {([
+                {
+                  id: "upcoming",
+                  label: "Upcoming Appointments",
+                  count: appointments.filter((appointment) => {
+                    const date = appointmentDate(appointment);
+                    return date >= tomorrow && activeAppointment(appointment);
+                  }).length,
+                  detail: "Scheduled for future dates",
+                },
                 {
                   id: "today",
                   label: "Today's Appointments",
