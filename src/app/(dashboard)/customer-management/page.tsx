@@ -393,10 +393,18 @@ export default function CustomerManagementPage() {
     }
 
     if (appointmentRange === "last7") {
-      return date >= last7DaysBoundary && date < tomorrow;
+      return (
+        date >= last7DaysBoundary &&
+        date < tomorrow &&
+        status !== "pending"
+      );
     }
 
-    return date >= monthStart && date < nextMonthStart;
+    return (
+      date >= monthStart &&
+      date < nextMonthStart &&
+      status !== "pending"
+    );
   });
 
   const allVisibleAppointmentsSelected =
@@ -605,7 +613,8 @@ export default function CustomerManagementPage() {
                   label: "Last 7 Days",
                   count: appointments.filter((appointment) => {
                     const date = appointmentDate(appointment);
-                    return date >= last7DaysBoundary && date < tomorrow;
+                    const status = appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-");
+                    return date >= last7DaysBoundary && date < tomorrow && status !== "pending";
                   }).length,
                   detail: "Including today",
                 },
@@ -614,7 +623,8 @@ export default function CustomerManagementPage() {
                   label: "This Month",
                   count: appointments.filter((appointment) => {
                     const date = appointmentDate(appointment);
-                    return date >= monthStart && date < nextMonthStart;
+                    const status = appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-");
+                    return date >= monthStart && date < nextMonthStart && status !== "pending";
                   }).length,
                   detail: "Current month",
                 },
