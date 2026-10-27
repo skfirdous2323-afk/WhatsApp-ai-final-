@@ -1,913 +1,1565 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useAuth } from "@/hooks/use-auth";
 import { ContactForm } from "@/components/contacts/contact-form";
 import {
   Search,
-  Plus,
   Users,
-  UserRound,
   CalendarDays,
   Clock,
-  Phone,
-  Mail,
-  MessageCircle,
+  XCircle,
   RefreshCw,
   Loader2,
-  ChevronRight,
-  UserPlus,
-  Activity,
-  CalendarCheck,
-  X,
-  Ban,
-  Trash2,
+  Phone,
+  Mail,
+  Building2,
+  ArrowLeft,
+  User,
 } from "lucide-react";
 
 type Customer = {
   id: string;
-  name: string | null;
+  name?: string;
   phone: string;
-  email: string | null;
-  company: string | null;
+  email?: string;
+  company?: string;
   created_at: string;
-};
-
-type Doctor = {
-  id: string;
-  doctor_name: string | null;
-  specialization?: string | null;
 };
 
 type Appointment = {
   id: string;
-  contact_id: string | null;
-  patient_name: string | null;
+  contact_id: string;
+  patient_name: string;
+  gender?: string;
+  age?: number;
   appointment_date: string;
   appointment_time: string;
   status: string;
-  doctor_id?: string | null;
-  service_id?: string | null;
-  amount?: number | null;
-  payment_status?: string | null;
-};
-
-const formatDate = (value?: string | null) => {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
-
-const initials = (name?: string | null) =>
-  (name || "Patient")
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("");
-
-const statusClass = (status: string) => {
-  const value = status.toLowerCase();
-  if (value === "confirmed" || value === "completed")
-    return "bg-emerald-50 text-emerald-700";
-  if (value === "cancelled" || value === "no-show")
-    return "bg-red-50 text-red-600";
-  return "bg-amber-50 text-amber-700";
+  doctor_id?: string;
+  service_id?: string;
 };
 
 export default function CustomerManagementPage() {
-  const supabase = useMemo(() => createClient(), []);
-  const { accountId } = useAuth();
+  const supabase = createClient();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [selectedDoctorId, setSelectedDoctorId] = useState("all");
-  const [selected, setSelected] = useState<Customer | null>(null);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "new" | "followup">("all");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [formOpen, setFormOpen] = useState(false);
-  const [appointmentRange, setAppointmentRange] = useState<"all" | "pending" | "upcoming" | "today" | "last7" | "month" | "completed" | "no-show" | "cancelled">("all");
-  const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>([]);
-  const [appointmentActionLoading, setAppointmentActionLoading] = useState(false);
-  const [appointmentActionError, setAppointmentActionError] = useState("");
-  const [appointmentActionMessage, setAppointmentActionMessage] = useState("");
-  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
-  const [customerActionLoading, setCustomerActionLoading] = useState(false);
-  const [customerActionError, setCustomerActionError] = useState("");
-  const [customerActionMessage, setCustomerActionMessage] = useState("");
+  const [selectedCustomer, setSelectedCustomer] =
+    useState<Customer | null>(null);
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
+  const [appointmentOpen, setAppointmentOpen] = useState(false);
+  const [doctors, setDoctors] = useState<{ id: string; doctor_name: string }[]>([]);
+  const [services, setServices] = useState<{ id: string; service_name: string; duration_minutes?: number; assigned_doctors?: string[] }[]>([]);
+  const [customerNotes, setCustomerNotes] = useState<{ id: string; note_text: string; created_at: string }[]>([]);
+  const [newNote, setNewNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [appointmentDoctor, setAppointmentDoctor] = useState("");
+  const [appointmentService, setAppointmentService] = useState("");
+  const [appointmentDate, setAppointmentDate] = useState("");
+  const [appointmentTime, setAppointmentTime] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [appointmentPatientName, setAppointmentPatientName] = useState("");
+  const [appointmentGender, setAppointmentGender] = useState("");
+  const [appointmentAge, setAppointmentAge] = useState("");
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<"day" | "week" | "month">("month");
+  const [savingAppointment, setSavingAppointment] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const getClinicId = async (userId: string) => {
+    const { data: clinic, error: clinicError } = await supabase
+      .from("clinics")
+      .select("id")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (clinicError || !clinic) {
+      throw new Error("Clinic not found");
+    }
+
+    return clinic.id;
+  };
+
+  const loadAppointmentOptions = async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) return;
+
+      const clinicId = await getClinicId(user.id);
+
+      const [{ data: doctorData }, { data: serviceData }] = await Promise.all([
+        supabase
+          .from("clinic_doctors")
+          .select("id, doctor_name")
+          .eq("clinic_id", clinicId)
+          .order("created_at", { ascending: false }),
+
+        supabase
+          .from("clinic_services")
+          .select("id, service_name, duration_minutes")
+          .eq("clinic_id", clinicId)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      setDoctors(doctorData || []);
+      setServices(serviceData || []);
+    } catch (error) {
+      console.error("Appointment options error:", error);
+    }
+  };
+
+  const loadData = async () => {
     setLoading(true);
-    setError("");
+
+    const [{ data: contacts }, { data: appointmentData }] =
+      await Promise.all([
+        supabase
+          .from("contacts")
+          .select("id, name, phone, email, company, created_at")
+          .order("created_at", { ascending: false }),
+
+        supabase
+          .from("appointments")
+          .select(
+            "id, contact_id, patient_name, gender, age, appointment_date, appointment_time, status, doctor_id, service_id"
+          )
+          .order("appointment_date", { ascending: false }),
+      ]);
+
+    setCustomers((contacts || []) as Customer[]);
+    setAppointments((appointmentData || []) as Appointment[]);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const filteredCustomers = useMemo(() => {
+    const term = search.toLowerCase().trim();
+
+    if (!term) return customers;
+
+    return customers.filter(
+      (customer) =>
+        customer.name?.toLowerCase().includes(term) ||
+        customer.phone?.toLowerCase().includes(term) ||
+        customer.email?.toLowerCase().includes(term)
+    );
+  }, [customers, search]);
+
+  const getCustomerAppointments = (customerId: string) =>
+    appointments.filter(
+      (appointment) => appointment.contact_id === customerId
+    );
+
+  const loadCustomerNotes = async (contactId: string) => {
+    const { data, error } = await supabase
+      .from("contact_notes")
+      .select("*")
+      .eq("contact_id", contactId)
+      .order("created_at", { ascending: false });
+
+    if (!error) {
+      setCustomerNotes(data || []);
+    }
+  };
+
+  const addCustomerNote = async () => {
+    if (!selectedCustomer || !newNote.trim()) return;
+
+    setSavingNote(true);
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      setSavingNote(false);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("contacts")
+      .select("account_id")
+      .eq("id", selectedCustomer.id)
+      .single();
+
+    if (!profile?.account_id) {
+      setSavingNote(false);
+      return;
+    }
+
+    const { error } = await supabase.from("contact_notes").insert({
+      contact_id: selectedCustomer.id,
+      account_id: profile.account_id,
+      user_id: user.id,
+      note_text: newNote.trim(),
+    });
+
+    if (!error) {
+      setNewNote("");
+      await loadCustomerNotes(selectedCustomer.id);
+    }
+
+    setSavingNote(false);
+  };
+
+  const pendingAppointments = appointments.filter(
+    (appointment) => appointment.status === "pending"
+  ).length;
+
+  const cancelledAppointments = appointments.filter(
+    (appointment) =>
+      appointment.status === "cancelled" ||
+      appointment.status === "canceled"
+  ).length;
+
+  const rescheduleAppointment = async (
+    appointmentId: string,
+    newDate: string,
+    newTime: string
+  ) => {
+    const { error } = await supabase
+      .from("appointments")
+      .update({
+        appointment_date: newDate,
+        appointment_time: newTime,
+      })
+      .eq("id", appointmentId);
+
+    if (error) {
+      console.error("Reschedule error:", error);
+      return false;
+    }
+
+    await loadData();
+    return true;
+  };
+
+  const loadAvailableSlots = async (doctorId: string, date: string) => {
+    if (!doctorId || !date) return [];
+
+    const { data: settings } = await supabase
+      .from("clinic_appointment_settings")
+      .select("slot_duration")
+      .limit(1)
+      .single();
+
+    const duration = settings?.slot_duration || 30;
+
+    const selectedDate = new Date(`${date}T00:00:00`);
+    const weekday = selectedDate.toLocaleDateString("en-US", {
+      weekday: "long",
+    });
+
+    const { data: workingHour } = await supabase
+      .from("clinic_working_hours")
+      .select("day_name, open_time, close_time, is_closed")
+      .eq("day_name", weekday)
+      .limit(1)
+      .maybeSingle();
+
+    if (!workingHour || workingHour.is_closed) {
+      return [];
+    }
+
+    const { data: booked } = await supabase
+      .from("appointments")
+      .select("appointment_time")
+      .eq("doctor_id", doctorId)
+      .eq("appointment_date", date)
+      .in("status", ["pending", "confirmed"]);
+
+    const bookedTimes = new Set(
+      (booked || []).map((item) => item.appointment_time)
+    );
+
+    const slots: string[] = [];
+    const [openHour, openMinute] = String(workingHour.open_time || "09:00")
+      .slice(0, 5)
+      .split(":")
+      .map(Number);
+    const [closeHour, closeMinute] = String(workingHour.close_time || "18:00")
+      .slice(0, 5)
+      .split(":")
+      .map(Number);
+
+    let currentMinutes = openHour * 60 + openMinute;
+    const closingMinutes = closeHour * 60 + closeMinute;
+
+    while (currentMinutes < closingMinutes) {
+      const hour = Math.floor(currentMinutes / 60);
+      const minute = currentMinutes % 60;
+      const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+
+      if (currentMinutes + duration <= closingMinutes && !bookedTimes.has(time)) {
+        slots.push(time);
+      }
+
+      currentMinutes += duration;
+    }
+
+    return slots;
+  };
+
+  const refreshAvailableSlots = async (doctorId: string, date: string) => {
+    setAppointmentTime("");
+    setAvailableSlots([]);
+
+    if (!doctorId || !date) return;
+
+    setLoadingSlots(true);
+    try {
+      const slots = await loadAvailableSlots(doctorId, date);
+      setAvailableSlots(slots);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  const createAppointment = async () => {
+    if (!selectedCustomer || !appointmentDoctor || !appointmentService || !appointmentDate || !appointmentTime) {
+      alert("Please fill Doctor, Service, Date and Time.");
+      return;
+    }
+
+    setSavingAppointment(true);
 
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
 
-      if (authError || !user) {
-        setError("Please sign in again to view your customers.");
-        setCustomers([]);
-        setAppointments([]);
+      if (!user) {
+        alert("Please login again.");
         return;
       }
 
-      if (!accountId) {
-        setCustomers([]);
-        setAppointments([]);
-        setError("Your workspace is still loading. Please refresh in a moment.");
-        return;
-      }
+      const clinicId = await getClinicId(user.id);
 
-      const { data: contactData, error: contactError } = await supabase
-        .from("contacts")
-        .select("id, name, phone, email, company, created_at")
-        .eq("account_id", accountId)
-        .order("created_at", { ascending: false });
-
-      if (contactError) throw contactError;
-
-      const { data: clinic, error: clinicError } = await supabase
-        .from("clinics")
+      const { data: existingAppointment } = await supabase
+        .from("appointments")
         .select("id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
+        .eq("clinic_id", clinicId)
+        .eq("doctor_id", appointmentDoctor)
+        .eq("appointment_date", appointmentDate)
+        .eq("appointment_time", appointmentTime)
+        .in("status", ["pending", "confirmed"])
         .limit(1)
         .maybeSingle();
 
-      let appointmentData: Appointment[] = [];
-      let doctorData: Doctor[] = [];
-
-      if (!clinicError && clinic?.id) {
-        const { data: clinicDoctors, error: doctorError } = await supabase
-          .from("clinic_doctors")
-          .select("id, doctor_name, specialization")
-          .eq("clinic_id", clinic.id)
-          .order("created_at", { ascending: false });
-
-        if (doctorError) {
-          console.error("Clinic doctors could not be loaded:", doctorError);
-        } else {
-          doctorData = (clinicDoctors || []) as Doctor[];
-        }
-
-        const { data, error: appointmentError } = await supabase
-          .from("appointments")
-          .select(
-            "id, contact_id, patient_name, appointment_date, appointment_time, status, doctor_id, service_id, amount, payment_status"
-          )
-          .eq("clinic_id", clinic.id)
-          .order("appointment_date", { ascending: false });
-
-        if (appointmentError) {
-          console.error("Customer appointments could not be loaded:", appointmentError);
-        } else {
-          appointmentData = (data || []) as Appointment[];
-        }
+      if (existingAppointment) {
+        alert("This time slot is already booked. Please select another time.");
+        await refreshAvailableSlots(appointmentDoctor, appointmentDate);
+        return;
       }
 
-      const loadedCustomers = (contactData || []) as Customer[];
-      setCustomers(loadedCustomers);
-      setAppointments(appointmentData);
-      setDoctors(doctorData);
-      setSelected((current) =>
-        current
-          ? loadedCustomers.find((item) => item.id === current.id) || null
-          : loadedCustomers[0] || null
-      );
-    } catch (err) {
-      console.error("Customer Management load error:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Customers could not be loaded. Please try again."
-      );
+      const { error } = await supabase.from("appointments").insert({
+        clinic_id: clinicId,
+        user_id: user.id,
+        contact_id: selectedCustomer.id,
+        doctor_id: appointmentDoctor,
+        service_id: appointmentService,
+        appointment_date: appointmentDate,
+        appointment_time: appointmentTime,
+        patient_name: appointmentPatientName.trim() || selectedCustomer.name || "",
+        gender: appointmentGender || null,
+        age: appointmentAge ? Number(appointmentAge) : null,
+        status: "pending",
+      });
+
+      if (error) {
+        console.error("Create appointment error:", error);
+        alert("Failed to create appointment.");
+        return;
+      }
+
+      setAppointmentDoctor("");
+      setAppointmentService("");
+      setAppointmentDate("");
+      setAppointmentTime("");
+      setAppointmentPatientName("");
+      setAppointmentGender("");
+      setAppointmentAge("");
+      setAppointmentOpen(false);
+
+      await loadData();
     } finally {
-      setLoading(false);
+      setSavingAppointment(false);
     }
-  }, [supabase, accountId]);
+  };
 
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
+  const cancelAppointment = async (appointmentId: string) => {
+    const { error } = await supabase
+      .from("appointments")
+      .update({ status: "cancelled" })
+      .eq("id", appointmentId);
 
-  const handleCustomerDelete = useCallback(
-    async (ids: string[]) => {
-      if (!ids.length || customerActionLoading) return;
+    if (!error) {
+      await loadData();
+    }
+  };
 
-      const confirmed = window.confirm(
-        ids.length === 1
-          ? "Delete this customer? This cannot be undone. Associated WhatsApp conversations and messages will also be permanently deleted."
-          : `Delete ${ids.length} selected customers? This cannot be undone. Associated WhatsApp conversations and messages will also be permanently deleted.`
-      );
+  // ==================== APPOINTMENT CALENDAR ENGINE ====================
 
-      if (!confirmed) return;
+  const formatCalendarDate = (date: Date) => {
+    return date.toLocaleDateString("en-CA");
+  };
 
-      setCustomerActionLoading(true);
-      setCustomerActionError("");
-      setCustomerActionMessage("");
+  const calendarMonthLabel = calendarDate.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
 
-      try {
-        const response = await fetch("/api/customers/manage", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "delete", ids }),
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result?.error || "Customers could not be deleted.");
-        }
-
-        setSelectedCustomerIds((current) =>
-          current.filter((id) => !ids.includes(id))
-        );
-
-        await loadData();
-        setCustomerActionMessage(
-          `${result.deletedCount ?? ids.length} customer(s) deleted successfully.`
-        );
-      } catch (err) {
-        setCustomerActionError(
-          err instanceof Error
-            ? err.message
-            : "Customers could not be deleted. Please try again."
-        );
-      } finally {
-        setCustomerActionLoading(false);
-      }
-    },
-    [customerActionLoading, loadData]
+  const calendarWeekStart = new Date(calendarDate);
+  calendarWeekStart.setHours(0, 0, 0, 0);
+  calendarWeekStart.setDate(
+    calendarWeekStart.getDate() - calendarWeekStart.getDay()
   );
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const recentBoundary = new Date(today);
-  recentBoundary.setDate(recentBoundary.getDate() - 30);
+  const calendarWeekDays = Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(calendarWeekStart);
+    day.setDate(calendarWeekStart.getDate() + index);
+    return day;
+  });
 
-  const customerAppointments = (customerId: string) =>
-    appointments
-      .filter(
-        (appointment) =>
-          appointment.contact_id === customerId ||
-          (!appointment.contact_id &&
-            appointments.filter(
-              (item) => item.patient_name === appointment.patient_name
-            ).length === 1 &&
-            appointment.patient_name?.trim().toLowerCase() ===
-              customers
-                .find((customer) => customer.id === customerId)
-                ?.name?.trim()
-                .toLowerCase())
-      )
-      .sort((a, b) => {
-        const first = `${a.appointment_date} ${a.appointment_time || ""}`;
-        const second = `${b.appointment_date} ${b.appointment_time || ""}`;
-        return second.localeCompare(first);
-      });
+  const calendarMonthStart = new Date(
+    calendarDate.getFullYear(),
+    calendarDate.getMonth(),
+    1
+  );
 
-  const filteredCustomers = customers.filter((customer) => {
-    const term = search.trim().toLowerCase();
-    const matchesSearch =
-      !term ||
-      (customer.name || "").toLowerCase().includes(term) ||
-      customer.phone.toLowerCase().includes(term) ||
-      (customer.email || "").toLowerCase().includes(term);
+  const calendarMonthEnd = new Date(
+    calendarDate.getFullYear(),
+    calendarDate.getMonth() + 1,
+    0
+  );
 
-    const isNew = new Date(customer.created_at) >= recentBoundary;
-    const history = customerAppointments(customer.id);
-    const hasFollowup = history.some((appointment) => {
-      const date = new Date(appointment.appointment_date);
-      return (
-        date < today &&
-        !["cancelled", "no-show"].includes(appointment.status.toLowerCase())
+  const calendarGridStart = new Date(calendarMonthStart);
+  calendarGridStart.setDate(
+    calendarMonthStart.getDate() - calendarMonthStart.getDay()
+  );
+
+  const calendarGridEnd = new Date(calendarMonthEnd);
+  calendarGridEnd.setDate(
+    calendarMonthEnd.getDate() + (6 - calendarMonthEnd.getDay())
+  );
+
+  const calendarMonthDays: Date[] = [];
+  const monthCursor = new Date(calendarGridStart);
+
+  while (monthCursor <= calendarGridEnd) {
+    calendarMonthDays.push(new Date(monthCursor));
+    monthCursor.setDate(monthCursor.getDate() + 1);
+  }
+
+  const appointmentsForDate = (date: Date) => {
+    const dateKey = formatCalendarDate(date);
+
+    return appointments
+      .filter((appointment) => appointment.appointment_date === dateKey)
+      .sort((a, b) =>
+        a.appointment_time.localeCompare(b.appointment_time)
       );
-    });
+  };
+
+  const getDoctorName = (doctorId?: string) => {
+    if (!doctorId) return "Unassigned";
 
     return (
-      matchesSearch &&
-      (filter === "all" ||
-        (filter === "new" && isNew) ||
-        (filter === "followup" && hasFollowup))
+      doctors.find((doctor) => doctor.id === doctorId)?.doctor_name ||
+      "Doctor"
     );
-  });
+  };
 
-  const newCustomers = customers.filter(
-    (customer) => new Date(customer.created_at) >= recentBoundary
-  ).length;
+  const getServiceName = (serviceId?: string) => {
+    if (!serviceId) return "Consultation";
 
-  const followups = customers.filter((customer) =>
-    customerAppointments(customer.id).some((appointment) => {
-      const date = new Date(appointment.appointment_date);
-      return (
-        date < today &&
-        !["cancelled", "no-show"].includes(appointment.status.toLowerCase())
-      );
-    })
-  ).length;
-
-  const selectedAppointments = selected
-    ? customerAppointments(selected.id)
-    : [];
-
-  const upcomingAppointments = selectedAppointments.filter((appointment) => {
-    const date = new Date(appointment.appointment_date);
     return (
-      date >= today &&
-      !["cancelled", "no-show"].includes(appointment.status.toLowerCase())
+      services.find((service) => service.id === serviceId)?.service_name ||
+      "Service"
     );
-  });
-
-  // Calendar-based appointment ranges use local dates to avoid UTC boundary shifts.
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  const last7DaysBoundary = new Date(today);
-  last7DaysBoundary.setDate(last7DaysBoundary.getDate() - 6);
-
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-
-  const activeAppointment = (appointment: Appointment) =>
-    !["cancelled", "no-show"].includes(
-      appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-")
-    );
-
-  const isConfirmedAppointment = (appointment: Appointment) =>
-    appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "confirmed";
-
-  const appointmentDate = (appointment: Appointment) => {
-    const [year, month, day] = appointment.appointment_date
-      .slice(0, 10)
-      .split("-")
-      .map(Number);
-    return new Date(year, month - 1, day);
   };
 
-  const upcomingAppointmentsCount = appointments.filter((appointment) => {
-    const date = appointmentDate(appointment);
-    return date >= tomorrow && isConfirmedAppointment(appointment);
-  }).length;
-
-  const rangeAppointments = appointments.filter((appointment) => {
-    if (selectedDoctorId !== "all" && appointment.doctor_id !== selectedDoctorId) {
-      return false;
+  const getAppointmentStatusClass = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "confirmed":
+        return "border-emerald-200 bg-emerald-50 text-emerald-700";
+      case "completed":
+        return "border-blue-200 bg-blue-50 text-blue-700";
+      case "cancelled":
+      case "canceled":
+        return "border-rose-200 bg-rose-50 text-rose-700";
+      case "no-show":
+        return "border-slate-200 bg-slate-100 text-slate-600";
+      default:
+        return "border-amber-200 bg-amber-50 text-amber-700";
     }
-    if (appointmentRange === "all") return true;
-    const date = appointmentDate(appointment);
-    const status = appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-");
-
-    if (appointmentRange === "pending") {
-      return status === "pending";
-    }
-
-    if (appointmentRange === "upcoming") {
-      return date >= tomorrow && isConfirmedAppointment(appointment);
-    }
-
-    if (appointmentRange === "today") {
-      return date >= today && date < tomorrow && isConfirmedAppointment(appointment);
-    }
-
-    if (appointmentRange === "completed") {
-      return status === "completed";
-    }
-
-    if (appointmentRange === "no-show") {
-      return status === "no-show";
-    }
-
-    if (appointmentRange === "cancelled") {
-      return status === "cancelled" || status === "canceled";
-    }
-
-    return true;
-  });
-
-  const allVisibleAppointmentsSelected =
-    rangeAppointments.length > 0 &&
-    rangeAppointments.every((appointment) => selectedAppointmentIds.includes(appointment.id));
-
-  const toggleAppointmentSelection = (id: string) => {
-    setSelectedAppointmentIds((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
-    );
-    setAppointmentActionError("");
-    setAppointmentActionMessage("");
   };
 
-  const toggleSelectAllAppointments = () => {
-    setSelectedAppointmentIds((current) =>
-      allVisibleAppointmentsSelected
-        ? current.filter((id) => !rangeAppointments.some((appointment) => appointment.id === id))
-        : Array.from(new Set([...current, ...rangeAppointments.map((appointment) => appointment.id)]))
-    );
-    setAppointmentActionError("");
-    setAppointmentActionMessage("");
+  const getAppointmentStatusLabel = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "confirmed":
+        return "Confirmed";
+      case "completed":
+        return "Completed";
+      case "cancelled":
+      case "canceled":
+        return "Cancelled";
+      case "no-show":
+        return "No-show";
+      default:
+        return "Pending";
+    }
   };
 
-  const handleAppointmentAction = async (
-    action: "approve" | "cancel" | "delete" | "complete" | "no-show",
-    ids: string[]
-  ) => {
-    if (appointmentActionLoading || ids.length === 0) return;
-    const confirmed = window.confirm(
-      action === "delete"
-        ? `Permanently delete ${ids.length} appointment(s)? This cannot be undone.`
-        : action === "approve"
-          ? `Confirm ${ids.length} appointment(s)?`
-          : action === "complete"
-            ? `Mark ${ids.length} appointment(s) as completed?`
-            : action === "no-show"
-              ? `Mark ${ids.length} appointment(s) as not visited?`
-              : `Cancel ${ids.length} appointment(s)? Their records will remain in history.`
-    );
-    if (!confirmed) return;
+  const changeCalendarDate = (direction: number) => {
+    setCalendarDate((current) => {
+      const next = new Date(current);
 
-    setAppointmentActionLoading(true);
-    setAppointmentActionError("");
-    setAppointmentActionMessage("");
-    try {
-      const response = await fetch("/api/appointments/manage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, ids }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "Could not update appointments.");
+      if (calendarView === "day") {
+        next.setDate(next.getDate() + direction);
+      } else if (calendarView === "week") {
+        next.setDate(next.getDate() + direction * 7);
+      } else {
+        next.setMonth(next.getMonth() + direction);
       }
-      setSelectedAppointmentIds((current) => current.filter((id) => !ids.includes(id)));
-      setAppointmentActionMessage(
-        `${result.count} appointment(s) ${
-          action === "approve" ? "confirmed"
-            : action === "cancel" ? "cancelled"
-            : action === "complete" ? "marked completed"
-            : action === "no-show" ? "marked not visited"
-            : "deleted"
-        }. `
-      );
-      await loadData();
-    } catch (error) {
-      setAppointmentActionError(
-        error instanceof Error ? error.message : "Something went wrong. Please try again."
-      );
-    } finally {
-      setAppointmentActionLoading(false);
-    }
+
+      return next;
+    });
   };
 
-  return (
-    <main className="min-h-full bg-slate-50 p-4 text-slate-800 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-[1600px] space-y-6">
-        {/* ---------- Header ---------- */}
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-600">
-              <Users size={14} />
-              <span>CRM</span>
-              <ChevronRight size={12} className="text-slate-300" />
-              <span className="text-slate-500">Customer Management</span>
+  const goToCalendarToday = () => {
+    setCalendarDate(new Date());
+  };
+
+  const isCalendarToday = (date: Date) => {
+    const today = new Date();
+
+    return (
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
+    );
+  };
+
+  // ==================== CUSTOMER DETAILS VIEW ====================
+  if (selectedCustomer) {
+    const customer = selectedCustomer;
+    const customerAppointments = getCustomerAppointments(customer.id);
+
+    if (customerNotes.length === 0) {
+      loadCustomerNotes(customer.id);
+    }
+
+    return (
+      <div className="min-h-screen bg-slate-50/40 p-4 text-slate-900 md:p-6">
+        <div className="mx-auto max-w-5xl space-y-6">
+          {/* Back */}
+          <button
+            onClick={() => {
+              setSelectedCustomer(null);
+              setAppointmentOpen(false);
+            }}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Customers
+          </button>
+
+          {/* Profile */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-2xl font-bold text-white shadow-md">
+                  {(customer.name || customer.phone || "?")
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <h1 className="truncate text-2xl font-bold tracking-tight text-slate-900">
+                    {customer.name || "Unnamed Customer"}
+                  </h1>
+
+                  <p className="mt-1 truncate text-xs font-medium text-slate-500">
+                    Customer ID:{" "}
+                    <span className="font-mono">{customer.id}</span>
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setAppointmentPatientName(customer.name || "");
+                    setAppointmentOpen(true);
+                    loadAppointmentOptions();
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                >
+                  + New Appointment
+                </button>
+              </div>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+
+            {/* Contact Information */}
+            <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+              <InfoCard
+                icon={<Phone className="h-4 w-4" />}
+                label="Phone"
+                value={customer.phone || "Not available"}
+              />
+
+              <InfoCard
+                icon={<Mail className="h-4 w-4" />}
+                label="Email"
+                value={customer.email || "Not available"}
+              />
+
+              <InfoCard
+                icon={<Building2 className="h-4 w-4" />}
+                label="Company"
+                value={customer.company || "Not available"}
+              />
+            </div>
+          </div>
+
+          {/* Appointment Summary */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <StatCard
+              title="Total Appointments"
+              value={customerAppointments.length}
+              icon={<CalendarDays className="h-5 w-5" />}
+            />
+
+            <StatCard
+              title="Active Appointments"
+              value={
+                customerAppointments.filter(
+                  (a) =>
+                    a.status === "pending" ||
+                    a.status === "confirmed"
+                ).length
+              }
+              icon={<Clock className="h-5 w-5" />}
+            />
+          </div>
+
+          {/* Customer Notes */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 bg-slate-50/60 px-5 py-4">
+              <h2 className="text-base font-semibold text-slate-900">
+                Customer Notes
+              </h2>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Internal notes about this customer
+              </p>
+            </div>
+
+            <div className="p-5">
+              <textarea
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                placeholder="Write a note about this customer..."
+                rows={3}
+                className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+
+              <button
+                onClick={addCustomerNote}
+                disabled={savingNote || !newNote.trim()}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savingNote ? "Saving..." : "Add Note"}
+              </button>
+
+              <div className="mt-5 space-y-3">
+                {customerNotes.length === 0 ? (
+                  <p className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">
+                    No notes yet.
+                  </p>
+                ) : (
+                  customerNotes.map(
+                    (note: {
+                      id: string;
+                      note_text: string;
+                      created_at: string;
+                    }) => (
+                      <div
+                        key={note.id}
+                        className="rounded-xl border border-slate-100 bg-slate-50/80 p-4"
+                      >
+                        <p className="text-sm leading-relaxed text-slate-700">
+                          {note.note_text}
+                        </p>
+                        <p className="mt-2 text-xs text-slate-400">
+                          {new Date(note.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                    )
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Appointment History */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 bg-slate-50/60 px-5 py-4">
+              <h2 className="text-base font-semibold text-slate-900">
+                Appointment History
+              </h2>
+
+              <p className="mt-0.5 text-sm text-slate-500">
+                All appointments for this customer
+              </p>
+            </div>
+
+            {customerAppointments.length === 0 ? (
+              <div className="py-16 text-center">
+                <CalendarDays className="mx-auto h-10 w-10 text-slate-300" />
+
+                <p className="mt-3 text-sm font-semibold text-slate-600">
+                  No appointments yet
+                </p>
+
+                <p className="mt-1 text-xs text-slate-400">
+                  Appointment history will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {customerAppointments.map((appointment) => (
+                  <div
+                    key={appointment.id}
+                    className="p-5 transition hover:bg-slate-50/60"
+                  >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-blue-600" />
+
+                          <span className="font-semibold text-slate-900">
+                            {appointment.patient_name ||
+                              customer.name ||
+                              "Patient"}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-slate-500">
+                          <span className="inline-flex items-center gap-1">
+                            📅 {appointment.appointment_date}
+                          </span>
+
+                          <span className="inline-flex items-center gap-1">
+                            🕐 {appointment.appointment_time}
+                          </span>
+
+                          {appointment.gender && (
+                            <span className="inline-flex items-center gap-1">
+                              ⚥ {appointment.gender}
+                            </span>
+                          )}
+
+                          {appointment.age && (
+                            <span className="inline-flex items-center gap-1">
+                              🎂 Age: {appointment.age}
+                            </span>
+                          )}
+                        </div>
+
+                        {(appointment.doctor_id ||
+                          appointment.service_id) && (
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+                            {appointment.doctor_id && (
+                              <span>
+                                Doctor ID:{" "}
+                                <span className="font-mono">
+                                  {appointment.doctor_id}
+                                </span>
+                              </span>
+                            )}
+                            {appointment.service_id && (
+                              <span>
+                                Service ID:{" "}
+                                <span className="font-mono">
+                                  {appointment.service_id}
+                                </span>
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <StatusBadge status={appointment.status} />
+
+                        {(appointment.status === "pending" ||
+                          appointment.status === "confirmed") && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                const newDate = window.prompt(
+                                  "Enter new date (YYYY-MM-DD):"
+                                );
+                                if (!newDate) return;
+                                const newTime = window.prompt(
+                                  "Enter new time (HH:MM):"
+                                );
+                                if (!newTime) return;
+                                rescheduleAppointment(
+                                  appointment.id,
+                                  newDate,
+                                  newTime
+                                );
+                              }}
+                              className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
+                            >
+                              Reschedule
+                            </button>
+
+                            <button
+                              onClick={() =>
+                                cancelAppointment(appointment.id)
+                              }
+                              className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ==================== NEW APPOINTMENT MODAL ==================== */}
+        {appointmentOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-start justify-between border-b border-slate-200 bg-slate-50 px-6 py-5">
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-slate-900">
+                    New Appointment
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    For {customer.name || "Customer"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setAppointmentOpen(false)}
+                  className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-200 hover:text-slate-600"
+                >
+                  <XCircle className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="max-h-[75vh] overflow-y-auto p-6">
+                <div className="space-y-4">
+                  <select
+                    value={appointmentDoctor}
+                    onChange={(e) => {
+                      const doctorId = e.target.value;
+                      setAppointmentDoctor(doctorId);
+                      refreshAvailableSlots(doctorId, appointmentDate);
+                    }}
+                    className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="">Select Doctor</option>
+                    {doctors.map((doctor) => (
+                      <option key={doctor.id} value={doctor.id}>
+                        {doctor.doctor_name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={appointmentService}
+                    onChange={(e) =>
+                      setAppointmentService(e.target.value)
+                    }
+                    className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="">Select Service</option>
+                    {services.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.service_name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    type="date"
+                    value={appointmentDate}
+                    onChange={(e) => {
+                      const date = e.target.value;
+                      setAppointmentDate(date);
+                      refreshAvailableSlots(appointmentDoctor, date);
+                    }}
+                    className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Available Time
+                    </label>
+
+                    {!appointmentDoctor || !appointmentDate ? (
+                      <p className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm text-slate-500">
+                        Select Doctor and Date first.
+                      </p>
+                    ) : loadingSlots ? (
+                      <p className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm text-slate-500">
+                        Loading available slots...
+                      </p>
+                    ) : availableSlots.length === 0 ? (
+                      <p className="rounded-lg border border-rose-100 bg-rose-50 p-3 text-sm text-rose-600">
+                        No available slots for this date.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2">
+                        {availableSlots.map((slot) => (
+                          <button
+                            key={slot}
+                            type="button"
+                            onClick={() => setAppointmentTime(slot)}
+                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                              appointmentTime === slot
+                                ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                                : "border-slate-200 bg-white text-slate-900 hover:border-blue-400 hover:bg-blue-50"
+                            }`}
+                          >
+                            {slot}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <input
+                    type="text"
+                    value={appointmentPatientName}
+                    onChange={(e) =>
+                      setAppointmentPatientName(e.target.value)
+                    }
+                    placeholder="Patient Name"
+                    className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <select
+                      value={appointmentGender}
+                      onChange={(e) =>
+                        setAppointmentGender(e.target.value)
+                      }
+                      className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    >
+                      <option value="">Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+
+                    <input
+                      type="number"
+                      min="0"
+                      value={appointmentAge}
+                      onChange={(e) => setAppointmentAge(e.target.value)}
+                      placeholder="Age"
+                      className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+
+                  <button
+                    onClick={createAppointment}
+                    disabled={savingAppointment}
+                    className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {savingAppointment
+                      ? "Creating..."
+                      : "Create Appointment"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ==================== CUSTOMER LIST VIEW ====================
+  return (
+    <div className="min-h-screen bg-slate-50/40 p-4 text-slate-900 md:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
               Customer Management
             </h1>
+
             <p className="mt-1 text-sm text-slate-500">
-              Manage your patients, appointments and customer relationships.
+              Manage customers and their appointments from one place.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              type="button"
-              onClick={() => void loadData()}
-              disabled={loading}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+              onClick={loadData}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
-              <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+              <RefreshCw className="h-4 w-4" />
               Refresh
             </button>
+
             <button
-              type="button"
-              onClick={() => { window.location.href = "/appointments/book"; }}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              onClick={() => setAddCustomerOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
             >
-              <CalendarDays size={16} />
-              Book Appointment
+              + Add Customer
             </button>
           </div>
-        </header>
+        </div>
 
-        {error && (
-          <div className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
-            <span>{error}</span>
-            <button
-              type="button"
-              onClick={() => void loadData()}
-              className="font-semibold underline"
-            >
-              Try again
-            </button>
-          </div>
-        )}
-
-        {/* ---------- Summary Strip ---------- */}
-        <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <SummaryCard
-            label="Total Customers"
+        {/* Stats */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Total Customers"
             value={customers.length}
-            detail="All registered customers"
-            icon={<Users size={18} />}
-            iconClass="bg-blue-50 text-blue-600"
+            icon={<Users className="h-5 w-5" />}
           />
-          <SummaryCard
-            label="New Customers"
-            value={newCustomers}
-            detail="Joined in the last 30 days"
-            icon={<UserPlus size={18} />}
-            iconClass="bg-emerald-50 text-emerald-600"
-          />
-          <SummaryCard
-            label="Upcoming Appointments"
-            value={upcomingAppointmentsCount}
-            detail="Scheduled ahead"
-            icon={<CalendarDays size={18} />}
-            iconClass="bg-indigo-50 text-indigo-600"
-          />
-          <SummaryCard
-            label="Follow-ups Due"
-            value={followups}
-            detail="Past visits to follow up"
-            icon={<Activity size={18} />}
-            iconClass="bg-amber-50 text-amber-600"
-          />
-        </section>
 
-        {/* ---------- Appointment Overview ---------- */}
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 p-5">
-            <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+          <StatCard
+            title="Total Appointments"
+            value={appointments.length}
+            icon={<CalendarDays className="h-5 w-5" />}
+          />
+
+          <StatCard
+            title="Pending"
+            value={pendingAppointments}
+            icon={<Clock className="h-5 w-5" />}
+          />
+
+          <StatCard
+            title="Cancelled"
+            value={cancelledAppointments}
+            icon={<XCircle className="h-5 w-5" />}
+          />
+        </div>
+
+        {/* ==================== PROFESSIONAL APPOINTMENT CALENDAR ==================== */}
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-slate-50/70 p-5 md:p-6">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
               <div>
-                <h2 className="text-base font-semibold text-slate-900">
-                  Appointment Overview
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Review clinic appointments by date range.
-                </p>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+                    <CalendarDays className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold tracking-tight text-slate-900">
+                      Appointment Calendar
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Manage clinic appointments, doctors and patient
+                      schedules.
+                    </p>
+                  </div>
+                </div>
               </div>
-              <span className="inline-flex items-center self-start rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 sm:self-auto">
-                {rangeAppointments.length} appointments
-              </span>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={goToCalendarToday}
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                >
+                  Today
+                </button>
+
+                <div className="flex items-center rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => changeCalendarDate(-1)}
+                    className="rounded-md px-3 py-1.5 text-lg font-medium text-slate-600 transition hover:bg-slate-100"
+                    aria-label="Previous"
+                  >
+                    ‹
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => changeCalendarDate(1)}
+                    className="rounded-md px-3 py-1.5 text-lg font-medium text-slate-600 transition hover:bg-slate-100"
+                    aria-label="Next"
+                  >
+                    ›
+                  </button>
+                </div>
+
+                <div className="flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+                  {(["day", "week", "month"] as const).map((view) => (
+                    <button
+                      key={view}
+                      type="button"
+                      onClick={() => setCalendarView(view)}
+                      className={`rounded-md px-3 py-2 text-sm font-semibold capitalize transition ${
+                        calendarView === view
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {view}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
-              {([
-                {
-                  id: "pending",
-                  label: "Pending",
-                  count: appointments.filter((appointment) =>
-                    appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "pending"
-                  ).length,
-                  detail: "Awaiting confirmation",
-                },
-                {
-                  id: "upcoming",
-                  label: "Upcoming",
-                  count: upcomingAppointmentsCount,
-                  detail: "Future dates",
-                },
-                {
-                  id: "today",
-                  label: "Today",
-                  count: appointments.filter((appointment) => {
-                    const date = appointmentDate(appointment);
-                    return date >= today && date < tomorrow && isConfirmedAppointment(appointment);
-                  }).length,
-                  detail: "Scheduled today",
-                },
-                {
-                  id: "completed",
-                  label: "Completed",
-                  count: appointments.filter((appointment) =>
-                    appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "completed"
-                  ).length,
-                  detail: "Consultations done",
-                },
-                {
-                  id: "no-show",
-                  label: "Not Visited",
-                  count: appointments.filter((appointment) =>
-                    appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "no-show"
-                  ).length,
-                  detail: "Patient no-show",
-                },
-                {
-                  id: "cancelled",
-                  label: "Cancelled",
-                  count: appointments.filter((appointment) =>
-                    ["cancelled", "canceled"].includes(
-                      appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-")
+            <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-lg font-bold text-slate-900">
+                {calendarView === "month"
+                  ? calendarMonthLabel
+                  : calendarView === "week"
+                    ? `${calendarWeekDays[0].toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })} - ${calendarWeekDays[6].toLocaleDateString(
+                        "en-US",
+                        {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        }
+                      )}`
+                    : calendarDate.toLocaleDateString("en-US", {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+              </h3>
+
+              <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-slate-600">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                  Pending
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                  Confirmed
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                  Completed
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                  Cancelled
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {calendarView === "month" && (
+            <div className="overflow-x-auto">
+              <div className="min-w-[900px]">
+                <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                    (day) => (
+                      <div
+                        key={day}
+                        className="border-r border-slate-200 px-3 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500 last:border-r-0"
+                      >
+                        {day}
+                      </div>
                     )
-                  ).length,
-                  detail: "Cancelled visits",
-                },
-              ] as const).map((item) => {
-                const isActive = appointmentRange === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setAppointmentRange(item.id);
-                      setSelectedAppointmentIds([]);
-                      setAppointmentActionError("");
-                      setAppointmentActionMessage("");
-                    }}
-                    aria-pressed={isActive}
-                    className={`rounded-lg border p-3 text-left transition ${
-                      isActive
-                        ? "border-blue-300 bg-blue-50 ring-2 ring-blue-100"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      <span
-                        className={`truncate text-xs font-semibold ${
-                          isActive ? "text-blue-700" : "text-slate-600"
+                  )}
+                </div>
+
+                <div className="grid grid-cols-7">
+                  {calendarMonthDays.map((date) => {
+                    const dayAppointments = appointmentsForDate(date);
+                    const isCurrentMonth =
+                      date.getMonth() === calendarDate.getMonth();
+
+                    return (
+                      <div
+                        key={formatCalendarDate(date)}
+                        className={`min-h-[155px] border-b border-r border-slate-200 p-2 ${
+                          !isCurrentMonth
+                            ? "bg-slate-50/60"
+                            : "bg-white"
                         }`}
                       >
-                        {item.label}
-                      </span>
-                      <CalendarDays
-                        size={14}
-                        className={isActive ? "text-blue-600" : "text-slate-400"}
-                      />
-                    </div>
-                    <div className="mt-2 text-xl font-bold tracking-tight text-slate-900">
-                      {item.count.toLocaleString("en-IN")}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-slate-500">
-                      {item.detail}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                        <div className="mb-2 flex items-center justify-between">
+                          <span
+                            className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
+                              isCalendarToday(date)
+                                ? "bg-blue-600 text-white shadow-sm"
+                                : isCurrentMonth
+                                  ? "text-slate-700"
+                                  : "text-slate-400"
+                            }`}
+                          >
+                            {date.getDate()}
+                          </span>
 
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <label
-                htmlFor="appointment-doctor-filter"
-                className="text-sm font-medium text-slate-700"
-              >
-                Select Doctor
-              </label>
-              <select
-                id="appointment-doctor-filter"
-                value={selectedDoctorId}
-                onChange={(event) => {
-                  setSelectedDoctorId(event.target.value);
-                  setSelectedAppointmentIds([]);
-                  setAppointmentActionError("");
-                  setAppointmentActionMessage("");
-                }}
-                className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 sm:max-w-xs"
-              >
-                <option value="all">All Doctors</option>
-                {doctors.map((doctor) => (
-                  <option key={doctor.id} value={doctor.id}>
-                    {doctor.doctor_name || "Unnamed Doctor"}
-                    {doctor.specialization ? ` · ${doctor.specialization}` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+                          {dayAppointments.length > 0 && (
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+                              {dayAppointments.length}
+                            </span>
+                          )}
+                        </div>
 
-          {/* Bulk bar */}
-          <div className="border-t border-slate-200 bg-slate-50/80 p-4 sm:px-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={allVisibleAppointmentsSelected}
-                  onChange={toggleSelectAllAppointments}
-                  disabled={rangeAppointments.length === 0 || appointmentActionLoading}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                Select all in this view
-              </label>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-slate-500">
-                  {selectedAppointmentIds.length} selected
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void handleAppointmentAction("cancel", selectedAppointmentIds)}
-                  disabled={selectedAppointmentIds.length === 0 || appointmentActionLoading}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-800 shadow-sm transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Ban size={13} /> Cancel Selected
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleAppointmentAction("delete", selectedAppointmentIds)}
-                  disabled={selectedAppointmentIds.length === 0 || appointmentActionLoading}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {appointmentActionLoading ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={13} />
-                  )}
-                  Delete Selected
-                </button>
+                        <div className="space-y-1.5">
+                          {dayAppointments.slice(0, 4).map((appointment) => (
+                            <button
+                              key={appointment.id}
+                              type="button"
+                              onClick={() => {
+                                const customer = customers.find(
+                                  (item) =>
+                                    item.id === appointment.contact_id
+                                );
+                                if (customer)
+                                  setSelectedCustomer(customer);
+                              }}
+                              className={`w-full rounded-lg border p-2 text-left transition hover:shadow-sm ${getAppointmentStatusClass(
+                                appointment.status
+                              )}`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[11px] font-bold">
+                                  {appointment.appointment_time}
+                                </span>
+                                <span className="truncate text-[9px] font-semibold uppercase tracking-wide">
+                                  {getAppointmentStatusLabel(
+                                    appointment.status
+                                  )}
+                                </span>
+                              </div>
+                              <p className="mt-1 truncate text-xs font-bold">
+                                {appointment.patient_name || "Patient"}
+                              </p>
+                              <p className="truncate text-[10px] opacity-80">
+                                {getDoctorName(appointment.doctor_id)}
+                              </p>
+                            </button>
+                          ))}
+
+                          {dayAppointments.length > 4 && (
+                            <button
+                              type="button"
+                              className="w-full rounded-md px-2 py-1 text-left text-[11px] font-semibold text-blue-600 transition hover:bg-blue-50"
+                            >
+                              +{dayAppointments.length - 4} more
+                              appointments
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-            {appointmentActionError && (
-              <p
-                role="alert"
-                className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"
-              >
-                {appointmentActionError}
-              </p>
-            )}
-            {appointmentActionMessage && (
-              <p
-                role="status"
-                className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
-              >
-                {appointmentActionMessage}
-              </p>
-            )}
+          )}
+
+          {calendarView === "week" && (
+            <div className="overflow-x-auto">
+              <div className="min-w-[900px]">
+                <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+                  {calendarWeekDays.map((date) => (
+                    <div
+                      key={formatCalendarDate(date)}
+                      className={`border-r border-slate-200 p-4 text-center last:border-r-0 ${
+                        isCalendarToday(date) ? "bg-blue-50/70" : ""
+                      }`}
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        {date.toLocaleDateString("en-US", {
+                          weekday: "short",
+                        })}
+                      </p>
+                      <p
+                        className={`mt-1 text-xl font-bold ${
+                          isCalendarToday(date)
+                            ? "text-blue-600"
+                            : "text-slate-800"
+                        }`}
+                      >
+                        {date.getDate()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-7">
+                  {calendarWeekDays.map((date) => {
+                    const dayAppointments = appointmentsForDate(date);
+
+                    return (
+                      <div
+                        key={formatCalendarDate(date)}
+                        className="min-h-[420px] border-r border-slate-200 p-3 last:border-r-0"
+                      >
+                        <div className="space-y-2">
+                          {dayAppointments.length === 0 ? (
+                            <p className="py-10 text-center text-xs text-slate-400">
+                              No appointments
+                            </p>
+                          ) : (
+                            dayAppointments.map((appointment) => (
+                              <button
+                                key={appointment.id}
+                                type="button"
+                                onClick={() => {
+                                  const customer = customers.find(
+                                    (item) =>
+                                      item.id ===
+                                      appointment.contact_id
+                                  );
+                                  if (customer)
+                                    setSelectedCustomer(customer);
+                                }}
+                                className={`w-full rounded-xl border p-3 text-left transition hover:shadow-sm ${getAppointmentStatusClass(
+                                  appointment.status
+                                )}`}
+                              >
+                                <p className="text-sm font-bold">
+                                  {appointment.appointment_time}
+                                </p>
+                                <p className="mt-1 truncate text-sm font-semibold">
+                                  {appointment.patient_name ||
+                                    "Patient"}
+                                </p>
+                                <p className="mt-1 truncate text-xs">
+                                  {getDoctorName(appointment.doctor_id)}
+                                </p>
+                                <p className="mt-1 truncate text-[11px] opacity-75">
+                                  {getServiceName(appointment.service_id)}
+                                </p>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {calendarView === "day" && (
+            <div className="p-5 md:p-6">
+              <div className="rounded-xl border border-slate-200">
+                <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                  <p className="font-semibold text-slate-900">
+                    {calendarDate.toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+
+                <div className="divide-y divide-slate-100">
+                  {appointmentsForDate(calendarDate).length === 0 ? (
+                    <div className="py-16 text-center text-sm text-slate-500">
+                      No appointments scheduled for this day.
+                    </div>
+                  ) : (
+                    appointmentsForDate(calendarDate).map(
+                      (appointment) => (
+                        <button
+                          key={appointment.id}
+                          type="button"
+                          onClick={() => {
+                            const customer = customers.find(
+                              (item) =>
+                                item.id === appointment.contact_id
+                            );
+                            if (customer)
+                              setSelectedCustomer(customer);
+                          }}
+                          className="flex w-full flex-col gap-4 p-5 text-left transition hover:bg-slate-50 md:flex-row md:items-center"
+                        >
+                          <div className="w-24 shrink-0">
+                            <p className="text-lg font-bold text-slate-900">
+                              {appointment.appointment_time}
+                            </p>
+                          </div>
+
+                          <div
+                            className={`flex-1 rounded-xl border p-4 ${getAppointmentStatusClass(
+                              appointment.status
+                            )}`}
+                          >
+                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                              <div>
+                                <p className="font-bold">
+                                  {appointment.patient_name ||
+                                    "Patient"}
+                                </p>
+                                <p className="mt-1 text-sm">
+                                  {getDoctorName(
+                                    appointment.doctor_id
+                                  )}{" "}
+                                  •{" "}
+                                  {getServiceName(
+                                    appointment.service_id
+                                  )}
+                                </p>
+                              </div>
+
+                              <span className="w-fit rounded-full border bg-white/70 px-3 py-1 text-xs font-bold">
+                                {getAppointmentStatusLabel(
+                                  appointment.status
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Search */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="relative max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search customer by name, phone or email..."
+              className="w-full rounded-lg border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+        </div>
+
+        {/* Customer List */}
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-1 border-b border-slate-200 bg-slate-50/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-base font-semibold text-slate-900">
+              Customers
+            </h2>
+
+            <p className="text-sm text-slate-500">
+              {filteredCustomers.length} customer
+              {filteredCustomers.length === 1 ? "" : "s"} found
+            </p>
           </div>
 
-          {/* Appointment list */}
-          <div className="divide-y divide-slate-100">
-            {rangeAppointments.length > 0 ? (
-              rangeAppointments.map((appointment) => {
-                const normalizedStatus = appointment.status
-                  .trim()
-                  .toLowerCase()
-                  .replace(/[_\s]+/g, "-");
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+            </div>
+          ) : filteredCustomers.length === 0 ? (
+            <div className="py-16 text-center">
+              <Users className="mx-auto h-10 w-10 text-slate-300" />
+              <p className="mt-3 text-sm font-medium text-slate-600">
+                No customers found
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Try adjusting your search or add a new customer.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {filteredCustomers.map((customerItem) => {
+                const customerAppointments =
+                  getCustomerAppointments(customerItem.id);
+
                 return (
                   <div
-                    key={appointment.id}
-                    className="group flex flex-col gap-4 p-4 transition-colors hover:bg-slate-50/70 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-5"
+                    key={customerItem.id}
+                    className="p-5 transition hover:bg-slate-50/70"
                   >
-                    <div className="flex min-w-0 items-start gap-3">
-                      <input
-                        type="checkbox"
-                        aria-label={`Select appointment for ${appointment.patient_name?.trim() || "Patient"}`}
-                        checked={selectedAppointmentIds.includes(appointment.id)}
-                        onChange={() => toggleAppointmentSelection(appointment.id)}
-                        disabled={appointmentActionLoading}
-                        className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-inset ring-blue-100">
-                        <UserRound size={18} />
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-base font-semibold text-white shadow-sm">
+                          {(customerItem.name ||
+                            customerItem.phone ||
+                            "?")
+                            .charAt(0)
+                            .toUpperCase()}
+                        </div>
+
+                        <div className="min-w-0">
+                          <h3 className="truncate font-semibold text-slate-900">
+                            {customerItem.name || "Unnamed Customer"}
+                          </h3>
+
+                          <p className="truncate text-sm text-slate-500">
+                            {customerItem.phone}
+                          </p>
+
+                          {customerItem.email && (
+                            <p className="truncate text-xs text-slate-400">
+                              {customerItem.email}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold tracking-tight text-slate-900">
-                          {appointment.patient_name?.trim() || "Patient"}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {formatDate(appointment.appointment_date)}
-                        </p>
-                        <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
-                          <Clock size={12} />
-                          {appointment.appointment_time || "Time not set"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 sm:justify-end sm:border-t-0 sm:pt-0">
-                      <span
-                        className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${statusClass(appointment.status)}`}
-                      >
-                        {appointment.status.replace(/[-_]/g, " ")}
-                      </span>
-                      {normalizedStatus === "pending" && (
+
+                      <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
+                        <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          {customerAppointments.length}{" "}
+                          {customerAppointments.length === 1
+                            ? "appointment"
+                            : "appointments"}
+                        </div>
+
                         <button
-                          type="button"
-                          onClick={() => void handleAppointmentAction("approve", [appointment.id])}
-                          disabled={appointmentActionLoading}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() =>
+                            setSelectedCustomer(customerItem)
+                          }
+                          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                         >
-                          Confirm
+                          View Details
                         </button>
-                      )}
-                      {normalizedStatus === "confirmed" && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => void handleAppointmentAction("complete", [appointment.id])}
-                            disabled={appointmentActionLoading}
-                            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Mark Completed
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleAppointmentAction("no-show", [appointment.id])}
-                            disabled={appointmentActionLoading}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Mark Not Visited
-                          </button>
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => void handleAppointmentAction("cancel", [appointment.id])}
-                        disabled={
-                          appointmentActionLoading ||
-                          ["cancelled", "no-show", "completed"].includes(normalizedStatus)
-                        }
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-800 shadow-sm transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Ban size={12} /> Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleAppointmentAction("delete", [appointment.id])}
-                        disabled={appointmentActionLoading}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Trash2 size={12} /> Delete
-                      </button>
+                      </div>
                     </div>
                   </div>
                 );
-              })
-            ) : (
-              <div className="px-5 py-12 text-center">
-                <CalendarCheck size={28} className="mx-auto text-slate-300" />
-                <p className="mt-3 text-sm font-semibold text-slate-700">
-                  No appointments in this period
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Appointments will appear here when available.
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       <ContactForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        onSaved={() => void loadData()}
+        open={addCustomerOpen}
+        onOpenChange={setAddCustomerOpen}
+        onSaved={() => {
+          setAddCustomerOpen(false);
+          loadData();
+        }}
       />
-    </main>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  detail,
-  icon,
-  iconClass,
-}: {
-  label: string;
-  value: number;
-  detail: string;
-  icon: React.ReactNode;
-  iconClass: string;
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
-          <p className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            {value.toLocaleString("en-IN")}
-          </p>
-          <p className="mt-1 text-[11px] text-slate-400 sm:text-xs">{detail}</p>
-        </div>
-        <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 ${iconClass}`}
-        >
-          {icon}
-        </div>
-      </div>
     </div>
   );
 }
 
-function InfoItem({
+function InfoCard({
   icon,
   label,
   value,
@@ -917,16 +1569,74 @@ function InfoItem({
   value: string;
 }) {
   return (
-    <div className="flex min-w-0 items-start gap-2.5 rounded-lg border border-slate-100 bg-slate-50/60 p-3">
-      <div className="mt-0.5 shrink-0 text-blue-600">{icon}</div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:shadow-sm">
+      <div className="flex items-center gap-2 text-blue-600">
+        {icon}
+        <span className="text-xs font-semibold uppercase tracking-wide">
           {label}
-        </p>
-        <p className="mt-0.5 break-words text-sm font-medium text-slate-800">
-          {value}
-        </p>
+        </span>
+      </div>
+
+      <p className="mt-2 break-words text-sm font-medium text-slate-900">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function StatCard({
+  title,
+  value,
+  icon,
+}: {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-slate-500">{title}</p>
+          <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+            {value}
+          </p>
+        </div>
+
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+          {icon}
+        </div>
       </div>
     </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const normalized = status.toLowerCase();
+
+  const label =
+    normalized === "confirmed"
+      ? "Confirmed"
+      : normalized === "pending"
+      ? "Pending"
+      : normalized === "cancelled" || normalized === "canceled"
+      ? "Cancelled"
+      : status;
+
+  const cls =
+    normalized === "confirmed"
+      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : normalized === "pending"
+      ? "bg-amber-50 text-amber-700 border-amber-200"
+      : normalized === "cancelled" || normalized === "canceled"
+      ? "bg-rose-50 text-rose-700 border-rose-200"
+      : "bg-slate-100 text-slate-700 border-slate-200";
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize ${cls}`}
+    >
+      {label}
+    </span>
   );
 }
