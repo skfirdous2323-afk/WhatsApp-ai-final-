@@ -344,6 +344,9 @@ export default function CustomerManagementPage() {
       appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-")
     );
 
+  const isConfirmedAppointment = (appointment: Appointment) =>
+    appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "confirmed";
+
   const appointmentDate = (appointment: Appointment) => {
     const [year, month, day] = appointment.appointment_date
       .slice(0, 10)
@@ -354,7 +357,7 @@ export default function CustomerManagementPage() {
 
   const upcomingAppointmentsCount = appointments.filter((appointment) => {
     const date = appointmentDate(appointment);
-    return date >= tomorrow && activeAppointment(appointment);
+    return date >= tomorrow && isConfirmedAppointment(appointment);
   }).length;
 
   const rangeAppointments = appointments.filter((appointment) => {
@@ -370,11 +373,11 @@ export default function CustomerManagementPage() {
     }
 
     if (appointmentRange === "upcoming") {
-      return date >= tomorrow && activeAppointment(appointment);
+      return date >= tomorrow && isConfirmedAppointment(appointment);
     }
 
     if (appointmentRange === "today") {
-      return date >= today && date < tomorrow && activeAppointment(appointment);
+      return date >= today && date < tomorrow && isConfirmedAppointment(appointment);
     }
 
     if (appointmentRange === "completed") {
@@ -593,7 +596,7 @@ export default function CustomerManagementPage() {
                   label: "Today",
                   count: appointments.filter((appointment) => {
                     const date = appointmentDate(appointment);
-                    return date >= today && date < tomorrow && activeAppointment(appointment);
+                    return date >= today && date < tomorrow && isConfirmedAppointment(appointment);
                   }).length,
                   detail: "Scheduled today",
                 },
