@@ -392,19 +392,7 @@ export default function CustomerManagementPage() {
       return status === "cancelled" || status === "canceled";
     }
 
-    if (appointmentRange === "last7") {
-      return (
-        date >= last7DaysBoundary &&
-        date < tomorrow &&
-        status !== "pending"
-      );
-    }
-
-    return (
-      date >= monthStart &&
-      date < nextMonthStart &&
-      status !== "pending"
-    );
+    return true;
   });
 
   const allVisibleAppointmentsSelected =
@@ -607,26 +595,6 @@ export default function CustomerManagementPage() {
                     return date >= today && date < tomorrow && isConfirmedAppointment(appointment);
                   }).length,
                   detail: "Scheduled today",
-                },
-                {
-                  id: "last7",
-                  label: "Last 7 Days",
-                  count: appointments.filter((appointment) => {
-                    const date = appointmentDate(appointment);
-                    const status = appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-");
-                    return date >= last7DaysBoundary && date < tomorrow && status !== "pending";
-                  }).length,
-                  detail: "Including today",
-                },
-                {
-                  id: "month",
-                  label: "This Month",
-                  count: appointments.filter((appointment) => {
-                    const date = appointmentDate(appointment);
-                    const status = appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-");
-                    return date >= monthStart && date < nextMonthStart && status !== "pending";
-                  }).length,
-                  detail: "Current month",
                 },
                 {
                   id: "completed",
