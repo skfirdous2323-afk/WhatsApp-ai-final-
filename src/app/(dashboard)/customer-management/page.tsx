@@ -42,6 +42,7 @@ type Doctor = {
 
 type Appointment = {
   id: string;
+  rescheduled_at?: string | null;
   contact_id: string | null;
   patient_name: string | null;
   appointment_date: string;
@@ -95,7 +96,7 @@ export default function CustomerManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
-  const [appointmentRange, setAppointmentRange] = useState<"all" | "pending" | "upcoming" | "today" | "last7" | "month" | "completed" | "no-show" | "cancelled">("today");
+  const [appointmentRange, setAppointmentRange] = useState<"all" | "pending" | "upcoming" | "today" | "last7" | "month" | "completed" | "no-show" | "cancelled" | "rescheduled">("today");
   const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>([]);
   const [appointmentActionLoading, setAppointmentActionLoading] = useState(false);
   const [appointmentActionError, setAppointmentActionError] = useState("");
@@ -168,7 +169,7 @@ export default function CustomerManagementPage() {
         const { data, error: appointmentError } = await supabase
           .from("appointments")
           .select(
-            "id, contact_id, patient_name, appointment_date, appointment_time, status, doctor_id, service_id, amount, payment_status"
+            "id, contact_id, patient_name, appointment_date, appointment_time, status, doctor_id, service_id, amount, payment_status, rescheduled_at"
           )
           .eq("clinic_id", clinic.id)
           .order("appointment_date", { ascending: false });
@@ -394,6 +395,10 @@ export default function CustomerManagementPage() {
 
     if (appointmentRange === "cancelled") {
       return status === "cancelled" || status === "canceled";
+    }
+
+    if (appointmentRange === "rescheduled") {
+      return Boolean(appointment.rescheduled_at);
     }
 
     return true;
@@ -665,6 +670,14 @@ export default function CustomerManagementPage() {
                     )
                   ).length,
                   detail: "Cancelled visits",
+                },
+                {
+                  id: "rescheduled",
+                  label: "Rescheduled",
+                  count: appointments.filter((appointment) =>
+                    Boolean(appointment.rescheduled_at)
+                  ).length,
+                  detail: "Appointments moved",
                 },
               ] as const).map((item) => {
                 const isActive = appointmentRange === item.id;

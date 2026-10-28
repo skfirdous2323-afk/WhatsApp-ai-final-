@@ -141,7 +141,7 @@ export async function POST(request: Request) {
 
       const { data: updated, error: updateError } = await supabase
         .from("appointments")
-        .update({ appointment_date: newDate, appointment_time: newTime })
+        .update({ appointment_date: newDate, appointment_time: newTime, rescheduled_at: new Date().toISOString() })
         .eq("clinic_id", clinic.id)
         .eq("id", appointment.id)
         .select("id")
