@@ -100,6 +100,10 @@ export default function CustomerManagementPage() {
   const [appointmentActionLoading, setAppointmentActionLoading] = useState(false);
   const [appointmentActionError, setAppointmentActionError] = useState("");
   const [appointmentActionMessage, setAppointmentActionMessage] = useState("");
+  const [rescheduleAppointment, setRescheduleAppointment] = useState<Appointment | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [customerActionLoading, setCustomerActionLoading] = useState(false);
   const [customerActionError, setCustomerActionError] = useState("");
@@ -468,6 +472,46 @@ export default function CustomerManagementPage() {
     }
   };
 
+  const handleReschedule = async () => {
+    if (!rescheduleAppointment || !rescheduleDate || !rescheduleTime || rescheduleLoading) {
+      return;
+    }
+
+    setRescheduleLoading(true);
+    setAppointmentActionError("");
+    setAppointmentActionMessage("");
+
+    try {
+      const response = await fetch("/api/appointments/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reschedule",
+          ids: [rescheduleAppointment.id],
+          date: rescheduleDate,
+          time: rescheduleTime,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Could not reschedule this appointment.");
+      }
+
+      setRescheduleAppointment(null);
+      setRescheduleDate("");
+      setRescheduleTime("");
+      setAppointmentActionMessage("Appointment rescheduled successfully.");
+      await loadData();
+    } catch (error) {
+      setAppointmentActionError(
+        error instanceof Error ? error.message : "Could not reschedule this appointment."
+      );
+    } finally {
+      setRescheduleLoading(false);
+    }
+  };
+
   return (
     <main className="min-h-full bg-slate-50 p-4 text-slate-800 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-[1600px] space-y-6">
@@ -826,6 +870,22 @@ export default function CustomerManagementPage() {
                           </button>
                         </>
                       )}
+                      {!["cancelled", "canceled", "no-show", "completed"].includes(normalizedStatus) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRescheduleAppointment(appointment);
+                            setRescheduleDate(appointment.appointment_date || "");
+                            setRescheduleTime((appointment.appointment_time || "").slice(0, 5));
+                            setAppointmentActionError("");
+                            setAppointmentActionMessage("");
+                          }}
+                          disabled={appointmentActionLoading || rescheduleLoading}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <CalendarDays size={12} /> Reschedule
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => void handleAppointmentAction("cancel", [appointment.id])}
@@ -864,6 +924,86 @@ export default function CustomerManagementPage() {
         </section>
 
       </div>
+
+      {rescheduleAppointment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reschedule-title"
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="reschedule-title" className="text-lg font-bold text-slate-900">
+                  Reschedule Appointment
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {rescheduleAppointment.patient_name?.trim() || "Patient"}
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Close reschedule form"
+                onClick={() => setRescheduleAppointment(null)}
+                disabled={rescheduleLoading}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">New date</span>
+                <input
+                  type="date"
+                  value={rescheduleDate}
+                  min={new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, "0") + "-" + String(new Date().getDate()).padStart(2, "0")}
+                  onChange={(event) => setRescheduleDate(event.target.value)}
+                  disabled={rescheduleLoading}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  required
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">New time</span>
+                <input
+                  type="time"
+                  value={rescheduleTime}
+                  onChange={(event) => setRescheduleTime(event.target.value)}
+                  disabled={rescheduleLoading}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  required
+                />
+              </label>
+              <p className="text-xs text-slate-500">
+                The new time will be checked for conflicts with the same doctor.
+              </p>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRescheduleAppointment(null)}
+                disabled={rescheduleLoading}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleReschedule()}
+                disabled={!rescheduleDate || !rescheduleTime || rescheduleLoading}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {rescheduleLoading && <Loader2 size={15} className="animate-spin" />}
+                Save Changes
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       <ContactForm
         open={formOpen}
