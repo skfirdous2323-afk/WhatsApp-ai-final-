@@ -96,7 +96,7 @@ export default function CustomerManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
-  const [appointmentRange, setAppointmentRange] = useState<"all" | "pending" | "upcoming" | "today" | "last7" | "month" | "completed" | "no-show" | "cancelled" | "rescheduled">("today");
+  const [appointmentRange, setAppointmentRange] = useState<"all" | "pending" | "pending-action" | "upcoming" | "today" | "last7" | "month" | "completed" | "no-show" | "cancelled" | "rescheduled">("today");
   const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>([]);
   const [appointmentActionLoading, setAppointmentActionLoading] = useState(false);
   const [appointmentActionError, setAppointmentActionError] = useState("");
@@ -360,6 +360,29 @@ export default function CustomerManagementPage() {
     return new Date(year, month - 1, day);
   };
 
+  const isPendingActionAppointment = (appointment: Appointment) => {
+    const status = appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-");
+    const date = appointmentDate(appointment);
+
+    if (!["pending", "confirmed"].includes(status) || date > today) {
+      return false;
+    }
+
+    if (date.getTime() === today.getTime() && appointment.rescheduled_at) {
+      const rescheduledDate = new Date(appointment.rescheduled_at);
+      if (!Number.isNaN(rescheduledDate.getTime())) {
+        const rescheduledLocalDate = new Date(
+          rescheduledDate.getFullYear(),
+          rescheduledDate.getMonth(),
+          rescheduledDate.getDate()
+        );
+        if (rescheduledLocalDate.getTime() === today.getTime()) return false;
+      }
+    }
+
+    return true;
+  };
+
   const upcomingAppointmentsCount = appointments.filter((appointment) => {
     const date = appointmentDate(appointment);
     return date >= tomorrow && isConfirmedAppointment(appointment);
@@ -375,6 +398,10 @@ export default function CustomerManagementPage() {
 
     if (appointmentRange === "pending") {
       return status === "pending";
+    }
+
+    if (appointmentRange === "pending-action") {
+      return isPendingActionAppointment(appointment);
     }
 
     if (appointmentRange === "upcoming") {
@@ -631,6 +658,12 @@ export default function CustomerManagementPage() {
                   detail: "Awaiting confirmation",
                 },
                 {
+                  id: "pending-action",
+                  label: "Pending Action",
+                  count: appointments.filter(isPendingActionAppointment).length,
+                  detail: "Needs staff action",
+                },
+                {
                   id: "upcoming",
                   label: "Upcoming",
                   count: upcomingAppointmentsCount,
@@ -863,7 +896,7 @@ export default function CustomerManagementPage() {
                           Confirm
                         </button>
                       )}
-                      {normalizedStatus === "confirmed" && (
+                      {["pending", "confirmed"].includes(normalizedStatus) && (
                         <>
                           <button
                             type="button"
@@ -871,7 +904,7 @@ export default function CustomerManagementPage() {
                             disabled={appointmentActionLoading}
                             className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-white px-2 py-1 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            Mark Completed
+                            Mark Visited
                           </button>
                           <button
                             type="button"

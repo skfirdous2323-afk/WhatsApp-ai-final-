@@ -185,11 +185,12 @@ export async function POST(request: Request) {
     if (
       ["complete", "no-show"].includes(action) &&
       ownedAppointments.some(
-        (appointment) => normalizedStatus(appointment.status) !== "confirmed"
+        (appointment) =>
+          !["pending", "confirmed"].includes(normalizedStatus(appointment.status))
       )
     ) {
       return NextResponse.json(
-        { error: "Only confirmed appointments can be marked completed or not visited." },
+        { error: "Only pending or confirmed appointments can be marked completed or not visited." },
         { status: 409 }
       );
     }
