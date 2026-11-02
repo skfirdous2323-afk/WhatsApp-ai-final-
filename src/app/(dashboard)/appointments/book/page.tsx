@@ -42,6 +42,58 @@ export default function BookAppointmentPage() {
   const [doctorId, setDoctorId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const [availableDates, setAvailableDates] = useState<{value: string; label: string; day: string}[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<{value: string; label: string}[]>([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadAvailability() {
+      if (!doctorId) {
+        setAvailableDates([]);
+        setAvailableSlots([]);
+        setAvailabilityError("");
+        return;
+      }
+
+      setAvailabilityLoading(true);
+      setAvailabilityError("");
+      setAvailableSlots([]);
+
+      try {
+        const response = await fetch("/api/appointments/availability", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ doctorId, ...(date ? { date } : {}) }),
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || "Could not load available dates.");
+        }
+
+        if (active) {
+          setAvailableDates(result.dates || []);
+          setAvailableSlots(result.slots || []);
+        }
+      } catch (err: any) {
+        if (active) {
+          setAvailableDates([]);
+          setAvailableSlots([]);
+          setAvailabilityError(err?.message || "Could not load availability.");
+        }
+      } finally {
+        if (active) setAvailabilityLoading(false);
+      }
+    }
+
+    void loadAvailability();
+    return () => {
+      active = false;
+    };
+  }, [doctorId, date]);
 
   useEffect(() => {
     let active = true;
@@ -437,6 +489,7 @@ export default function BookAppointmentPage() {
                           onChange={(event) => {
                             setServiceId(event.target.value);
                             setDoctorId("");
+                            setDate("");
                             setTime("");
                           }}
                           className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
@@ -465,6 +518,7 @@ export default function BookAppointmentPage() {
                           value={doctorId}
                           onChange={(event) => {
                             setDoctorId(event.target.value);
+                            setDate("");
                             setTime("");
                           }}
                           className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
@@ -486,31 +540,55 @@ export default function BookAppointmentPage() {
 
                       <label className="block text-sm font-medium text-slate-700">
                         <span className="flex items-center gap-2"><CalendarDays size={15} /> Appointment date *</span>
-                        <input
+                        <select
                           required
-                          type="date"
-                          min={new Date().toLocaleDateString("en-CA")}
                           value={date}
+                          disabled={!doctorId || availabilityLoading || availableDates.length === 0}
                           onChange={(event) => {
                             setDate(event.target.value);
                             setTime("");
                           }}
-                          className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                        />
+                          className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          <option value="">
+                            {!doctorId ? "Select doctor first" : availabilityLoading ? "Loading available dates..." : "Select available date"}
+                          </option>
+                          {availableDates.map((item) => (
+                            <option key={item.value} value={item.value}>
+                              {item.label} · {item.day}
+                            </option>
+                          ))}
+                        </select>
                       </label>
 
                       <label className="block text-sm font-medium text-slate-700">
                         <span className="flex items-center gap-2"><Clock3 size={15} /> Appointment time *</span>
-                        <input
+                        <select
                           required
-                          type="time"
                           value={time}
+                          disabled={!date || availabilityLoading || availableSlots.length === 0}
                           onChange={(event) => setTime(event.target.value)}
-                          className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                        />
-                        <span className="mt-1 block text-xs font-normal text-slate-400">
-                          Choose a time within the selected doctor&apos;s working hours.
-                        </span>
+                          className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          <option value="">
+                            {!date ? "Select date first" : availabilityLoading ? "Loading available times..." : "Select available time"}
+                          </option>
+                          {availableSlots.map((slot) => (
+                            <option key={slot.value} value={slot.value}>
+                              {slot.label}
+                            </option>
+                          ))}
+                        </select>
+                        {availabilityError && (
+                          <span className="mt-1 block text-xs font-normal text-red-600">
+                            {availabilityError}
+                          </span>
+                        )}
+                        {date && !availabilityLoading && availableSlots.length === 0 && !availabilityError && (
+                          <span className="mt-1 block text-xs font-normal text-amber-700">
+                            No available time slots for this date.
+                          </span>
+                        )}
                       </label>
                     </div>
                   </div>
