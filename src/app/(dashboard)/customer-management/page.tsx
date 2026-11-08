@@ -853,34 +853,34 @@ export default function CustomerManagementPage() {
                 return (
                   <div
                     key={appointment.id}
-                    className="group flex flex-col gap-4 p-4 transition-colors hover:bg-slate-50/70 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-5"
+                    className="group flex flex-col gap-2.5 border-l-2 border-transparent px-3 py-3 transition-colors hover:border-blue-400 hover:bg-slate-50/80 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3"
                   >
-                    <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex min-w-0 items-center gap-2.5 sm:w-[34%] sm:gap-3">
                       <input
                         type="checkbox"
                         aria-label={`Select appointment for ${appointment.patient_name?.trim() || "Patient"}`}
                         checked={selectedAppointmentIds.includes(appointment.id)}
                         onChange={() => toggleAppointmentSelection(appointment.id)}
                         disabled={appointmentActionLoading}
-                        className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       />
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-inset ring-blue-100">
-                        <UserRound size={18} />
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-100">
+                        <UserRound size={16} />
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold tracking-tight text-slate-900">
                           {appointment.patient_name?.trim() || "Patient"}
                         </p>
-                        <p className="mt-0.5 text-xs text-slate-500">
+                        <p className="mt-0.5 text-[11px] text-slate-500">
                           {formatDate(appointment.appointment_date)}
                         </p>
-                        <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                        <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
                           <Clock size={12} />
                           {appointment.appointment_time || "Time not set"}
                         </p>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 sm:justify-end sm:border-t-0 sm:pt-0">
+                    <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2 sm:flex-1 sm:justify-end sm:border-t-0 sm:pt-0">
                       <span
                         className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${statusClass(appointment.status)}`}
                       >
@@ -891,7 +891,7 @@ export default function CustomerManagementPage() {
                           type="button"
                           onClick={() => void handleAppointmentAction("approve", [appointment.id])}
                           disabled={appointmentActionLoading}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Confirm
                         </button>
@@ -910,7 +910,7 @@ export default function CustomerManagementPage() {
                             type="button"
                             onClick={() => void handleAppointmentAction("no-show", [appointment.id])}
                             disabled={appointmentActionLoading}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Mark Not Visited
                           </button>
@@ -927,7 +927,7 @@ export default function CustomerManagementPage() {
                             setAppointmentActionMessage("");
                           }}
                           disabled={appointmentActionLoading || rescheduleLoading}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <CalendarDays size={12} /> Reschedule
                         </button>
@@ -939,7 +939,7 @@ export default function CustomerManagementPage() {
                           appointmentActionLoading ||
                           ["cancelled", "no-show", "completed"].includes(normalizedStatus)
                         }
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-800 shadow-sm transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-amber-800 shadow-sm transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Ban size={12} /> Cancel
                       </button>
@@ -947,7 +947,7 @@ export default function CustomerManagementPage() {
                         type="button"
                         onClick={() => void handleAppointmentAction("delete", [appointment.id])}
                         disabled={appointmentActionLoading}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Trash2 size={12} /> Delete
                       </button>
