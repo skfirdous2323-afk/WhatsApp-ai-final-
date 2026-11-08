@@ -8,7 +8,6 @@ import {
   Search,
   Plus,
   Users,
-  UserRound,
   CalendarDays,
   Clock,
   Phone,
@@ -850,6 +849,10 @@ export default function CustomerManagementPage() {
                   .trim()
                   .toLowerCase()
                   .replace(/[_\s]+/g, "-");
+                const linkedCustomer = customers.find(
+                  (customer) => customer.id === appointment.contact_id
+                );
+
                 return (
                   <div
                     key={appointment.id}
@@ -864,12 +867,16 @@ export default function CustomerManagementPage() {
                         disabled={appointmentActionLoading}
                         className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       />
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-100">
-                        <UserRound size={16} />
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-inset ring-blue-100">
+                        {initials(appointment.patient_name).slice(0, 2)}
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold tracking-tight text-slate-900">
                           {appointment.patient_name?.trim() || "Patient"}
+                        </p>
+                        <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
+                          <Phone size={11} />
+                          {linkedCustomer?.phone || "Phone not available"}
                         </p>
                         <p className="mt-0.5 text-[11px] text-slate-500">
                           {formatDate(appointment.appointment_date)}
