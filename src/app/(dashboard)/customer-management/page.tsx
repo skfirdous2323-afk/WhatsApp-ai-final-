@@ -101,6 +101,7 @@ export default function CustomerManagementPage() {
   const [appointmentActionLoading, setAppointmentActionLoading] = useState(false);
   const [appointmentActionError, setAppointmentActionError] = useState("");
   const [appointmentActionMessage, setAppointmentActionMessage] = useState("");
+  const [appointmentConfirmation, setAppointmentConfirmation] = useState<{ action: "approve" | "cancel" | "delete" | "complete" | "no-show"; ids: string[] } | null>(null);
   const [rescheduleAppointment, setRescheduleAppointment] = useState<Appointment | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
@@ -455,21 +456,15 @@ export default function CustomerManagementPage() {
 
   const handleAppointmentAction = async (
     action: "approve" | "cancel" | "delete" | "complete" | "no-show",
-    ids: string[]
+    ids: string[],
+    confirmed = false
   ) => {
     if (appointmentActionLoading || ids.length === 0) return;
-    const confirmed = window.confirm(
-      action === "delete"
-        ? `Permanently delete ${ids.length} appointment(s)? This cannot be undone.`
-        : action === "approve"
-          ? `Confirm ${ids.length} appointment(s)?`
-          : action === "complete"
-            ? `Mark ${ids.length} appointment(s) as completed?`
-            : action === "no-show"
-              ? `Mark ${ids.length} appointment(s) as not visited?`
-              : `Cancel ${ids.length} appointment(s)? Their records will remain in history.`
-    );
-    if (!confirmed) return;
+    if (!confirmed) {
+      setAppointmentConfirmation({ action, ids });
+      return;
+    }
+    setAppointmentConfirmation(null);
 
     setAppointmentActionLoading(true);
     setAppointmentActionError("");
@@ -1082,6 +1077,104 @@ export default function CustomerManagementPage() {
               >
                 {rescheduleLoading && <Loader2 size={15} className="animate-spin" />}
                 Save Changes
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {appointmentConfirmation && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !appointmentActionLoading) {
+              setAppointmentConfirmation(null);
+            }
+          }}
+        >
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="appointment-confirm-title"
+            aria-describedby="appointment-confirm-description"
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+          >
+            <div className="p-6">
+              <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${
+                appointmentConfirmation.action === "delete"
+                  ? "bg-red-50 text-red-600"
+                  : "bg-blue-50 text-blue-600"
+              }`}>
+                {appointmentConfirmation.action === "delete" ? (
+                  <Trash2 size={23} />
+                ) : (
+                  <CalendarCheck size={23} />
+                )}
+              </div>
+
+              <h2 id="appointment-confirm-title" className="text-lg font-bold text-slate-900">
+                {appointmentConfirmation.action === "delete"
+                  ? "Delete Appointment?"
+                  : appointmentConfirmation.action === "approve"
+                    ? "Confirm Appointment?"
+                    : appointmentConfirmation.action === "complete"
+                      ? "Mark as Visited?"
+                      : appointmentConfirmation.action === "no-show"
+                        ? "Mark as Not Visited?"
+                        : "Cancel Appointment?"}
+              </h2>
+
+              <p id="appointment-confirm-description" className="mt-2 text-sm leading-6 text-slate-600">
+                {appointmentConfirmation.action === "delete"
+                  ? `Are you sure you want to permanently delete ${appointmentConfirmation.ids.length} appointment${appointmentConfirmation.ids.length === 1 ? "" : "s"}? This action cannot be undone.`
+                  : appointmentConfirmation.action === "cancel"
+                    ? `Cancel ${appointmentConfirmation.ids.length} appointment${appointmentConfirmation.ids.length === 1 ? "" : "s"}? Their records will remain in history.`
+                    : appointmentConfirmation.action === "approve"
+                      ? `Confirm ${appointmentConfirmation.ids.length} appointment${appointmentConfirmation.ids.length === 1 ? "" : "s"}?`
+                      : appointmentConfirmation.action === "complete"
+                        ? `Mark ${appointmentConfirmation.ids.length} appointment${appointmentConfirmation.ids.length === 1 ? "" : "s"} as completed?`
+                        : `Mark ${appointmentConfirmation.ids.length} appointment${appointmentConfirmation.ids.length === 1 ? "" : "s"} as not visited?`}
+              </p>
+
+              {appointmentConfirmation.action === "delete" && (
+                <div className="mt-4 rounded-lg border border-red-100 bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700">
+                  Warning: Deleted appointment records cannot be recovered.
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setAppointmentConfirmation(null)}
+                disabled={appointmentActionLoading}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const pending = appointmentConfirmation;
+                  void handleAppointmentAction(pending.action, pending.ids, true);
+                }}
+                disabled={appointmentActionLoading}
+                className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                  appointmentConfirmation.action === "delete"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                {appointmentActionLoading && <Loader2 size={15} className="animate-spin" />}
+                {appointmentConfirmation.action === "delete"
+                  ? "Delete Appointment"
+                  : appointmentConfirmation.action === "approve"
+                    ? "Confirm Appointment"
+                    : appointmentConfirmation.action === "complete"
+                      ? "Mark Visited"
+                      : appointmentConfirmation.action === "no-show"
+                        ? "Mark Not Visited"
+                        : "Confirm Cancellation"}
               </button>
             </div>
           </section>
