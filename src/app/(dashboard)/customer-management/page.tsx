@@ -928,7 +928,7 @@ export default function CustomerManagementPage() {
                           Confirm
                         </button>
                       )}
-                      {["pending", "confirmed"].includes(normalizedStatus) && (
+                      {normalizedStatus === "confirmed" && (
                         <>
                           <button
                             type="button"
