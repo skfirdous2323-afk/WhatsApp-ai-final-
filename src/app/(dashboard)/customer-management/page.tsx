@@ -918,6 +918,8 @@ export default function CustomerManagementPage() {
                       >
                         {appointment.status.replace(/[-_]/g, " ")}
                       </span>
+                      {selectionMode && selectedAppointmentIds.includes(appointment.id) && (
+                        <>
                       {normalizedStatus === "pending" && (
                         <button
                           type="button"
@@ -983,6 +985,8 @@ export default function CustomerManagementPage() {
                       >
                         <Trash2 size={12} /> Delete
                       </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
