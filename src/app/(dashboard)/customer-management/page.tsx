@@ -97,6 +97,7 @@ export default function CustomerManagementPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [appointmentRange, setAppointmentRange] = useState<"all" | "pending" | "pending-action" | "upcoming" | "today" | "last7" | "month" | "completed" | "no-show" | "cancelled" | "rescheduled">("today");
   const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>([]);
+  const [selectionMode, setSelectionMode] = useState(false);
   const [appointmentActionLoading, setAppointmentActionLoading] = useState(false);
   const [appointmentActionError, setAppointmentActionError] = useState("");
   const [appointmentActionMessage, setAppointmentActionMessage] = useState("");
@@ -783,59 +784,86 @@ export default function CustomerManagementPage() {
             </div>
           </div>
 
-          {/* Bulk bar */}
-          <div className="border-t border-slate-200 bg-slate-50/80 p-4 sm:px-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={allVisibleAppointmentsSelected}
-                  onChange={toggleSelectAllAppointments}
-                  disabled={rangeAppointments.length === 0 || appointmentActionLoading}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                Select all in this view
-              </label>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-slate-500">
-                  {selectedAppointmentIds.length} selected
-                </span>
+          {/* Smart Selection Bar */}
+          <div className="border-t border-slate-200 bg-slate-50/80 px-3 py-3 sm:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {selectionMode ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleAppointmentsSelected}
+                        onChange={toggleSelectAllAppointments}
+                        disabled={rangeAppointments.length === 0 || appointmentActionLoading}
+                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      Select All
+                    </label>
+                    <span className="text-xs font-medium text-slate-500">
+                      {selectedAppointmentIds.length} selected
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedAppointmentIds.length > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleAppointmentAction("cancel", selectedAppointmentIds)}
+                          disabled={appointmentActionLoading}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-800 shadow-sm transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Ban size={13} /> Cancel Selected
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleAppointmentAction("delete", selectedAppointmentIds)}
+                          disabled={appointmentActionLoading}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {appointmentActionLoading ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={13} />
+                          )}
+                          Delete Selected
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectionMode(false);
+                        setSelectedAppointmentIds([]);
+                        setAppointmentActionError("");
+                        setAppointmentActionMessage("");
+                      }}
+                      disabled={appointmentActionLoading}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </>
+              ) : (
                 <button
                   type="button"
-                  onClick={() => void handleAppointmentAction("cancel", selectedAppointmentIds)}
-                  disabled={selectedAppointmentIds.length === 0 || appointmentActionLoading}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-800 shadow-sm transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => setSelectionMode(true)}
+                  disabled={rangeAppointments.length === 0}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Ban size={13} /> Cancel Selected
+                  <Users size={14} /> Select
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void handleAppointmentAction("delete", selectedAppointmentIds)}
-                  disabled={selectedAppointmentIds.length === 0 || appointmentActionLoading}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {appointmentActionLoading ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={13} />
-                  )}
-                  Delete Selected
-                </button>
-              </div>
+              )}
             </div>
             {appointmentActionError && (
-              <p
-                role="alert"
-                className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"
-              >
+              <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
                 {appointmentActionError}
               </p>
             )}
             {appointmentActionMessage && (
-              <p
-                role="status"
-                className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
-              >
+              <p role="status" className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                 {appointmentActionMessage}
               </p>
             )}
@@ -859,14 +887,16 @@ export default function CustomerManagementPage() {
                     className="group flex flex-col gap-2.5 border-l-2 border-transparent px-3 py-3 transition-colors hover:border-blue-400 hover:bg-slate-50/80 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3"
                   >
                     <div className="flex min-w-0 items-center gap-2.5 sm:w-[34%] sm:gap-3">
-                      <input
-                        type="checkbox"
-                        aria-label={`Select appointment for ${appointment.patient_name?.trim() || "Patient"}`}
-                        checked={selectedAppointmentIds.includes(appointment.id)}
-                        onChange={() => toggleAppointmentSelection(appointment.id)}
-                        disabled={appointmentActionLoading}
-                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                      />
+                      {selectionMode && (
+                        <input
+                          type="checkbox"
+                          aria-label={`Select appointment for ${appointment.patient_name?.trim() || "Patient"}`}
+                          checked={selectedAppointmentIds.includes(appointment.id)}
+                          onChange={() => toggleAppointmentSelection(appointment.id)}
+                          disabled={appointmentActionLoading}
+                          className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      )}
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-inset ring-blue-100">
                         {initials(appointment.patient_name).slice(0, 2)}
                       </div>
