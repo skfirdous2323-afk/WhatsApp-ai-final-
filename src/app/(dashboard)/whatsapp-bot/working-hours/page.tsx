@@ -366,7 +366,7 @@ export default function WorkingHoursPage() {
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse"></span>
-                Step 4 of 6
+                Step 4 of 5
               </span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
@@ -643,13 +643,12 @@ export default function WorkingHoursPage() {
         {/* Navigation */}
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold text-gray-500">Step 4 of 6</span>
+            <span className="text-xs font-semibold text-gray-500">Step 4 of 5</span>
             <div className="flex gap-1">
               <div className="h-1.5 w-6 rounded-full bg-blue-600"></div>
               <div className="h-1.5 w-6 rounded-full bg-blue-600"></div>
               <div className="h-1.5 w-6 rounded-full bg-blue-600"></div>
               <div className="h-1.5 w-6 rounded-full bg-blue-600"></div>
-              <div className="h-1.5 w-1.5 rounded-full bg-gray-300"></div>
               <div className="h-1.5 w-1.5 rounded-full bg-gray-300"></div>
             </div>
           </div>
@@ -661,10 +660,10 @@ export default function WorkingHoursPage() {
               ← Previous
             </Link>
             <Link
-              href="/whatsapp-bot/review"
+              href="/whatsapp-bot/payment"
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow-xl hover:shadow-blue-500/40"
             >
-              Next → Review & Publish
+              Next → Payment Setup
             </Link>
           </div>
         </div>
