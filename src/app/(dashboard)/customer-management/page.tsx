@@ -715,6 +715,7 @@ export default function CustomerManagementPage() {
                     type="button"
                     onClick={() => {
                       setAppointmentRange(item.id);
+                      setSelectionMode(false);
                       setSelectedAppointmentIds([]);
                       setAppointmentActionError("");
                       setAppointmentActionMessage("");
