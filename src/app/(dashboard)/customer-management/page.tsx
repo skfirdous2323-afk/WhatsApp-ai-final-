@@ -967,6 +967,7 @@ export default function CustomerManagementPage() {
                           <CalendarDays size={12} /> Reschedule
                         </button>
                       )}
+                      {!["cancelled", "canceled", "no-show", "completed"].includes(normalizedStatus) && (
                       <button
                         type="button"
                         onClick={() => void handleAppointmentAction("cancel", [appointment.id])}
@@ -978,6 +979,7 @@ export default function CustomerManagementPage() {
                       >
                         <Ban size={12} /> Cancel
                       </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => void handleAppointmentAction("delete", [appointment.id])}
