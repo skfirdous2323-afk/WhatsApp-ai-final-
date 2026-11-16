@@ -403,6 +403,75 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
   // Handle session-based flows
   // ============================================================
 
+  // ---- PAYMENT METHOD SELECTION ----
+  if (session?.step === "payment_method") {
+    if (["payment_cash", "payment_upi", "payment_clinic"].includes(command)) {
+      try {
+        const { data: paymentSettings, error: paymentError } = await db
+          .from("clinic_payment_settings")
+          .select("cash_enabled, upi_enabled, upi_qr_url, pay_at_clinic_enabled")
+          .eq("clinic_id", clinicId)
+          .maybeSingle();
+
+        if (paymentError) throw paymentError;
+
+        const paymentMethod = {
+          payment_cash: {
+            enabled: paymentSettings?.cash_enabled === true,
+            instruction: "💵 *Cash Payment*\n\nPlease keep the consultation fee ready and pay directly to the clinic."
+          },
+          payment_upi: {
+            enabled: paymentSettings?.upi_enabled === true,
+          },
+          payment_clinic: {
+            enabled: paymentSettings?.pay_at_clinic_enabled === true,
+            instruction: "🏥 *Pay at Clinic*\n\nPlease visit the clinic and pay your consultation fee directly at the reception."
+          },
+        }[command];
+
+        if (!paymentMethod?.enabled) {
+          await engineSendText({
+            accountId, userId, conversationId, contactId,
+            text: "This payment method is currently unavailable. Please contact the clinic."
+          });
+          return true;
+        }
+
+        if (command === "payment_upi") {
+          if (paymentSettings?.upi_qr_url) {
+            await engineSendMedia({
+              accountId, userId, conversationId, contactId,
+              kind: "image",
+              link: paymentSettings.upi_qr_url,
+              caption: "📲 *Clinic UPI Payment QR*\n\nPlease pay directly to the clinic. ZIVEXO does not process payments."
+            });
+          } else {
+            await engineSendText({
+              accountId, userId, conversationId, contactId,
+              text: "📲 UPI is enabled, but the clinic QR code is currently unavailable. Please contact the clinic for payment details."
+            });
+          }
+        } else {
+          await engineSendText({
+            accountId, userId, conversationId, contactId,
+            text: paymentMethod.instruction + "\n\nZIVEXO does not process payments."
+          });
+        }
+
+        clearSession(contactId);
+      } catch (paymentError) {
+        console.error("Payment instruction error:", paymentError);
+        clearSession(contactId);
+        await engineSendText({
+          accountId, userId, conversationId, contactId,
+          text: "Your appointment remains booked. Please contact the clinic directly for payment instructions."
+        }).catch((error) => console.error("Payment fallback message error:", error));
+      }
+
+      return true;
+    }
+  }
+
   // ---- DOCTOR PROFILE AND NAVIGATION ----
   if (command === "main_menu") {
     clearSession(contactId);
@@ -1452,6 +1521,71 @@ Your appointment has been successfully booked.
 
 Thank you for choosing us. 🏥`,
           });
+
+          // Payment selection is optional and must never affect booking success.
+          try {
+            const { data: paymentSettings, error: paymentError } = await db
+              .from("clinic_payment_settings")
+              .select("cash_enabled, upi_enabled, pay_at_clinic_enabled")
+              .eq("clinic_id", clinicId)
+              .maybeSingle();
+
+            if (paymentError) throw paymentError;
+
+            const paymentRows = [];
+
+            if (paymentSettings?.cash_enabled === true) {
+              paymentRows.push({
+                id: "payment_cash",
+                title: "💵 Cash",
+                description: "Pay directly at the clinic"
+              });
+            }
+
+            if (paymentSettings?.upi_enabled === true) {
+              paymentRows.push({
+                id: "payment_upi",
+                title: "📲 UPI Payment",
+                description: "View clinic UPI QR code"
+              });
+            }
+
+            if (paymentSettings?.pay_at_clinic_enabled === true) {
+              paymentRows.push({
+                id: "payment_clinic",
+                title: "🏥 Pay at Clinic",
+                description: "Pay at clinic reception"
+              });
+            }
+
+            if (paymentRows.length > 0) {
+              setSession(contactId, { ...session, step: "payment_method" });
+
+              await engineSendInteractiveList({
+                accountId, userId, conversationId, contactId,
+                bodyText: "💳 *Choose Payment Method*\n\nYour appointment is booked successfully. Please select an available payment method.\n\n🌐 Online Payment Gateway: Coming Soon\n\nPayment is made directly to the clinic. ZIVEXO does not process payments.",
+                buttonLabel: "Select Payment",
+                footerText: "🏥 Powered by ZIVEXO",
+                sections: [{
+                  title: "Available Payment Methods",
+                  rows: paymentRows
+                }]
+              });
+            } else {
+              clearSession(contactId);
+              await engineSendText({
+                accountId, userId, conversationId, contactId,
+                text: "Please contact the clinic directly for payment information."
+              });
+            }
+          } catch (paymentError) {
+            console.error("Payment selection setup error:", paymentError);
+            clearSession(contactId);
+            await engineSendText({
+              accountId, userId, conversationId, contactId,
+              text: "Your appointment is successfully booked. Please contact the clinic directly for payment information."
+            }).catch((error) => console.error("Payment fallback message error:", error));
+          }
 
           return true;
         } catch (error) {
