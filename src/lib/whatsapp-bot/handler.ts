@@ -1567,7 +1567,7 @@ Thank you for choosing us. 🏥`,
                 buttonLabel: "Select Payment",
                 footerText: "🏥 Powered by ZIVEXO",
                 sections: [{
-                  title: "Available Payment Methods",
+                  title: "Payment Options",
                   rows: paymentRows
                 }]
               });
