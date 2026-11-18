@@ -10,6 +10,7 @@ export interface Session {
   gender?: string;
   age?: number;
   page?: number;
+  appointmentId?: string;
 }
 ;
 

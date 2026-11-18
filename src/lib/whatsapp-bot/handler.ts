@@ -6,6 +6,7 @@ import {
   engineSendMedia,
 } from "@/lib/flows/meta-send";
 import { supabaseAdmin } from "@/lib/ai/admin-client";
+import { getMediaUrl, downloadMedia } from "@/lib/whatsapp/meta-api";
 import { sendMainMenu } from "@/lib/whatsapp-bot/menu";
 import {
   getSession,
@@ -29,6 +30,7 @@ interface SessionData {
   gender?: string;
   age?: number;
   page?: number;
+  appointmentId?: string;
 }
 
 // ============================================================
@@ -303,12 +305,20 @@ export async function runWhatsAppBot({
   conversationId,
   contactId,
   text,
+  mediaId,
+  mediaMimeType,
+  whatsappMessageId,
+  accessToken,
 }: {
   accountId: string;
   userId: string;
   conversationId: string;
   contactId: string;
   text: string;
+  mediaId?: string;
+  mediaMimeType?: string;
+  whatsappMessageId?: string;
+  accessToken?: string;
 }) {
   const msg = text.trim().toLowerCase();
   console.log("📩 Message received:", text);
@@ -340,6 +350,128 @@ export async function runWhatsAppBot({
   }
 
   const clinicId = clinic.id;
+
+  // ---- PRIVATE UPI PAYMENT SCREENSHOT ----
+  if (mediaId) {
+    try {
+      const { data: duplicate } = await db
+        .from("clinic_payment_submissions")
+        .select("id")
+        .eq("whatsapp_message_id", whatsappMessageId || "")
+        .maybeSingle();
+
+      if (duplicate) return true;
+
+      const { data: pendingPayments, error: pendingError } = await db
+        .from("clinic_payment_submissions")
+        .select("id, appointment_id")
+        .eq("clinic_id", clinicId)
+        .eq("contact_id", contactId)
+        .eq("status", "awaiting_screenshot")
+        .order("created_at", { ascending: false })
+        .limit(2);
+
+      if (pendingError) throw pendingError;
+
+      if (!pendingPayments || pendingPayments.length !== 1) {
+        await engineSendText({
+          accountId, userId, conversationId, contactId,
+          text: "We couldn't safely match this screenshot to one appointment. Please contact the clinic for help."
+        });
+        return true;
+      }
+
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+      if (!mediaMimeType || !allowedTypes.includes(mediaMimeType) || !accessToken) {
+        await engineSendText({
+          accountId, userId, conversationId, contactId,
+          text: "Please send your payment screenshot as a JPG, PNG or WEBP image."
+        });
+        return true;
+      }
+
+      const media = await getMediaUrl({ mediaId, accessToken });
+      if (!allowedTypes.includes(media.mimeType)) {
+        throw new Error("Unsupported payment screenshot MIME type");
+      }
+
+      const downloaded = await downloadMedia({
+        downloadUrl: media.url,
+        accessToken
+      });
+
+      if (
+        !allowedTypes.includes(downloaded.contentType.split(";")[0].toLowerCase()) ||
+        downloaded.buffer.length === 0 ||
+        downloaded.buffer.length > 5 * 1024 * 1024
+      ) {
+        await engineSendText({
+          accountId, userId, conversationId, contactId,
+          text: "The screenshot must be a valid JPG, PNG or WEBP image under 5 MB. Please try again."
+        });
+        return true;
+      }
+
+      const extension = downloaded.contentType.toLowerCase().includes("png")
+        ? "png"
+        : downloaded.contentType.toLowerCase().includes("webp")
+          ? "webp"
+          : "jpg";
+      const payment = pendingPayments[0];
+      const storagePath = `${clinicId}/${payment.id}/${whatsappMessageId || crypto.randomUUID()}.${extension}`;
+
+      const { error: uploadError } = await db.storage
+        .from("clinic-payment-submissions")
+        .upload(storagePath, downloaded.buffer, {
+          contentType: downloaded.contentType,
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: updatedPayment, error: updateError } = await db
+        .from("clinic_payment_submissions")
+        .update({
+          screenshot_path: storagePath,
+          status: "pending_verification",
+          whatsapp_message_id: whatsappMessageId || null,
+          submitted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", payment.id)
+        .eq("status", "awaiting_screenshot")
+        .select("id")
+        .maybeSingle();
+
+      if (updateError || !updatedPayment) {
+        await db.storage.from("clinic-payment-submissions").remove([storagePath]);
+        if (updateError) throw updateError;
+        return true;
+      }
+
+      const { error: appointmentError } = await db
+        .from("appointments")
+        .update({ payment_status: "pending_verification" })
+        .eq("id", payment.appointment_id)
+        .eq("clinic_id", clinicId);
+
+      if (appointmentError) {
+        console.error("Appointment payment status update failed:", appointmentError);
+      }
+
+      await engineSendText({
+        accountId, userId, conversationId, contactId,
+        text: "✅ Payment screenshot received.\n\n⏳ *Status: Pending Verification*\n\nThe clinic will verify the payment and notify you. Your appointment booking status is unchanged."
+      });
+    } catch (screenshotError) {
+      console.error("UPI screenshot processing error:", screenshotError);
+      await engineSendText({
+        accountId, userId, conversationId, contactId,
+        text: "We couldn't process this payment screenshot. Please try again or contact the clinic."
+      });
+    }
+    return true;
+  }
 
   // Get appointment settings from CRM
   const { data: settings, error: settingsError } = await db
@@ -438,18 +570,61 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
         }
 
         if (command === "payment_upi") {
-          if (paymentSettings?.upi_qr_url) {
+          if (paymentSettings?.upi_qr_url && session.appointmentId) {
+            const { data: appointment, error: appointmentError } = await db
+              .from("appointments")
+              .select("amount")
+              .eq("id", session.appointmentId)
+              .eq("clinic_id", clinicId)
+              .maybeSingle();
+
+            if (appointmentError || !appointment) {
+              await engineSendText({
+                accountId, userId, conversationId, contactId,
+                text: "Sorry, we could not prepare your payment request. Please contact the clinic."
+              });
+              return true;
+            }
+
+            const { error: paymentRequestError } = await db
+              .from("clinic_payment_submissions")
+              .insert({
+                clinic_id: clinicId,
+                user_id: userId,
+                appointment_id: session.appointmentId,
+                contact_id: contactId,
+                amount: appointment.amount || null,
+                status: "awaiting_screenshot"
+              });
+
+            if (paymentRequestError) {
+              console.error("[UPI Payment] Request creation failed:", paymentRequestError);
+              await engineSendText({
+                accountId, userId, conversationId, contactId,
+                text: "Sorry, we could not start payment verification. Please contact the clinic."
+              });
+              return true;
+            }
+
             await engineSendMedia({
               accountId, userId, conversationId, contactId,
               kind: "image",
               link: paymentSettings.upi_qr_url,
               caption: "📲 *Clinic UPI Payment QR*\n\nPlease pay directly to the clinic. ZIVEXO does not process payments."
             });
+
+            setSession(contactId, { ...session, step: "payment_screenshot" });
+            await engineSendText({
+              accountId, userId, conversationId, contactId,
+              text: "📸 After payment, please send your payment screenshot here. Your payment will remain pending until clinic staff verifies the amount in their bank/UPI account."
+            });
+            return true;
           } else {
             await engineSendText({
               accountId, userId, conversationId, contactId,
-              text: "📲 UPI is enabled, but the clinic QR code is currently unavailable. Please contact the clinic for payment details."
+              text: "📲 UPI QR or appointment details are unavailable. Please contact the clinic."
             });
+            return true;
           }
         } else {
           await engineSendText({
@@ -1453,8 +1628,16 @@ Please choose an option below:`;
 
         try {
           // Save appointment to database
+          const { data: bookedService } = await db
+            .from("clinic_services")
+            .select("price")
+            .eq("id", session.serviceId)
+            .eq("clinic_id", clinicId)
+            .maybeSingle();
+
           const appointmentData = {
             clinic_id: clinicId,
+            amount: bookedService?.price ?? null,
             user_id: userId,
             contact_id: contactId,
             service_id: session.serviceId,
@@ -1559,7 +1742,7 @@ Thank you for choosing us. 🏥`,
             }
 
             if (paymentRows.length > 0) {
-              setSession(contactId, { ...session, step: "payment_method" });
+              setSession(contactId, { ...session, step: "payment_method", appointmentId: inserted.id });
 
               await engineSendInteractiveList({
                 accountId, userId, conversationId, contactId,

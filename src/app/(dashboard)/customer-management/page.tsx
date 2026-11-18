@@ -22,6 +22,10 @@ import {
   X,
   Ban,
   Trash2,
+  CreditCard,
+  CheckCircle2,
+  ExternalLink,
+  XCircle,
 } from "lucide-react";
 
 type Customer = {
@@ -37,6 +41,17 @@ type Doctor = {
   id: string;
   doctor_name: string | null;
   specialization?: string | null;
+};
+
+type PaymentSubmission = {
+  id: string;
+  appointment_id: string;
+  contact_id: string | null;
+  amount: number | null;
+  status: string;
+  utr: string | null;
+  submitted_at: string | null;
+  screenshot_url: string | null;
 };
 
 type Appointment = {
@@ -94,6 +109,12 @@ export default function CustomerManagementPage() {
   const [filter, setFilter] = useState<"all" | "new" | "followup">("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pendingPayments, setPendingPayments] = useState<PaymentSubmission[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentActionId, setPaymentActionId] = useState<string | null>(null);
+  const [paymentUtrs, setPaymentUtrs] = useState<Record<string, string>>({});
+  const [paymentError, setPaymentError] = useState("");
+
   const [formOpen, setFormOpen] = useState(false);
   const [appointmentRange, setAppointmentRange] = useState<"all" | "pending" | "pending-action" | "upcoming" | "today" | "last7" | "month" | "completed" | "no-show" | "cancelled" | "rescheduled">("today");
   const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>([]);
@@ -539,6 +560,75 @@ export default function CustomerManagementPage() {
     }
   };
 
+  const loadPendingPayments = useCallback(async () => {
+    setPaymentsLoading(true);
+    setPaymentError("");
+    try {
+      const response = await fetch("/api/payments/verification", {
+        method: "GET",
+        cache: "no-store",
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Could not load pending payments.");
+      }
+      setPendingPayments(result.payments || []);
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : "Could not load pending payments.");
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPendingPayments();
+  }, [loadPendingPayments]);
+
+  const processPayment = async (payment: PaymentSubmission, action: "approve" | "reject") => {
+    let rejectionReason = "";
+    if (action === "reject") {
+      const reason = window.prompt("Enter the reason for rejecting this payment:");
+      if (reason === null) return;
+      rejectionReason = reason.trim();
+      if (!rejectionReason) {
+        window.alert("Please enter a rejection reason.");
+        return;
+      }
+    }
+
+    if (
+      action === "approve" &&
+      !window.confirm("Have you checked your bank/UPI account and confirmed that the actual payment was received?")
+    ) {
+      return;
+    }
+
+    setPaymentActionId(payment.id);
+    setPaymentError("");
+    try {
+      const response = await fetch("/api/payments/verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentId: payment.id,
+          action,
+          verifiedReceived: action === "approve",
+          utr: paymentUtrs[payment.id] || "",
+          rejectionReason,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Payment could not be updated.");
+      }
+      await loadPendingPayments();
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : "Payment could not be updated.");
+    } finally {
+      setPaymentActionId(null);
+    }
+  };
+
   return (
     <main className="min-h-full bg-slate-50 p-4 text-slate-800 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-[1600px] space-y-6">
@@ -623,6 +713,142 @@ export default function CustomerManagementPage() {
             icon={<Activity size={18} />}
             iconClass="bg-amber-50 text-amber-600"
           />
+        </section>
+
+        {/* ---------- Payment Verification ---------- */}
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col justify-between gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center">
+            <div>
+              <div className="flex items-center gap-2">
+                <CreditCard size={19} className="text-blue-600" />
+                <h2 className="text-base font-semibold text-slate-900">
+                  Payment Verification
+                </h2>
+                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                  {pendingPayments.length} Pending
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-slate-500">
+                Verify the actual payment in your bank or UPI account before approving.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadPendingPayments()}
+              disabled={paymentsLoading}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={paymentsLoading ? "animate-spin" : ""} />
+              Refresh Payments
+            </button>
+          </div>
+
+          <div className="space-y-3 p-5">
+            {paymentError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {paymentError}
+              </div>
+            )}
+
+            {paymentsLoading && pendingPayments.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-500">
+                <Loader2 size={17} className="animate-spin" />
+                Loading pending payments...
+              </div>
+            ) : pendingPayments.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-200 py-8 text-center">
+                <CheckCircle2 size={25} className="mx-auto text-emerald-500" />
+                <p className="mt-2 text-sm font-medium text-slate-700">
+                  No pending payments
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  New UPI screenshot submissions will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pendingPayments.map((payment) => (
+                  <article
+                    key={payment.id}
+                    className="rounded-xl border border-slate-200 p-4"
+                  >
+                    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900">
+                          Appointment #{payment.appointment_id.slice(0, 8).toUpperCase()}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Submitted: {formatDate(payment.submitted_at || payment.id)}
+                        </p>
+                        <p className="mt-2 text-lg font-bold text-slate-900">
+                          {payment.amount != null
+                            ? `₹${Number(payment.amount).toLocaleString("en-IN")}`
+                            : "Amount not available"}
+                        </p>
+                        <span className="mt-2 inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                          Pending Verification
+                        </span>
+                      </div>
+
+                      {payment.screenshot_url ? (
+                        <a
+                          href={payment.screenshot_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                        >
+                          <ExternalLink size={14} />
+                          View Screenshot
+                        </a>
+                      ) : (
+                        <span className="text-xs text-red-600">
+                          Screenshot unavailable
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+                      <input
+                        type="text"
+                        value={paymentUtrs[payment.id] || ""}
+                        onChange={(event) =>
+                          setPaymentUtrs((current) => ({
+                            ...current,
+                            [payment.id]: event.target.value,
+                          }))
+                        }
+                        maxLength={100}
+                        placeholder="UPI UTR / Transaction ID (optional)"
+                        className="h-10 min-w-0 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void processPayment(payment, "approve")}
+                        disabled={paymentActionId === payment.id}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {paymentActionId === payment.id ? (
+                          <Loader2 size={15} className="animate-spin" />
+                        ) : (
+                          <CheckCircle2 size={15} />
+                        )}
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void processPayment(payment, "reject")}
+                        disabled={paymentActionId === payment.id}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        <XCircle size={15} />
+                        Reject
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
 
         {/* ---------- Appointment Overview ---------- */}

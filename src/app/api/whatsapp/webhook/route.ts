@@ -777,6 +777,10 @@ const botHandled = await runWhatsAppBot({
   conversationId: conversation.id,
   contactId: contactRecord.id,
   text: command,
+  mediaId: message.type === 'image' ? message.image?.id : undefined,
+  mediaMimeType: message.type === 'image' ? message.image?.mime_type : undefined,
+  whatsappMessageId: message.id,
+  accessToken,
 })
 
 
