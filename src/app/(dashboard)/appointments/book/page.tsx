@@ -18,6 +18,20 @@ import { useAuth } from "@/hooks/use-auth";
 
 type Row = Record<string, any>;
 
+type PaymentSettings = {
+  cash_enabled: boolean;
+  upi_enabled: boolean;
+  upi_qr_url: string | null;
+  pay_at_clinic_enabled: boolean;
+};
+
+const defaultPaymentSettings: PaymentSettings = {
+  cash_enabled: true,
+  upi_enabled: false,
+  upi_qr_url: null,
+  pay_at_clinic_enabled: true,
+};
+
 export default function BookAppointmentPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -32,8 +46,10 @@ export default function BookAppointmentPage() {
   const [customers, setCustomers] = useState<Row[]>([]);
   const [services, setServices] = useState<Row[]>([]);
   const [doctors, setDoctors] = useState<Row[]>([]);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(defaultPaymentSettings);
 
   const [contactId, setContactId] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [patientName, setPatientName] = useState("");
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
@@ -130,7 +146,7 @@ export default function BookAppointmentPage() {
           throw new Error("Your workspace could not be identified. Please refresh and sign in again.");
         }
 
-        const [customerResult, serviceResult, doctorResult] = await Promise.all([
+        const [customerResult, serviceResult, doctorResult, paymentResult] = await Promise.all([
           supabase
             .from("contacts")
             .select("id, name, phone")
@@ -146,17 +162,42 @@ export default function BookAppointmentPage() {
             .select("*")
             .eq("clinic_id", clinic.id)
             .order("created_at", { ascending: false }),
+          supabase
+            .from("clinic_payment_settings")
+            .select("cash_enabled, upi_enabled, upi_qr_url, pay_at_clinic_enabled")
+            .eq("clinic_id", clinic.id)
+            .maybeSingle(),
         ]);
 
         if (customerResult.error) throw customerResult.error;
         if (serviceResult.error) throw serviceResult.error;
         if (doctorResult.error) throw doctorResult.error;
+        if (paymentResult.error) throw paymentResult.error;
 
         if (!active) return;
 
         setUserId(user.id);
         setClinicId(clinic.id);
         setCustomers(customerResult.data || []);
+        const loadedPaymentSettings: PaymentSettings = paymentResult.data
+          ? {
+              cash_enabled: paymentResult.data.cash_enabled === true,
+              upi_enabled: paymentResult.data.upi_enabled === true,
+              upi_qr_url: paymentResult.data.upi_qr_url || null,
+              pay_at_clinic_enabled: paymentResult.data.pay_at_clinic_enabled === true,
+            }
+          : defaultPaymentSettings;
+
+        setPaymentSettings(loadedPaymentSettings);
+        const firstEnabledMethod = loadedPaymentSettings.cash_enabled
+          ? "cash"
+          : loadedPaymentSettings.upi_enabled
+            ? "upi"
+            : loadedPaymentSettings.pay_at_clinic_enabled
+              ? "pay_at_clinic"
+              : "";
+        setPaymentMethod(firstEnabledMethod);
+
         setServices((serviceResult.data || []).filter((row: Row) =>
           row.is_active !== false && row.active !== false && row.enabled !== false
         ));
@@ -213,6 +254,27 @@ export default function BookAppointmentPage() {
 
     if (!patientName.trim() || !serviceId || !doctorId || !date || !time || !gender || !age) {
       setError("Please complete all required fields.");
+      return;
+    }
+
+    const enabledPaymentMethods = [
+      ...(paymentSettings.cash_enabled ? ["cash"] : []),
+      ...(paymentSettings.upi_enabled ? ["upi"] : []),
+      ...(paymentSettings.pay_at_clinic_enabled ? ["pay_at_clinic"] : []),
+    ];
+
+    if (!enabledPaymentMethods.length) {
+      setError("No payment method is enabled. Configure payment options in WhatsApp Bot → Payment first.");
+      return;
+    }
+
+    if (!enabledPaymentMethods.includes(paymentMethod)) {
+      setError("Please select an enabled payment method.");
+      return;
+    }
+
+    if (paymentMethod === "upi" && !paymentSettings.upi_qr_url) {
+      setError("UPI QR code is missing. Upload the clinic QR code in WhatsApp Bot → Payment, or choose another payment method.");
       return;
     }
 
@@ -305,6 +367,8 @@ export default function BookAppointmentPage() {
         gender,
         age: ageNumber,
         status: "pending",
+        payment_method: paymentMethod,
+        payment_status: "pending",
         ...(Number.isFinite(amount) && amount > 0 ? { amount } : {}),
       });
 
@@ -316,6 +380,7 @@ export default function BookAppointmentPage() {
       setPhone("");
       setGender("");
       setAge("");
+      setPaymentMethod(enabledPaymentMethods[0] || "");
       setServiceId("");
       setDoctorId("");
       setDate("");
@@ -591,6 +656,77 @@ export default function BookAppointmentPage() {
                         )}
                       </label>
                     </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-7">
+                    <div className="mb-4 flex items-center gap-2">
+                      <ClipboardList size={19} className="text-blue-700" />
+                      <h2 className="font-semibold text-slate-900">Payment options</h2>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {paymentSettings.upi_enabled && (
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod("upi")}
+                          aria-pressed={paymentMethod === "upi"}
+                          className={`rounded-xl border p-4 text-left transition ${paymentMethod === "upi" ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100" : "border-slate-200 hover:border-blue-300"}`}
+                        >
+                          <span className="block text-sm font-semibold text-slate-900">UPI Payment</span>
+                          <span className="mt-1 block text-xs text-slate-500">Pay using clinic UPI QR</span>
+                        </button>
+                      )}
+
+                      {paymentSettings.pay_at_clinic_enabled && (
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod("pay_at_clinic")}
+                          aria-pressed={paymentMethod === "pay_at_clinic"}
+                          className={`rounded-xl border p-4 text-left transition ${paymentMethod === "pay_at_clinic" ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100" : "border-slate-200 hover:border-blue-300"}`}
+                        >
+                          <span className="block text-sm font-semibold text-slate-900">Pay at Clinic</span>
+                          <span className="mt-1 block text-xs text-slate-500">Pay when visiting the clinic</span>
+                        </button>
+                      )}
+
+                      {paymentSettings.cash_enabled && (
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod("cash")}
+                          aria-pressed={paymentMethod === "cash"}
+                          className={`rounded-xl border p-4 text-left transition ${paymentMethod === "cash" ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100" : "border-slate-200 hover:border-blue-300"}`}
+                        >
+                          <span className="block text-sm font-semibold text-slate-900">Cash</span>
+                          <span className="mt-1 block text-xs text-slate-500">Cash payment at the clinic</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {paymentMethod === "upi" && paymentSettings.upi_enabled && (
+                      <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+                        <p className="text-sm font-semibold text-slate-800">Clinic UPI QR code</p>
+                        {paymentSettings.upi_qr_url ? (
+                          <img
+                            src={paymentSettings.upi_qr_url}
+                            alt="Clinic UPI payment QR code"
+                            className="mt-3 h-48 w-48 rounded-lg border border-slate-200 bg-white object-contain p-2"
+                          />
+                        ) : (
+                          <p className="mt-2 text-sm text-amber-700">
+                            UPI is enabled, but no QR code is configured. Add a QR code in WhatsApp Bot → Payment.
+                          </p>
+                        )}
+                        <p className="mt-2 text-xs text-slate-600">
+                          Payment will remain Pending until the clinic verifies that the amount was received.
+                        </p>
+                      </div>
+                    )}
+
+                    {!paymentSettings.cash_enabled && !paymentSettings.upi_enabled && !paymentSettings.pay_at_clinic_enabled && (
+                      <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        No payment methods are enabled. Configure them in WhatsApp Bot → Payment before booking.
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
