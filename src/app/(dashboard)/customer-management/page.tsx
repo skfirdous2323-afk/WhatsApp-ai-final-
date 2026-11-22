@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { formatCurrency } from "@/lib/currency";
 import { ContactForm } from "@/components/contacts/contact-form";
 import {
   Search,
@@ -66,6 +67,7 @@ type Appointment = {
   service_id?: string | null;
   amount?: number | null;
   payment_status?: string | null;
+  payment_method?: string | null;
 };
 
 const formatDate = (value?: string | null) => {
@@ -98,7 +100,10 @@ const statusClass = (status: string) => {
 
 export default function CustomerManagementPage() {
   const supabase = useMemo(() => createClient(), []);
-  const { accountId } = useAuth();
+  const { accountId, defaultCurrency: authCurrency } = useAuth();
+  const defaultCurrency =
+    authCurrency === "USD" || !authCurrency ? "INR" : authCurrency;
+  const [collectionRange, setCollectionRange] = useState<"today" | "last7" | "month">("today");
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -191,7 +196,7 @@ export default function CustomerManagementPage() {
         const { data, error: appointmentError } = await supabase
           .from("appointments")
           .select(
-            "id, contact_id, patient_name, appointment_date, appointment_time, status, doctor_id, service_id, amount, payment_status, rescheduled_at"
+            "id, contact_id, patient_name, appointment_date, appointment_time, status, doctor_id, service_id, amount, payment_status, payment_method, rescheduled_at"
           )
           .eq("clinic_id", clinic.id)
           .order("appointment_date", { ascending: false });
@@ -380,6 +385,58 @@ export default function CustomerManagementPage() {
       .split("-")
       .map(Number);
     return new Date(year, month - 1, day);
+  };
+
+  const collectionStartDate = (() => {
+    if (collectionRange === "today") return today;
+    if (collectionRange === "last7") return last7DaysBoundary;
+    return monthStart;
+  })();
+
+  const collectionAppointments = appointments.filter((appointment) => {
+    const date = appointmentDate(appointment);
+    return date >= collectionStartDate && date < tomorrow &&
+      activeAppointment(appointment);
+  });
+
+  const paidAppointments = collectionAppointments.filter(
+    (appointment) => appointment.payment_status?.trim().toLowerCase() === "paid"
+  );
+
+  const unpaidAppointments = collectionAppointments.filter(
+    (appointment) => appointment.payment_status?.trim().toLowerCase() !== "paid"
+  );
+
+  const totalCollection = paidAppointments.reduce(
+    (total, appointment) => total + (Number(appointment.amount) || 0), 0
+  );
+
+  const pendingCollection = unpaidAppointments.reduce(
+    (total, appointment) => total + (Number(appointment.amount) || 0), 0
+  );
+
+  const getPaymentMethod = (appointment: Appointment) =>
+    (appointment.payment_method || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+
+  const methodCollection = (method: string) =>
+    paidAppointments
+      .filter((appointment) => getPaymentMethod(appointment) === method)
+      .reduce((total, appointment) => total + (Number(appointment.amount) || 0), 0);
+
+  const recentTransactions = [...paidAppointments]
+    .sort((a, b) =>
+      `${b.appointment_date} ${b.appointment_time || ""}`.localeCompare(
+        `${a.appointment_date} ${a.appointment_time || ""}`
+      )
+    )
+    .slice(0, 8);
+
+  const paymentMethodLabel = (method?: string | null) => {
+    const normalized = (method || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+    if (normalized === "upi") return "UPI";
+    if (normalized === "cash") return "Cash";
+    if (normalized === "pay_at_clinic") return "Pay at Clinic";
+    return method || "Other";
   };
 
   const isPendingActionAppointment = (appointment: Appointment) => {
@@ -713,6 +770,106 @@ export default function CustomerManagementPage() {
             icon={<Activity size={18} />}
             iconClass="bg-amber-50 text-amber-600"
           />
+        </section>
+
+        {/* ---------- Payment Collection ---------- */}
+        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Payment Collection</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Paid and pending appointment payments for your clinic.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {([
+                ["today", "Today"],
+                ["last7", "Last 7 Days"],
+                ["month", "This Month"],
+              ] as const).map(([range, label]) => (
+                <button
+                  key={range}
+                  type="button"
+                  onClick={() => setCollectionRange(range)}
+                  className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                    collectionRange === range
+                      ? "bg-blue-600 text-white"
+                      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="rounded-xl bg-emerald-50 p-4">
+              <p className="text-xs font-medium text-emerald-700">Total Collection</p>
+              <p className="mt-2 text-xl font-bold text-emerald-800">
+                {formatCurrency(totalCollection, defaultCurrency)}
+              </p>
+              <p className="mt-1 text-xs text-emerald-700">Paid appointments only</p>
+            </div>
+            <div className="rounded-xl bg-amber-50 p-4">
+              <p className="text-xs font-medium text-amber-700">Pending Payments</p>
+              <p className="mt-2 text-xl font-bold text-amber-800">
+                {formatCurrency(pendingCollection, defaultCurrency)}
+              </p>
+              <p className="mt-1 text-xs text-amber-700">Unpaid / awaiting verification</p>
+            </div>
+            <div className="rounded-xl border border-slate-100 p-4">
+              <p className="text-xs font-medium text-slate-500">Cash Collection</p>
+              <p className="mt-2 text-lg font-bold text-slate-900">
+                {formatCurrency(methodCollection("cash"), defaultCurrency)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-100 p-4">
+              <p className="text-xs font-medium text-slate-500">UPI Collection</p>
+              <p className="mt-2 text-lg font-bold text-slate-900">
+                {formatCurrency(methodCollection("upi"), defaultCurrency)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-100 p-4">
+              <p className="text-xs font-medium text-slate-500">Pay at Clinic</p>
+              <p className="mt-2 text-lg font-bold text-slate-900">
+                {formatCurrency(methodCollection("pay_at_clinic"), defaultCurrency)}
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-slate-100">
+            <div className="border-b border-slate-100 px-4 py-3">
+              <h3 className="text-sm font-semibold text-slate-800">Recent Transactions</h3>
+              <p className="mt-1 text-xs text-slate-500">Latest 8 paid appointments in the selected date range.</p>
+            </div>
+            {recentTransactions.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-slate-500">
+                No paid transactions found for this period.
+              </p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {recentTransactions.map((appointment) => (
+                  <div
+                    key={appointment.id}
+                    className="flex flex-col justify-between gap-2 px-4 py-3 sm:flex-row sm:items-center"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-800">
+                        {appointment.patient_name || "Patient"}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {formatDate(appointment.appointment_date)} · {paymentMethodLabel(appointment.payment_method)}
+                      </p>
+                    </div>
+                    <p className="text-sm font-semibold text-emerald-700">
+                      {formatCurrency(Number(appointment.amount) || 0, defaultCurrency)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
 
         {/* ---------- Payment Verification ---------- */}
