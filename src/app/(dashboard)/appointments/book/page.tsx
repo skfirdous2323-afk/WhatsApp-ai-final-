@@ -19,14 +19,12 @@ import { useAuth } from "@/hooks/use-auth";
 type Row = Record<string, any>;
 
 type PaymentSettings = {
-  cash_enabled: boolean;
   upi_enabled: boolean;
   upi_qr_url: string | null;
   pay_at_clinic_enabled: boolean;
 };
 
 const defaultPaymentSettings: PaymentSettings = {
-  cash_enabled: true,
   upi_enabled: false,
   upi_qr_url: null,
   pay_at_clinic_enabled: true,
@@ -49,7 +47,7 @@ export default function BookAppointmentPage() {
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(defaultPaymentSettings);
 
   const [contactId, setContactId] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentMethod, setPaymentMethod] = useState("");
   const [patientName, setPatientName] = useState("");
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
@@ -164,7 +162,7 @@ export default function BookAppointmentPage() {
             .order("created_at", { ascending: false }),
           supabase
             .from("clinic_payment_settings")
-            .select("cash_enabled, upi_enabled, upi_qr_url, pay_at_clinic_enabled")
+            .select("upi_enabled, upi_qr_url, pay_at_clinic_enabled")
             .eq("clinic_id", clinic.id)
             .maybeSingle(),
         ]);
@@ -181,7 +179,6 @@ export default function BookAppointmentPage() {
         setCustomers(customerResult.data || []);
         const loadedPaymentSettings: PaymentSettings = paymentResult.data
           ? {
-              cash_enabled: paymentResult.data.cash_enabled === true,
               upi_enabled: paymentResult.data.upi_enabled === true,
               upi_qr_url: paymentResult.data.upi_qr_url || null,
               pay_at_clinic_enabled: paymentResult.data.pay_at_clinic_enabled === true,
@@ -189,13 +186,11 @@ export default function BookAppointmentPage() {
           : defaultPaymentSettings;
 
         setPaymentSettings(loadedPaymentSettings);
-        const firstEnabledMethod = loadedPaymentSettings.cash_enabled
-          ? "cash"
-          : loadedPaymentSettings.upi_enabled
-            ? "upi"
-            : loadedPaymentSettings.pay_at_clinic_enabled
-              ? "pay_at_clinic"
-              : "";
+        const firstEnabledMethod = loadedPaymentSettings.upi_enabled
+          ? "upi"
+          : loadedPaymentSettings.pay_at_clinic_enabled
+            ? "pay_at_clinic"
+            : "";
         setPaymentMethod(firstEnabledMethod);
 
         setServices((serviceResult.data || []).filter((row: Row) =>
@@ -258,7 +253,6 @@ export default function BookAppointmentPage() {
     }
 
     const enabledPaymentMethods = [
-      ...(paymentSettings.cash_enabled ? ["cash"] : []),
       ...(paymentSettings.upi_enabled ? ["upi"] : []),
       ...(paymentSettings.pay_at_clinic_enabled ? ["pay_at_clinic"] : []),
     ];
@@ -689,17 +683,6 @@ export default function BookAppointmentPage() {
                         </button>
                       )}
 
-                      {paymentSettings.cash_enabled && (
-                        <button
-                          type="button"
-                          onClick={() => setPaymentMethod("cash")}
-                          aria-pressed={paymentMethod === "cash"}
-                          className={`rounded-xl border p-4 text-left transition ${paymentMethod === "cash" ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100" : "border-slate-200 hover:border-blue-300"}`}
-                        >
-                          <span className="block text-sm font-semibold text-slate-900">Cash</span>
-                          <span className="mt-1 block text-xs text-slate-500">Cash payment at the clinic</span>
-                        </button>
-                      )}
                     </div>
 
                     {paymentMethod === "upi" && paymentSettings.upi_enabled && (
@@ -722,7 +705,7 @@ export default function BookAppointmentPage() {
                       </div>
                     )}
 
-                    {!paymentSettings.cash_enabled && !paymentSettings.upi_enabled && !paymentSettings.pay_at_clinic_enabled && (
+                    {!paymentSettings.upi_enabled && !paymentSettings.pay_at_clinic_enabled && (
                       <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
                         No payment methods are enabled. Configure them in WhatsApp Bot → Payment before booking.
                       </p>
