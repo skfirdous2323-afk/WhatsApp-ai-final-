@@ -8,6 +8,8 @@ interface PaymentSettings {
   cash_enabled: boolean;
   upi_enabled: boolean;
   upi_qr_url: string | null;
+  upi_id: string;
+  upi_mobile_number: string;
   pay_at_clinic_enabled: boolean;
 }
 
@@ -15,6 +17,8 @@ const defaultSettings: PaymentSettings = {
   cash_enabled: true,
   upi_enabled: false,
   upi_qr_url: null,
+  upi_id: "",
+  upi_mobile_number: "",
   pay_at_clinic_enabled: true,
 };
 
@@ -60,7 +64,7 @@ export default function PaymentSetupPage() {
 
       const { data, error } = await supabase
         .from("clinic_payment_settings")
-        .select("cash_enabled, upi_enabled, upi_qr_url, pay_at_clinic_enabled")
+        .select("cash_enabled, upi_enabled, upi_qr_url, upi_id, upi_mobile_number, pay_at_clinic_enabled")
         .eq("clinic_id", clinic.id)
         .maybeSingle();
 
@@ -71,6 +75,8 @@ export default function PaymentSetupPage() {
           cash_enabled: data.cash_enabled,
           upi_enabled: data.upi_enabled,
           upi_qr_url: data.upi_qr_url,
+          upi_id: data.upi_id || "",
+          upi_mobile_number: data.upi_mobile_number || "",
           pay_at_clinic_enabled: data.pay_at_clinic_enabled,
         });
       }
@@ -84,7 +90,17 @@ export default function PaymentSetupPage() {
     }
   };
 
-  const updateSetting = (key: keyof PaymentSettings, value: boolean) => {
+  const updateSetting = (
+    key: "cash_enabled" | "upi_enabled" | "pay_at_clinic_enabled",
+    value: boolean
+  ) => {
+    setSettings((previous) => ({ ...previous, [key]: value }));
+  };
+
+  const updateTextSetting = (
+    key: "upi_id" | "upi_mobile_number",
+    value: string
+  ) => {
     setSettings((previous) => ({ ...previous, [key]: value }));
   };
 
@@ -165,6 +181,8 @@ export default function PaymentSetupPage() {
             cash_enabled: settings.cash_enabled,
             upi_enabled: settings.upi_enabled,
             upi_qr_url: settings.upi_qr_url,
+            upi_id: settings.upi_id.trim() || null,
+            upi_mobile_number: settings.upi_mobile_number.trim() || null,
             pay_at_clinic_enabled: settings.pay_at_clinic_enabled,
             updated_at: new Date().toISOString(),
           },
@@ -289,8 +307,34 @@ export default function PaymentSetupPage() {
                 UPI QR Code
               </h2>
               <p className="mt-1 text-sm text-gray-500">
-                Upload your clinic's UPI QR code for patients to scan and pay.
+                Add your clinic's UPI ID and mobile number, and upload its QR code.
               </p>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-gray-700">UPI ID</span>
+                <input
+                  type="text"
+                  value={settings.upi_id}
+                  onChange={(event) => updateTextSetting("upi_id", event.target.value)}
+                  placeholder="clinicname@upi"
+                  autoComplete="off"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-gray-700">Mobile Number</span>
+                <input
+                  type="tel"
+                  value={settings.upi_mobile_number}
+                  onChange={(event) => updateTextSetting("upi_mobile_number", event.target.value)}
+                  placeholder="Enter UPI-linked mobile number"
+                  autoComplete="tel"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
             </div>
 
             {settings.upi_qr_url && (

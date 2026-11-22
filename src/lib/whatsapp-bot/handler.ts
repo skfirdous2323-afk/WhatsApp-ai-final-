@@ -541,7 +541,7 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
       try {
         const { data: paymentSettings, error: paymentError } = await db
           .from("clinic_payment_settings")
-          .select("cash_enabled, upi_enabled, upi_qr_url, pay_at_clinic_enabled")
+          .select("cash_enabled, upi_enabled, upi_qr_url, upi_id, upi_mobile_number, pay_at_clinic_enabled")
           .eq("clinic_id", clinicId)
           .maybeSingle();
 
@@ -570,7 +570,13 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
         }
 
         if (command === "payment_upi") {
-          if (paymentSettings?.upi_qr_url && session.appointmentId) {
+          const hasUpiDetails = Boolean(
+            paymentSettings?.upi_qr_url ||
+            paymentSettings?.upi_id?.trim() ||
+            paymentSettings?.upi_mobile_number?.trim()
+          );
+
+          if (hasUpiDetails && session.appointmentId) {
             const { data: appointment, error: appointmentError } = await db
               .from("appointments")
               .select("amount")
@@ -606,12 +612,34 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
               return true;
             }
 
-            await engineSendMedia({
-              accountId, userId, conversationId, contactId,
-              kind: "image",
-              link: paymentSettings.upi_qr_url,
-              caption: "📲 *Clinic UPI Payment QR*\n\nPlease pay directly to the clinic. ZIVEXO does not process payments."
-            });
+            const upiId = paymentSettings?.upi_id?.trim() ?? "";
+            const upiMobileNumber = paymentSettings?.upi_mobile_number?.trim() ?? "";
+            const upiQrUrl = paymentSettings?.upi_qr_url ?? "";
+
+            const upiDetails = [
+              upiId ? `🆔 *UPI ID:* ${upiId}` : "",
+              upiMobileNumber ? `📱 *Mobile Number:* ${upiMobileNumber}` : "",
+            ].filter(Boolean).join("\n");
+
+            const paymentInstructions = [
+              "📲 *Clinic UPI Payment Details*",
+              upiDetails,
+              "Please pay directly to the clinic. ZIVEXO does not process payments.",
+            ].filter(Boolean).join("\n\n");
+
+            if (upiQrUrl) {
+              await engineSendMedia({
+                accountId, userId, conversationId, contactId,
+                kind: "image",
+                link: upiQrUrl,
+                caption: paymentInstructions
+              });
+            } else {
+              await engineSendText({
+                accountId, userId, conversationId, contactId,
+                text: paymentInstructions
+              });
+            }
 
             setSession(contactId, { ...session, step: "payment_screenshot" });
             await engineSendText({
@@ -622,7 +650,7 @@ if (msg === "hi" || msg === "hello" || msg === "hey" || msg === "menu") {
           } else {
             await engineSendText({
               accountId, userId, conversationId, contactId,
-              text: "📲 UPI QR or appointment details are unavailable. Please contact the clinic."
+              text: "📲 UPI payment details or appointment information are unavailable. Please contact the clinic."
             });
             return true;
           }
@@ -1729,7 +1757,7 @@ Thank you for choosing us. 🏥`,
               paymentRows.push({
                 id: "payment_upi",
                 title: "📲 UPI Payment",
-                description: "View clinic UPI QR code"
+                description: "View clinic QR, UPI ID and mobile number"
               });
             }
 

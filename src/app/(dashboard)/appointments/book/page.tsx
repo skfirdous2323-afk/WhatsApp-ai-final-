@@ -21,12 +21,16 @@ type Row = Record<string, any>;
 type PaymentSettings = {
   upi_enabled: boolean;
   upi_qr_url: string | null;
+  upi_id: string;
+  upi_mobile_number: string;
   pay_at_clinic_enabled: boolean;
 };
 
 const defaultPaymentSettings: PaymentSettings = {
   upi_enabled: false,
   upi_qr_url: null,
+  upi_id: "",
+  upi_mobile_number: "",
   pay_at_clinic_enabled: true,
 };
 
@@ -162,7 +166,7 @@ export default function BookAppointmentPage() {
             .order("created_at", { ascending: false }),
           supabase
             .from("clinic_payment_settings")
-            .select("upi_enabled, upi_qr_url, pay_at_clinic_enabled")
+            .select("upi_enabled, upi_qr_url, upi_id, upi_mobile_number, pay_at_clinic_enabled")
             .eq("clinic_id", clinic.id)
             .maybeSingle(),
         ]);
@@ -181,6 +185,8 @@ export default function BookAppointmentPage() {
           ? {
               upi_enabled: paymentResult.data.upi_enabled === true,
               upi_qr_url: paymentResult.data.upi_qr_url || null,
+              upi_id: paymentResult.data.upi_id || "",
+              upi_mobile_number: paymentResult.data.upi_mobile_number || "",
               pay_at_clinic_enabled: paymentResult.data.pay_at_clinic_enabled === true,
             }
           : defaultPaymentSettings;
@@ -267,8 +273,13 @@ export default function BookAppointmentPage() {
       return;
     }
 
-    if (paymentMethod === "upi" && !paymentSettings.upi_qr_url) {
-      setError("UPI QR code is missing. Upload the clinic QR code in WhatsApp Bot → Payment, or choose another payment method.");
+    if (
+      paymentMethod === "upi" &&
+      !paymentSettings.upi_qr_url &&
+      !paymentSettings.upi_id.trim() &&
+      !paymentSettings.upi_mobile_number.trim()
+    ) {
+      setError("UPI details are missing. Add a QR code, UPI ID or mobile number in WhatsApp Bot → Payment.");
       return;
     }
 
@@ -667,7 +678,7 @@ export default function BookAppointmentPage() {
                           className={`rounded-xl border p-4 text-left transition ${paymentMethod === "upi" ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100" : "border-slate-200 hover:border-blue-300"}`}
                         >
                           <span className="block text-sm font-semibold text-slate-900">UPI Payment</span>
-                          <span className="mt-1 block text-xs text-slate-500">Pay using clinic UPI QR</span>
+                          <span className="mt-1 block text-xs text-slate-500">Pay using clinic QR, UPI ID or mobile number</span>
                         </button>
                       )}
 
@@ -687,7 +698,17 @@ export default function BookAppointmentPage() {
 
                     {paymentMethod === "upi" && paymentSettings.upi_enabled && (
                       <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
-                        <p className="text-sm font-semibold text-slate-800">Clinic UPI QR code</p>
+                        <p className="text-sm font-semibold text-slate-800">Clinic UPI Payment Details</p>
+                        {paymentSettings.upi_id && (
+                          <p className="mt-2 text-sm text-slate-700">
+                            <span className="font-medium">UPI ID:</span> {paymentSettings.upi_id}
+                          </p>
+                        )}
+                        {paymentSettings.upi_mobile_number && (
+                          <p className="mt-1 text-sm text-slate-700">
+                            <span className="font-medium">Mobile Number:</span> {paymentSettings.upi_mobile_number}
+                          </p>
+                        )}
                         {paymentSettings.upi_qr_url ? (
                           <img
                             src={paymentSettings.upi_qr_url}
@@ -696,7 +717,7 @@ export default function BookAppointmentPage() {
                           />
                         ) : (
                           <p className="mt-2 text-sm text-amber-700">
-                            UPI is enabled, but no QR code is configured. Add a QR code in WhatsApp Bot → Payment.
+                            No QR code is configured. You can use the UPI ID or mobile number shown above.
                           </p>
                         )}
                         <p className="mt-2 text-xs text-slate-600">
