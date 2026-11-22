@@ -443,7 +443,7 @@ export default function CustomerManagementPage() {
     const status = appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-");
     const date = appointmentDate(appointment);
 
-    if (!["pending", "confirmed"].includes(status) || date > today) {
+    if (status !== "confirmed" || date > today) {
       return false;
     }
 
