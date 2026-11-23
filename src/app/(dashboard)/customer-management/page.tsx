@@ -819,12 +819,6 @@ export default function CustomerManagementPage() {
               <p className="mt-1 text-xs text-amber-700">Unpaid / awaiting verification</p>
             </div>
             <div className="rounded-xl border border-slate-100 p-4">
-              <p className="text-xs font-medium text-slate-500">Cash Collection</p>
-              <p className="mt-2 text-lg font-bold text-slate-900">
-                {formatCurrency(methodCollection("cash"), defaultCurrency)}
-              </p>
-            </div>
-            <div className="rounded-xl border border-slate-100 p-4">
               <p className="text-xs font-medium text-slate-500">UPI Collection</p>
               <p className="mt-2 text-lg font-bold text-slate-900">
                 {formatCurrency(methodCollection("upi"), defaultCurrency)}
