@@ -1376,6 +1376,19 @@ export default function CustomerManagementPage() {
                   .trim()
                   .toLowerCase()
                   .replace(/[_\s]+/g, "-");
+                const normalizedPaymentStatus = (appointment.payment_status || "pending")
+                  .trim()
+                  .toLowerCase()
+                  .replace(/[_\s]+/g, "-");
+                const isPaymentPaid = normalizedPaymentStatus === "paid";
+                const isPaymentVerificationPending = [
+                  "pending-verification",
+                  "awaiting-verification",
+                ].includes(normalizedPaymentStatus);
+                const canMarkPaymentPaid =
+                  !isPaymentPaid &&
+                  !isPaymentVerificationPending &&
+                  !["cancelled", "canceled", "no-show"].includes(normalizedStatus);
                 const linkedCustomer = customers.find(
                   (customer) => customer.id === appointment.contact_id
                 );
@@ -1383,7 +1396,13 @@ export default function CustomerManagementPage() {
                 return (
                   <div
                     key={appointment.id}
-                    className="group flex flex-col gap-2.5 border-l-2 border-transparent px-3 py-3 transition-colors hover:border-blue-400 hover:bg-slate-50/80 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3"
+                    className={`group flex flex-col gap-2.5 border-l-4 px-3 py-3 transition-colors sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3 ${
+                      isPaymentPaid
+                        ? "border-l-emerald-400 bg-emerald-50/70 hover:bg-emerald-50"
+                        : isPaymentVerificationPending
+                          ? "border-l-sky-400 bg-sky-50/70 hover:bg-sky-50"
+                          : "border-l-amber-400 bg-amber-50/70 hover:bg-amber-50"
+                    }` }
                   >
                     <div className="flex min-w-0 items-center gap-2.5 sm:w-[34%] sm:gap-3">
                       {selectionMode && (
@@ -1422,6 +1441,43 @@ export default function CustomerManagementPage() {
                       >
                         {appointment.status.replace(/[-_]/g, " ")}
                       </span>
+
+                      <div
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          isPaymentPaid
+                            ? "bg-emerald-100 text-emerald-800"
+                            : isPaymentVerificationPending
+                              ? "bg-sky-100 text-sky-800"
+                              : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        <CreditCard size={12} />
+                        {isPaymentPaid
+                          ? "Paid"
+                          : isPaymentVerificationPending
+                            ? "Pending Verification"
+                            : "Payment Pending"}
+                        <span className="font-bold">
+                          {formatCurrency(Number(appointment.amount) || 0, defaultCurrency)}
+                        </span>
+                      </div>
+
+                      {canMarkPaymentPaid && (
+                        <button
+                          type="button"
+                          onClick={() => void markAppointmentPaid(appointment)}
+                          disabled={markPaidLoadingId !== null}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {markPaidLoadingId === appointment.id ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <CheckCircle2 size={12} />
+                          )}
+                          {markPaidLoadingId === appointment.id ? "Updating..." : "Mark as Paid"}
+                        </button>
+                      )}
+
                       {selectionMode && selectedAppointmentIds.includes(appointment.id) && (
                         <>
                       {normalizedStatus === "pending" && (
