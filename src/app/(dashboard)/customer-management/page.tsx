@@ -117,6 +117,7 @@ export default function CustomerManagementPage() {
   const [pendingPayments, setPendingPayments] = useState<PaymentSubmission[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentActionId, setPaymentActionId] = useState<string | null>(null);
+  const [markPaidLoadingId, setMarkPaidLoadingId] = useState<string | null>(null);
   const [paymentUtrs, setPaymentUtrs] = useState<Record<string, string>>({});
   const [paymentError, setPaymentError] = useState("");
 
@@ -617,6 +618,34 @@ export default function CustomerManagementPage() {
     }
   };
 
+  const markAppointmentPaid = async (appointment: Appointment) => {
+    if (markPaidLoadingId) return;
+
+    const confirmed = window.confirm(
+      `Have you actually received ${formatCurrency(Number(appointment.amount) || 0, defaultCurrency)} from ${appointment.patient_name || "this patient"}? Only confirm after checking the payment.`
+    );
+    if (!confirmed) return;
+
+    setMarkPaidLoadingId(appointment.id);
+    setPaymentError("");
+    try {
+      const response = await fetch("/api/appointments/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark-paid", ids: [appointment.id] }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Could not mark this payment as paid.");
+      }
+      await loadData();
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : "Could not update this payment.");
+    } finally {
+      setMarkPaidLoadingId(null);
+    }
+  };
+
   const loadPendingPayments = useCallback(async () => {
     setPaymentsLoading(true);
     setPaymentError("");
@@ -832,6 +861,98 @@ export default function CustomerManagementPage() {
             </div>
           </div>
 
+          <div className="overflow-hidden rounded-lg border border-amber-200">
+            <div className="border-b border-amber-100 bg-amber-50/60 px-4 py-3">
+              <h3 className="text-sm font-semibold text-amber-900">Pending Payment Details</h3>
+              <p className="mt-1 text-xs text-amber-700">
+                Patient-wise unpaid payments in the selected date range.
+              </p>
+            </div>
+            {unpaidAppointments.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-slate-500">
+                No pending payments found for this period.
+              </p>
+            ) : (
+              <div className="divide-y divide-amber-100">
+                {[...unpaidAppointments]
+                  .sort((a, b) =>
+                    `${b.appointment_date} ${b.appointment_time || ""}`.localeCompare(
+                      `${a.appointment_date} ${a.appointment_time || ""}`
+                    )
+                  )
+                  .map((appointment) => {
+                    const normalizedPaymentStatus = (appointment.payment_status || "")
+                      .trim()
+                      .toLowerCase()
+                      .replace(/[_\s]+/g, "-");
+                    const awaitingVerification =
+                      normalizedPaymentStatus === "pending-verification";
+                    const patientPhone = customers.find(
+                      (customer) => customer.id === appointment.contact_id
+                    )?.phone;
+
+                    return (
+                      <div
+                        key={appointment.id}
+                        className="flex flex-col justify-between gap-3 bg-amber-50/30 px-4 py-3 sm:flex-row sm:items-center"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-800">
+                            {appointment.patient_name || "Patient"}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            {patientPhone || "Phone unavailable"}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {formatDate(appointment.appointment_date)} · {appointment.appointment_time || "Time unavailable"}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {paymentMethodLabel(appointment.payment_method)}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                          <div className="sm:text-right">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                                awaitingVerification
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-amber-100 text-amber-800"
+                              }`}
+                            >
+                              {awaitingVerification
+                                ? "Awaiting Verification"
+                                : "Payment Pending"}
+                            </span>
+                            <p className="mt-1 text-sm font-bold text-slate-900">
+                              {formatCurrency(Number(appointment.amount) || 0, defaultCurrency)}
+                            </p>
+                          </div>
+
+                          {awaitingVerification ? (
+                            <span className="text-xs text-blue-700">
+                              Verify below
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void markAppointmentPaid(appointment)}
+                              disabled={markPaidLoadingId !== null}
+                              className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {markPaidLoadingId === appointment.id
+                                ? "Updating..."
+                                : "Mark as Paid"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+
           <div className="overflow-hidden rounded-lg border border-slate-100">
             <div className="border-b border-slate-100 px-4 py-3">
               <h3 className="text-sm font-semibold text-slate-800">Recent Transactions</h3>
@@ -846,7 +967,7 @@ export default function CustomerManagementPage() {
                 {recentTransactions.map((appointment) => (
                   <div
                     key={appointment.id}
-                    className="flex flex-col justify-between gap-2 px-4 py-3 sm:flex-row sm:items-center"
+                    className="flex flex-col justify-between gap-2 bg-emerald-50/70 px-4 py-3 sm:flex-row sm:items-center"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-slate-800">

@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const newTime = body?.time;
 
     if (
-      !["cancel", "delete", "approve", "reject", "complete", "no-show", "reschedule"].includes(action) ||
+      !["cancel", "delete", "approve", "reject", "complete", "no-show", "reschedule", "mark-paid"].includes(action) ||
       !Array.isArray(ids) ||
       ids.length === 0 ||
       ids.length > 100 ||
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
 
     const { data: ownedAppointments, error: lookupError } = await supabase
       .from("appointments")
-      .select("id, status, doctor_id, appointment_date, appointment_time")
+      .select("id, status, payment_status, doctor_id, appointment_date, appointment_time")
       .eq("clinic_id", clinic.id)
       .in("id", ids);
 
@@ -82,6 +82,46 @@ export async function POST(request: Request) {
 
     const normalizedStatus = (status: string) =>
       String(status || "").toLowerCase().replace(/[_\s]+/g, "-");
+
+    if (action === "mark-paid") {
+      const blockedAppointment = ownedAppointments.some((appointment) => {
+        const status = normalizedStatus(appointment.status);
+        const paymentStatus = normalizedStatus(appointment.payment_status || "");
+        return (
+          ["cancelled", "canceled", "no-show"].includes(status) ||
+          paymentStatus === "paid" ||
+          paymentStatus === "pending-verification"
+        );
+      });
+
+      if (blockedAppointment) {
+        return NextResponse.json(
+          { error: "Some payments are already paid, awaiting verification, or belong to cancelled/no-show appointments." },
+          { status: 409 }
+        );
+      }
+
+      const { data: updatedPayments, error: paymentUpdateError } = await supabase
+        .from("appointments")
+        .update({ payment_status: "paid" })
+        .eq("clinic_id", clinic.id)
+        .in("id", ids)
+        .select("id");
+
+      if (paymentUpdateError || !updatedPayments || updatedPayments.length !== ids.length) {
+        console.error("Appointment payment update failed:", paymentUpdateError);
+        return NextResponse.json(
+          { error: "Could not mark the selected payment as paid. Refresh and try again." },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        action,
+        count: updatedPayments.length,
+      });
+    }
 
     if (action === "reschedule") {
       const appointment = ownedAppointments[0];
