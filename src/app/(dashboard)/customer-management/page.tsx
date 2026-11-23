@@ -104,6 +104,7 @@ export default function CustomerManagementPage() {
   const defaultCurrency =
     authCurrency === "USD" || !authCurrency ? "INR" : authCurrency;
   const [collectionRange, setCollectionRange] = useState<"today" | "last7" | "month">("today");
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -137,6 +138,11 @@ export default function CustomerManagementPage() {
   const [customerActionLoading, setCustomerActionLoading] = useState(false);
   const [customerActionError, setCustomerActionError] = useState("");
   const [customerActionMessage, setCustomerActionMessage] = useState("");
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -284,7 +290,7 @@ export default function CustomerManagementPage() {
     [customerActionLoading, loadData]
   );
 
-  const today = new Date();
+  const today = new Date(currentTime);
   today.setHours(0, 0, 0, 0);
   const recentBoundary = new Date(today);
   recentBoundary.setDate(recentBoundary.getDate() - 30);
@@ -442,25 +448,24 @@ export default function CustomerManagementPage() {
 
   const isPendingActionAppointment = (appointment: Appointment) => {
     const status = appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-");
-    const date = appointmentDate(appointment);
 
-    if (status !== "confirmed" || date > today) {
-      return false;
-    }
+    if (status !== "confirmed") return false;
 
-    if (date.getTime() === today.getTime() && appointment.rescheduled_at) {
-      const rescheduledDate = new Date(appointment.rescheduled_at);
-      if (!Number.isNaN(rescheduledDate.getTime())) {
-        const rescheduledLocalDate = new Date(
-          rescheduledDate.getFullYear(),
-          rescheduledDate.getMonth(),
-          rescheduledDate.getDate()
-        );
-        if (rescheduledLocalDate.getTime() === today.getTime()) return false;
-      }
-    }
+    const timeMatch = (appointment.appointment_time || "")
+      .trim()
+      .match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
 
-    return true;
+    if (!timeMatch) return false;
+
+    const hours = Number(timeMatch[1]);
+    const minutes = Number(timeMatch[2]);
+
+    if (hours > 23 || minutes > 59) return false;
+
+    const scheduledDateTime = appointmentDate(appointment);
+    scheduledDateTime.setHours(hours, minutes, 0, 0);
+
+    return scheduledDateTime.getTime() < currentTime.getTime();
   };
 
   const upcomingAppointmentsCount = appointments.filter((appointment) => {
