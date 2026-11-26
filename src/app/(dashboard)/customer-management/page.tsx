@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/currency";
 import { ContactForm } from "@/components/contacts/contact-form";
 import {
   Search,
+  ArrowLeft,
   Plus,
   Users,
   CalendarDays,
@@ -1690,25 +1691,23 @@ export default function CustomerManagementPage() {
       )}
 
       {customerDirectoryOpen && (
-        <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 p-2 backdrop-blur-sm sm:p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setCustomerDirectoryOpen(false);
-            }
-          }}
-        >
+        <div className="fixed inset-0 z-[90] flex flex-col bg-slate-50">
           <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="customer-directory-title"
-            className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            className="flex h-full min-h-0 w-full max-w-none flex-col overflow-hidden border-0 bg-slate-50 shadow-none"
           >
-            <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+            <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-8">
               <div>
-                <h2 id="customer-directory-title" className="text-lg font-bold text-slate-900 sm:text-xl">
-                  Customer Directory
-                </h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 id="customer-directory-title" className="text-lg font-bold text-slate-900 sm:text-xl">
+                    Customer Directory
+                  </h2>
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 ring-1 ring-blue-100">
+                    {customers.length} total
+                  </span>
+                </div>
                 <p className="mt-1 text-xs text-slate-500">
                   {customerDirectoryMode === "new"
                     ? "Customers joined in the last 30 days"
@@ -1718,16 +1717,26 @@ export default function CustomerManagementPage() {
               <button
                 type="button"
                 onClick={() => setCustomerDirectoryOpen(false)}
-                aria-label="Close customer directory"
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+                className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 sm:px-4 sm:text-sm"
               >
-                <X size={20} />
+                <ArrowLeft size={16} />
+                <span className="hidden sm:inline">Back to Dashboard</span>
+                <span className="sm:hidden">Back</span>
               </button>
             </header>
 
-            <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[320px_minmax(0,1fr)] lg:overflow-hidden">
+            <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[340px_minmax(0,1fr)] lg:overflow-hidden">
               <aside className="flex min-h-[260px] flex-col border-b border-slate-100 lg:min-h-0 lg:border-b-0 lg:border-r">
-                <div className="space-y-3 p-4">
+                <div className="space-y-4 border-b border-slate-100 bg-white p-4 sm:p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">Your Customers</p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">Browse and manage your contacts</p>
+                    </div>
+                    <span className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-bold text-slate-600">
+                      {directoryCustomers.length}
+                    </span>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
@@ -1745,7 +1754,10 @@ export default function CustomerManagementPage() {
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                       }`}
                     >
-                      All Customers
+                      <span>All Customers</span>
+                      <span className={`ml-1 rounded-md px-1.5 py-0.5 text-[10px] ${
+                        customerDirectoryMode === "all" ? "bg-white/20 text-white" : "bg-white text-slate-500"
+                      }`}>{customers.length}</span>
                     </button>
                     <button
                       type="button"
@@ -1763,7 +1775,10 @@ export default function CustomerManagementPage() {
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                       }`}
                     >
-                      New Customers
+                      <span>New Customers</span>
+                      <span className={`ml-1 rounded-md px-1.5 py-0.5 text-[10px] ${
+                        customerDirectoryMode === "new" ? "bg-white/20 text-white" : "bg-white text-slate-500"
+                      }`}>{customers.filter((customer) => new Date(customer.created_at) >= recentBoundary).length}</span>
                     </button>
                   </div>
 
@@ -1794,11 +1809,25 @@ export default function CustomerManagementPage() {
                         setSelected(matches[0] || null);
                       }}
                       placeholder="Search name, phone or email..."
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-10 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
                     />
+                    {directorySearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDirectorySearch("");
+                          const first = directoryCustomers[0] || null;
+                          setSelected(first);
+                        }}
+                        aria-label="Clear search"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
                   </div>
-                  <p className="text-xs font-medium text-slate-500">
-                    {directoryCustomers.length} customers
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                    Customer list · {directoryCustomers.length} results
                   </p>
                 </div>
 
@@ -1821,11 +1850,15 @@ export default function CustomerManagementPage() {
                         onClick={() => setSelected(customer)}
                         className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${
                           selected?.id === customer.id
-                            ? "bg-blue-50 ring-1 ring-blue-200"
-                            : "hover:bg-slate-50"
+                            ? "bg-blue-50 shadow-sm ring-1 ring-blue-200"
+                            : "border border-transparent hover:bg-white hover:shadow-sm"
                         }`}
                       >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold shadow-sm ${
+                          selected?.id === customer.id
+                            ? "bg-blue-600 text-white"
+                            : "bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-700"
+                        }`}>
                           {initials(customer.name)}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -1843,7 +1876,7 @@ export default function CustomerManagementPage() {
                 </div>
               </aside>
 
-              <div className="min-h-0 overflow-y-auto bg-slate-50/70 p-4 sm:p-6">
+              <div className="min-h-0 overflow-y-auto bg-gradient-to-br from-slate-50 via-slate-50 to-blue-50/40 p-4 sm:p-6 lg:p-8">
                 {!selected ? (
                   <div className="flex min-h-[300px] flex-col items-center justify-center text-center">
                     <Users size={34} className="text-slate-300" />
@@ -1856,22 +1889,28 @@ export default function CustomerManagementPage() {
                   </div>
                 ) : (
                   <div className="space-y-5">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                      <div className="flex flex-wrap items-center gap-4">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-lg font-bold text-blue-700">
+                    <div className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-white to-blue-50 p-5 shadow-sm sm:p-7">
+                      <div className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-blue-100/50" />
+                      <div className="relative flex flex-wrap items-center gap-4">
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-xl font-extrabold text-white shadow-lg shadow-blue-200">
                           {initials(selected.name)}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <h3 className="break-words text-lg font-bold text-slate-900">
-                            {selected.name || "Unnamed customer"}
-                          </h3>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="break-words text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
+                              {selected.name || "Unnamed customer"}
+                            </h3>
+                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-100">
+                              Customer
+                            </span>
+                          </div>
                           <p className="mt-1 text-xs text-slate-500">
                             Customer since {formatDate(selected.created_at)}
                           </p>
                         </div>
                       </div>
 
-                      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      <div className="relative mt-6 grid gap-3 sm:grid-cols-2">
                         <InfoItem
                           icon={<Phone size={16} />}
                           label="Phone"
@@ -1886,36 +1925,39 @@ export default function CustomerManagementPage() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                      <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
-                        <p className="text-xs text-slate-500">Total Appointments</p>
+                      <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                        <p className="text-xs font-semibold text-slate-500">Total Appointments</p>
                         <p className="mt-2 text-2xl font-bold text-slate-900">
                           {selectedAppointments.length}
                         </p>
                       </div>
-                      <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
-                        <p className="text-xs text-slate-500">Completed</p>
+                      <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                        <p className="text-xs font-semibold text-slate-500">Completed</p>
                         <p className="mt-2 text-2xl font-bold text-emerald-600">
                           {completedAppointmentsCount}
                         </p>
                       </div>
-                      <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
-                        <p className="text-xs text-slate-500">Total Paid</p>
+                      <div className="rounded-2xl border border-green-100 bg-gradient-to-br from-white to-green-50/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                        <p className="text-xs font-semibold text-slate-500">Total Paid</p>
                         <p className="mt-2 break-words text-lg font-bold text-emerald-700">
                           {formatCurrency(totalPaidAmount, defaultCurrency)}
                         </p>
                       </div>
-                      <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
-                        <p className="text-xs text-slate-500">Pending Payment</p>
+                      <div className="rounded-2xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                        <p className="text-xs font-semibold text-slate-500">Pending Payment</p>
                         <p className="mt-2 break-words text-lg font-bold text-amber-600">
                           {formatCurrency(pendingPaymentAmount, defaultCurrency)}
                         </p>
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Last Appointment
-                      </p>
+                    <div className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-white to-indigo-50/70 p-5 shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-indigo-700">
+                          Last Appointment
+                        </p>
+                        <CalendarCheck size={18} className="text-indigo-500" />
+                      </div>
                       {lastCustomerAppointment ? (
                         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                           <div>
@@ -1935,9 +1977,9 @@ export default function CustomerManagementPage() {
                       )}
                     </div>
 
-                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                      <div className="border-b border-slate-100 px-4 py-4">
-                        <h3 className="font-semibold text-slate-900">
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white px-5 py-5">
+                        <h3 className="text-base font-bold text-slate-900">
                           Appointment History
                         </h3>
                         <p className="mt-1 text-xs text-slate-500">
@@ -1964,7 +2006,7 @@ export default function CustomerManagementPage() {
                             return (
                               <div
                                 key={appointment.id}
-                                className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                                className="flex flex-col gap-3 px-5 py-4 transition hover:bg-slate-50/80 sm:flex-row sm:items-center sm:justify-between"
                               >
                                 <div className="min-w-0">
                                   <p className="text-sm font-semibold text-slate-800">
