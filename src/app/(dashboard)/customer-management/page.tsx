@@ -111,6 +111,9 @@ export default function CustomerManagementPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState("all");
   const [selected, setSelected] = useState<Customer | null>(null);
+  const [customerDirectoryOpen, setCustomerDirectoryOpen] = useState(false);
+  const [customerDirectoryMode, setCustomerDirectoryMode] = useState<"all" | "new">("all");
+  const [directorySearch, setDirectorySearch] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "new" | "followup">("all");
   const [loading, setLoading] = useState(true);
@@ -359,6 +362,49 @@ export default function CustomerManagementPage() {
   const selectedAppointments = selected
     ? customerAppointments(selected.id)
     : [];
+
+  const directoryCustomers = customers
+    .filter((customer) => {
+      const isNew = new Date(customer.created_at) >= recentBoundary;
+      const term = directorySearch.trim().toLowerCase();
+      const matchesSearch =
+        !term ||
+        (customer.name || "").toLowerCase().includes(term) ||
+        customer.phone.toLowerCase().includes(term) ||
+        (customer.email || "").toLowerCase().includes(term);
+
+      return matchesSearch && (customerDirectoryMode === "all" || isNew);
+    })
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+  const completedAppointmentsCount = selectedAppointments.filter(
+    (appointment) => appointment.status.trim().toLowerCase() === "completed"
+  ).length;
+
+  const paymentEligibleAppointments = selectedAppointments.filter(
+    (appointment) =>
+      !["cancelled", "canceled", "no-show"].includes(
+        appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-")
+      )
+  );
+
+  const totalPaidAmount = paymentEligibleAppointments.reduce(
+    (total, appointment) =>
+      appointment.payment_status?.trim().toLowerCase() === "paid"
+        ? total + (Number(appointment.amount) || 0)
+        : total,
+    0
+  );
+
+  const pendingPaymentAmount = paymentEligibleAppointments.reduce(
+    (total, appointment) =>
+      appointment.payment_status?.trim().toLowerCase() !== "paid"
+        ? total + (Number(appointment.amount) || 0)
+        : total,
+    0
+  );
+
+  const lastCustomerAppointment = selectedAppointments[0] || null;
 
   const upcomingAppointments = selectedAppointments.filter((appointment) => {
     const date = new Date(appointment.appointment_date);
@@ -782,6 +828,15 @@ export default function CustomerManagementPage() {
             detail="All registered customers"
             icon={<Users size={18} />}
             iconClass="bg-blue-50 text-blue-600"
+            onClick={() => {
+              const sorted = [...customers].sort(
+                (a, b) => b.created_at.localeCompare(a.created_at)
+              );
+              setCustomerDirectoryMode("all");
+              setDirectorySearch("");
+              setSelected(sorted[0] || null);
+              setCustomerDirectoryOpen(true);
+            }}
           />
           <SummaryCard
             label="New Customers"
@@ -789,6 +844,15 @@ export default function CustomerManagementPage() {
             detail="Joined in the last 30 days"
             icon={<UserPlus size={18} />}
             iconClass="bg-emerald-50 text-emerald-600"
+            onClick={() => {
+              const recent = customers
+                .filter((customer) => new Date(customer.created_at) >= recentBoundary)
+                .sort((a, b) => b.created_at.localeCompare(a.created_at));
+              setCustomerDirectoryMode("new");
+              setDirectorySearch("");
+              setSelected(recent[0] || null);
+              setCustomerDirectoryOpen(true);
+            }}
           />
           <SummaryCard
             label="Upcoming Appointments"
@@ -1623,6 +1687,323 @@ export default function CustomerManagementPage() {
         </div>
       )}
 
+      {customerDirectoryOpen && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 p-2 backdrop-blur-sm sm:p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setCustomerDirectoryOpen(false);
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="customer-directory-title"
+            className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+          >
+            <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+              <div>
+                <h2 id="customer-directory-title" className="text-lg font-bold text-slate-900 sm:text-xl">
+                  Customer Directory
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  {customerDirectoryMode === "new"
+                    ? "Customers joined in the last 30 days"
+                    : "All registered customers"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCustomerDirectoryOpen(false)}
+                aria-label="Close customer directory"
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+              >
+                <X size={20} />
+              </button>
+            </header>
+
+            <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[320px_minmax(0,1fr)] lg:overflow-hidden">
+              <aside className="flex min-h-[260px] flex-col border-b border-slate-100 lg:min-h-0 lg:border-b-0 lg:border-r">
+                <div className="space-y-3 p-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const firstCustomer = [...customers].sort(
+                          (a, b) => b.created_at.localeCompare(a.created_at)
+                        )[0] || null;
+                        setCustomerDirectoryMode("all");
+                        setDirectorySearch("");
+                        setSelected(firstCustomer);
+                      }}
+                      className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                        customerDirectoryMode === "all"
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      All Customers
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const firstCustomer = customers
+                          .filter((customer) => new Date(customer.created_at) >= recentBoundary)
+                          .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] || null;
+                        setCustomerDirectoryMode("new");
+                        setDirectorySearch("");
+                        setSelected(firstCustomer);
+                      }}
+                      className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                        customerDirectoryMode === "new"
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      New Customers
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={directorySearch}
+                      onChange={(event) => {
+                        const term = event.target.value.trim().toLowerCase();
+                        setDirectorySearch(event.target.value);
+
+                        const matches = customers
+                          .filter((customer) => {
+                            const isNew = new Date(customer.created_at) >= recentBoundary;
+                            const matchesMode =
+                              customerDirectoryMode === "all" || isNew;
+                            const matchesSearch =
+                              !term ||
+                              (customer.name || "").toLowerCase().includes(term) ||
+                              customer.phone.toLowerCase().includes(term) ||
+                              (customer.email || "").toLowerCase().includes(term);
+
+                            return matchesMode && matchesSearch;
+                          })
+                          .sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+                        setSelected(matches[0] || null);
+                      }}
+                      placeholder="Search name, phone or email..."
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <p className="text-xs font-medium text-slate-500">
+                    {directoryCustomers.length} customers
+                  </p>
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
+                  {directoryCustomers.length === 0 ? (
+                    <div className="px-4 py-10 text-center">
+                      <Users size={26} className="mx-auto text-slate-300" />
+                      <p className="mt-3 text-sm font-semibold text-slate-600">
+                        No customers found
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Try another search.
+                      </p>
+                    </div>
+                  ) : (
+                    directoryCustomers.map((customer) => (
+                      <button
+                        key={customer.id}
+                        type="button"
+                        onClick={() => setSelected(customer)}
+                        className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${
+                          selected?.id === customer.id
+                            ? "bg-blue-50 ring-1 ring-blue-200"
+                            : "hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                          {initials(customer.name)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-800">
+                            {customer.name || "Unnamed customer"}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-slate-500">
+                            {customer.phone}
+                          </p>
+                        </div>
+                        <ChevronRight size={16} className="shrink-0 text-slate-400" />
+                      </button>
+                    ))
+                  )}
+                </div>
+              </aside>
+
+              <div className="min-h-0 overflow-y-auto bg-slate-50/70 p-4 sm:p-6">
+                {!selected ? (
+                  <div className="flex min-h-[300px] flex-col items-center justify-center text-center">
+                    <Users size={34} className="text-slate-300" />
+                    <p className="mt-3 text-sm font-semibold text-slate-600">
+                      Select a customer
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Choose a customer from the list to view their profile.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                      <div className="flex flex-wrap items-center gap-4">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-lg font-bold text-blue-700">
+                          {initials(selected.name)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="break-words text-lg font-bold text-slate-900">
+                            {selected.name || "Unnamed customer"}
+                          </h3>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Customer since {formatDate(selected.created_at)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                        <InfoItem
+                          icon={<Phone size={16} />}
+                          label="Phone"
+                          value={selected.phone || "—"}
+                        />
+                        <InfoItem
+                          icon={<Mail size={16} />}
+                          label="Email"
+                          value={selected.email || "Not provided"}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+                        <p className="text-xs text-slate-500">Total Appointments</p>
+                        <p className="mt-2 text-2xl font-bold text-slate-900">
+                          {selectedAppointments.length}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+                        <p className="text-xs text-slate-500">Completed</p>
+                        <p className="mt-2 text-2xl font-bold text-emerald-600">
+                          {completedAppointmentsCount}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+                        <p className="text-xs text-slate-500">Total Paid</p>
+                        <p className="mt-2 break-words text-lg font-bold text-emerald-700">
+                          {formatCurrency(totalPaidAmount, defaultCurrency)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+                        <p className="text-xs text-slate-500">Pending Payment</p>
+                        <p className="mt-2 break-words text-lg font-bold text-amber-600">
+                          {formatCurrency(pendingPaymentAmount, defaultCurrency)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Last Appointment
+                      </p>
+                      {lastCustomerAppointment ? (
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-800">
+                              {formatDate(lastCustomerAppointment.appointment_date)}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {lastCustomerAppointment.appointment_time || "Time unavailable"}
+                            </p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(lastCustomerAppointment.status)}`}>
+                            {lastCustomerAppointment.status.replace(/[-_]/g, " ")}
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-sm text-slate-400">No appointment history</p>
+                      )}
+                    </div>
+
+                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                      <div className="border-b border-slate-100 px-4 py-4">
+                        <h3 className="font-semibold text-slate-900">
+                          Appointment History
+                        </h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          All appointments associated with this customer
+                        </p>
+                      </div>
+
+                      {selectedAppointments.length === 0 ? (
+                        <div className="px-4 py-10 text-center">
+                          <CalendarDays size={26} className="mx-auto text-slate-300" />
+                          <p className="mt-2 text-sm font-medium text-slate-600">
+                            No appointments found
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-slate-100">
+                          {selectedAppointments.map((appointment) => {
+                            const doctor = doctors.find(
+                              (item) => item.id === appointment.doctor_id
+                            );
+                            const isPaid =
+                              appointment.payment_status?.trim().toLowerCase() === "paid";
+
+                            return (
+                              <div
+                                key={appointment.id}
+                                className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-slate-800">
+                                    {formatDate(appointment.appointment_date)}
+                                    <span className="ml-2 text-xs font-normal text-slate-500">
+                                      {appointment.appointment_time}
+                                    </span>
+                                  </p>
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    {doctor?.doctor_name || "Doctor not available"}
+                                  </p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusClass(appointment.status)}`}>
+                                    {appointment.status.replace(/[-_]/g, " ")}
+                                  </span>
+                                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                    isPaid
+                                      ? "bg-emerald-50 text-emerald-700"
+                                      : "bg-amber-50 text-amber-700"
+                                  }`}>
+                                    {isPaid ? "Paid" : "Payment Pending"}
+                                  </span>
+                                  <span className="text-sm font-bold text-slate-800">
+                                    {formatCurrency(Number(appointment.amount) || 0, defaultCurrency)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
       <ContactForm
         open={formOpen}
         onOpenChange={setFormOpen}
@@ -1638,30 +2019,44 @@ function SummaryCard({
   detail,
   icon,
   iconClass,
+  onClick,
 }: {
   label: string;
   value: number;
   detail: string;
   icon: React.ReactNode;
   iconClass: string;
+  onClick?: () => void;
 }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
-          <p className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            {value.toLocaleString("en-IN")}
-          </p>
-          <p className="mt-1 text-[11px] text-slate-400 sm:text-xs">{detail}</p>
-        </div>
-        <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 ${iconClass}`}
-        >
-          {icon}
-        </div>
+  const content = (
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
+        <p className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+          {value.toLocaleString("en-IN")}
+        </p>
+        <p className="mt-1 text-[11px] text-slate-400 sm:text-xs">{detail}</p>
+      </div>
+      <div
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 ${iconClass}`}
+      >
+        {icon}
       </div>
     </div>
+  );
+
+  const className = "w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm sm:p-5";
+
+  return onClick ? (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${className} cursor-pointer transition hover:border-blue-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+    >
+      {content}
+    </button>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }
 
