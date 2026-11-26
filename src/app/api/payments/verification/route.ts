@@ -196,7 +196,7 @@ export async function POST(request: Request) {
 
     const { error: appointmentError } = await db
       .from("appointments")
-      .update({ payment_status: newStatus })
+      .update({ payment_status: newStatus, ...(action === "approve" ? { paid_at: now } : {}) })
       .eq("id", payment.appointment_id)
       .eq("clinic_id", ownership.clinic.id);
 

@@ -103,7 +103,7 @@ export async function POST(request: Request) {
 
       const { data: updatedPayments, error: paymentUpdateError } = await supabase
         .from("appointments")
-        .update({ payment_status: "paid" })
+        .update({ payment_status: "paid", paid_at: new Date().toISOString() })
         .eq("clinic_id", clinic.id)
         .in("id", ids)
         .select("id");

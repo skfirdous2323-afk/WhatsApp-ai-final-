@@ -69,6 +69,7 @@ type Appointment = {
   amount?: number | null;
   payment_status?: string | null;
   payment_method?: string | null;
+  paid_at?: string | null;
 };
 
 const formatDate = (value?: string | null) => {
@@ -207,7 +208,7 @@ export default function CustomerManagementPage() {
         const { data, error: appointmentError } = await supabase
           .from("appointments")
           .select(
-            "id, contact_id, patient_name, appointment_date, appointment_time, status, doctor_id, service_id, amount, payment_status, payment_method, rescheduled_at"
+            "id, contact_id, patient_name, appointment_date, appointment_time, status, doctor_id, service_id, amount, payment_status, payment_method, rescheduled_at, paid_at"
           )
           .eq("clinic_id", clinic.id)
           .order("appointment_date", { ascending: false });
@@ -429,6 +430,19 @@ export default function CustomerManagementPage() {
     !["cancelled", "no-show"].includes(
       appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-")
     );
+
+  const monthlyReceivedCollection = appointments
+    .filter((appointment) => {
+      if (
+        appointment.payment_status?.trim().toLowerCase() !== "paid" ||
+        !appointment.paid_at ||
+        !activeAppointment(appointment)
+      ) return false;
+
+      const receivedAt = new Date(appointment.paid_at);
+      return receivedAt >= monthStart && receivedAt < nextMonthStart;
+    })
+    .reduce((total, appointment) => total + (Number(appointment.amount) || 0), 0);
 
   const isConfirmedAppointment = (appointment: Appointment) =>
     appointment.status.trim().toLowerCase().replace(/[_\s]+/g, "-") === "confirmed";
@@ -841,21 +855,12 @@ export default function CustomerManagementPage() {
             }}
           />
           <SummaryCard
-            label="New Customers"
+            label="This Month Total Collection"
             featured
-            value={newCustomers}
-            detail="Joined in the last 30 days"
-            icon={<UserPlus size={18} />}
+            value={formatCurrency(monthlyReceivedCollection, defaultCurrency)}
+            detail="Payments actually received this month"
+            icon={<CreditCard size={18} />}
             iconClass="bg-emerald-50 text-emerald-600"
-            onClick={() => {
-              const recent = customers
-                .filter((customer) => new Date(customer.created_at) >= recentBoundary)
-                .sort((a, b) => b.created_at.localeCompare(a.created_at));
-              setCustomerDirectoryMode("new");
-              setDirectorySearch("");
-              setSelected(recent[0] || null);
-              setCustomerDirectoryOpen(true);
-            }}
           />
           <SummaryCard
             label="Upcoming Appointments"
@@ -2067,14 +2072,14 @@ function SummaryCard({
   featured = false,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   detail: string;
   icon: React.ReactNode;
   iconClass: string;
   onClick?: () => void;
   featured?: boolean;
 }) {
-  const isNewCustomer = label === "New Customers";
+  const isNewCustomer = label === "This Month Total Collection";
 
   const content = featured ? (
     <div className="relative overflow-hidden">
@@ -2089,7 +2094,7 @@ function SummaryCard({
             {label}
           </p>
           <p className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-            {value.toLocaleString("en-IN")}
+            {typeof value === "number" ? value.toLocaleString("en-IN") : value}
           </p>
           <p className="mt-1.5 text-xs text-slate-500 sm:text-sm">{detail}</p>
         </div>
@@ -2110,8 +2115,8 @@ function SummaryCard({
             : "border-blue-100 text-blue-700"
         }`}
       >
-        <span>Customer directory</span>
-        <span>View list <span aria-hidden="true">→</span></span>
+        <span>Payments received</span>
+        <span>This month</span>
       </div>
     </div>
   ) : (
@@ -2119,7 +2124,7 @@ function SummaryCard({
       <div className="min-w-0">
         <p className="text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
         <p className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-          {value.toLocaleString("en-IN")}
+          {typeof value === "number" ? value.toLocaleString("en-IN") : value}
         </p>
         <p className="mt-1 text-[11px] text-slate-400 sm:text-xs">{detail}</p>
       </div>
