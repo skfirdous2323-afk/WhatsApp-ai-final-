@@ -824,6 +824,7 @@ export default function CustomerManagementPage() {
         <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           <SummaryCard
             label="Total Customers"
+            featured
             value={customers.length}
             detail="All registered customers"
             icon={<Users size={18} />}
@@ -840,6 +841,7 @@ export default function CustomerManagementPage() {
           />
           <SummaryCard
             label="New Customers"
+            featured
             value={newCustomers}
             detail="Joined in the last 30 days"
             icon={<UserPlus size={18} />}
@@ -2020,6 +2022,7 @@ function SummaryCard({
   icon,
   iconClass,
   onClick,
+  featured = false,
 }: {
   label: string;
   value: number;
@@ -2027,8 +2030,49 @@ function SummaryCard({
   icon: React.ReactNode;
   iconClass: string;
   onClick?: () => void;
+  featured?: boolean;
 }) {
-  const content = (
+  const isNewCustomer = label === "New Customers";
+
+  const content = featured ? (
+    <div className="relative overflow-hidden">
+      <div
+        className={`pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full ${
+          isNewCustomer ? "bg-emerald-100/70" : "bg-blue-100/70"
+        }`}
+      />
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+            {label}
+          </p>
+          <p className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+            {value.toLocaleString("en-IN")}
+          </p>
+          <p className="mt-1.5 text-xs text-slate-500 sm:text-sm">{detail}</p>
+        </div>
+        <div
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-sm ring-1 ring-white/80 sm:h-14 sm:w-14 ${
+            isNewCustomer
+              ? "bg-emerald-100 text-emerald-700"
+              : "bg-blue-100 text-blue-700"
+          }`}
+        >
+          {icon}
+        </div>
+      </div>
+      <div
+        className={`relative mt-5 flex items-center justify-between border-t pt-3 text-xs font-semibold ${
+          isNewCustomer
+            ? "border-emerald-100 text-emerald-700"
+            : "border-blue-100 text-blue-700"
+        }`}
+      >
+        <span>Customer directory</span>
+        <span>View list <span aria-hidden="true">→</span></span>
+      </div>
+    </div>
+  ) : (
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0">
         <p className="text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
@@ -2045,13 +2089,19 @@ function SummaryCard({
     </div>
   );
 
-  const className = "w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm sm:p-5";
+  const className = featured
+    ? `w-full rounded-2xl border bg-gradient-to-br p-4 text-left shadow-sm transition duration-200 sm:p-5 ${
+        isNewCustomer
+          ? "border-emerald-200/80 from-white to-emerald-50/70"
+          : "border-blue-200/80 from-white to-blue-50/70"
+      }`
+    : "w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm sm:p-5";
 
   return onClick ? (
     <button
       type="button"
       onClick={onClick}
-      className={`${className} cursor-pointer transition hover:border-blue-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+      className={`${className} cursor-pointer hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
     >
       {content}
     </button>
