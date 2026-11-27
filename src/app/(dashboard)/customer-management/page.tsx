@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/currency";
@@ -101,6 +102,7 @@ const statusClass = (status: string) => {
 };
 
 export default function CustomerManagementPage() {
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { accountId, defaultCurrency: authCurrency } = useAuth();
   const defaultCurrency =
@@ -861,6 +863,7 @@ export default function CustomerManagementPage() {
             detail="Payments actually received this month"
             icon={<CreditCard size={18} />}
             iconClass="bg-emerald-50 text-emerald-600"
+            onClick={() => router.push("/payments-received")}
           />
           <SummaryCard
             label="Upcoming Appointments"
