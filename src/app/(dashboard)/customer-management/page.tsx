@@ -229,7 +229,7 @@ export default function CustomerManagementPage() {
       setSelected((current) =>
         current
           ? loadedCustomers.find((item) => item.id === current.id) || null
-          : loadedCustomers[0] || null
+          : null
       );
     } catch (err) {
       console.error("Customer Management load error:", err);
@@ -253,8 +253,8 @@ export default function CustomerManagementPage() {
 
       const confirmed = window.confirm(
         ids.length === 1
-          ? "Delete this customer? This cannot be undone. Associated WhatsApp conversations and messages will also be permanently deleted."
-          : `Delete ${ids.length} selected customers? This cannot be undone. Associated WhatsApp conversations and messages will also be permanently deleted.`
+          ? "Permanently delete this customer, their appointments and payment records, and WhatsApp conversations/messages? This cannot be undone."
+          : `Permanently delete ${ids.length} selected customers, their appointments and payment records, and WhatsApp conversations/messages? This cannot be undone.`
       );
 
       if (!confirmed) return;
@@ -282,7 +282,7 @@ export default function CustomerManagementPage() {
 
         await loadData();
         setCustomerActionMessage(
-          `${result.deletedCount ?? ids.length} customer(s) deleted successfully.`
+          `${result.deletedCount ?? ids.length} customer(s) and ${result.deletedAppointmentsCount ?? 0} appointment(s) deleted successfully.`
         );
       } catch (err) {
         setCustomerActionError(
@@ -847,12 +847,9 @@ export default function CustomerManagementPage() {
             icon={<Users size={18} />}
             iconClass="bg-blue-50 text-blue-600"
             onClick={() => {
-              const sorted = [...customers].sort(
-                (a, b) => b.created_at.localeCompare(a.created_at)
-              );
               setCustomerDirectoryMode("all");
               setDirectorySearch("");
-              setSelected(sorted[0] || null);
+              setSelected(null);
               setCustomerDirectoryOpen(true);
             }}
           />
@@ -1749,12 +1746,8 @@ export default function CustomerManagementPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        const firstCustomer = [...customers].sort(
-                          (a, b) => b.created_at.localeCompare(a.created_at)
-                        )[0] || null;
                         setCustomerDirectoryMode("all");
                         setDirectorySearch("");
-                        setSelected(firstCustomer);
                       }}
                       className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
                         customerDirectoryMode === "all"
@@ -1770,12 +1763,8 @@ export default function CustomerManagementPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        const firstCustomer = customers
-                          .filter((customer) => new Date(customer.created_at) >= recentBoundary)
-                          .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] || null;
                         setCustomerDirectoryMode("new");
                         setDirectorySearch("");
-                        setSelected(firstCustomer);
                       }}
                       className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
                         customerDirectoryMode === "new"
@@ -1796,25 +1785,7 @@ export default function CustomerManagementPage() {
                       type="search"
                       value={directorySearch}
                       onChange={(event) => {
-                        const term = event.target.value.trim().toLowerCase();
                         setDirectorySearch(event.target.value);
-
-                        const matches = customers
-                          .filter((customer) => {
-                            const isNew = new Date(customer.created_at) >= recentBoundary;
-                            const matchesMode =
-                              customerDirectoryMode === "all" || isNew;
-                            const matchesSearch =
-                              !term ||
-                              (customer.name || "").toLowerCase().includes(term) ||
-                              customer.phone.toLowerCase().includes(term) ||
-                              (customer.email || "").toLowerCase().includes(term);
-
-                            return matchesMode && matchesSearch;
-                          })
-                          .sort((a, b) => b.created_at.localeCompare(a.created_at));
-
-                        setSelected(matches[0] || null);
                       }}
                       placeholder="Search name, phone or email..."
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-10 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
@@ -1824,8 +1795,6 @@ export default function CustomerManagementPage() {
                         type="button"
                         onClick={() => {
                           setDirectorySearch("");
-                          const first = directoryCustomers[0] || null;
-                          setSelected(first);
                         }}
                         aria-label="Clear search"
                         className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
@@ -2047,6 +2016,18 @@ export default function CustomerManagementPage() {
                           })}
                         </div>
                       )}
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => void handleCustomerDelete([selected.id])}
+                        disabled={customerActionLoading}
+                        className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Trash2 size={16} />
+                        {customerActionLoading ? "Deleting..." : "Delete Customer"}
+                      </button>
                     </div>
                   </div>
                 )}

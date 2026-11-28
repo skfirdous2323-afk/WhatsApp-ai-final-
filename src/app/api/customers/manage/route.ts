@@ -38,78 +38,33 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("account_id, account_role")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const { data, error } = await supabase.rpc(
+      "delete_customers_with_appointments",
+      { p_contact_ids: ids as string[] }
+    );
 
-    if (profileError || !profile?.account_id) {
+    if (error) {
+      console.error("Customer deletion RPC failed:", error);
+
+      const status =
+        error.code === "42501"
+          ? 403
+          : error.code === "P0002"
+            ? 404
+            : error.code === "22023"
+              ? 400
+              : 409;
+
       return NextResponse.json(
-        { error: "Your workspace could not be verified." },
-        { status: 403 }
+        { error: error.message || "Customers could not be deleted." },
+        { status }
       );
     }
 
-    if (!["owner", "admin", "agent"].includes(profile.account_role)) {
-      return NextResponse.json(
-        { error: "You do not have permission to delete customers." },
-        { status: 403 }
-      );
-    }
-
-    const { data: ownedCustomers, error: lookupError } = await supabase
-      .from("contacts")
-      .select("id")
-      .eq("account_id", profile.account_id)
-      .in("id", ids);
-
-    if (lookupError) {
-      console.error("Customer ownership check failed:", lookupError);
-      return NextResponse.json(
-        { error: "Could not verify the selected customers." },
-        { status: 500 }
-      );
-    }
-
-    if (!ownedCustomers || ownedCustomers.length !== ids.length) {
-      return NextResponse.json(
-        { error: "Some customers were not found in your workspace." },
-        { status: 404 }
-      );
-    }
-
-    const { data: deletedCustomers, error: deleteError } = await supabase
-      .from("contacts")
-      .delete()
-      .eq("account_id", profile.account_id)
-      .in("id", ids)
-      .select("id");
-
-    if (deleteError) {
-      console.error("Customer deletion failed:", deleteError);
-      return NextResponse.json(
-        {
-          error:
-            "Customers could not be deleted. Their linked records may need a database update first.",
-        },
-        { status: 409 }
-      );
-    }
-
-    if (!deletedCustomers || deletedCustomers.length !== ids.length) {
-      return NextResponse.json(
-        { error: "Not all selected customers could be deleted." },
-        { status: 409 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      deletedCount: deletedCustomers.length,
-    });
+    return NextResponse.json(data);
   } catch (error) {
     console.error("Customer manage API error:", error);
+
     return NextResponse.json(
       { error: "An unexpected error occurred." },
       { status: 500 }
